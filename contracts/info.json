@@ -1,0 +1,9 @@
+{
+  "address": {
+    "implementation": "0x8e605e4f30f1bA3EDf15c7F1fa3B5d9f404579ae",
+    "allocator": "0x0CAE2ceD373970211b5f3c7cAbc42b38e5040711",
+    "beacon": "0x8BC74e860586e9B9d02d920af7948F541EbA51b0"
+  },
+  "hyperliquid_testnet": "https://rpc.hyperliquid-testnet.xyz/evm",
+  "hyperliquid_mainnet": "https://rpc.hyperliquid.xyz/evm"
+}

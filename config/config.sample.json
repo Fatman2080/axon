@@ -1,0 +1,27 @@
+{
+  "appBaseUrl": "http://localhost:9333",
+  "server": {
+    "port": 9333,
+    "tokenSecret": "openfi-dev-secret"
+  },
+  "storage": {
+    "dbPath": "../data/openfi.db"
+  },
+  "agentPool": {
+    "fixedKey": "01234567890123456789012345678901"
+  },
+  "hyperliquid": {
+    "baseURL": "https://api.hyperliquid.xyz"
+  },
+  "frontend": {
+    "mode": "dev",
+    "release": {
+      "wwwDistDir": "../../frontend-www/dist",
+      "adminDistDir": "../../frontend-admin/dist"
+    },
+    "dev": {
+      "wwwDevServer": "http://127.0.0.1:9334",
+      "adminDevServer": "http://127.0.0.1:9335"
+    }
+  }
+}

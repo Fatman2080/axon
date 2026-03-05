@@ -1,0 +1,24 @@
+# Build outputs
+dist/
+local_run/
+openfi-server-bin
+
+# Config files (keep only sample)
+config/config.json
+config/config.*.json
+!config/config.sample.json
+
+# Data
+data/
+
+# Dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
