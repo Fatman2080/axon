@@ -2,8 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { fetchStrategies } from '../store/slices/strategySlice';
 import { Link } from 'react-router-dom';
-import { Search, TrendingUp } from 'lucide-react';
+import { Search, TrendingUp, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+
+const tierColor = (category: string) => {
+  switch (category?.toLowerCase()) {
+    case 'partner': return { bg: 'rgba(255,184,0,0.08)', text: 'var(--tier-partner)', border: 'rgba(255,184,0,0.2)' };
+    case 'manager': return { bg: 'rgba(138,43,226,0.08)', text: 'var(--tier-manager)', border: 'rgba(138,43,226,0.2)' };
+    case 'analyst': return { bg: 'rgba(42,127,255,0.1)', text: 'var(--tier-analyst)', border: 'rgba(42,127,255,0.2)' };
+    default: return { bg: 'rgba(142,146,155,0.1)', text: 'var(--tier-intern)', border: 'rgba(142,146,155,0.2)' };
+  }
+};
 
 const Strategies = () => {
   const dispatch = useAppDispatch();
@@ -24,81 +33,154 @@ const Strategies = () => {
   });
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center border-b border-zinc-100 pb-6">
+    <div className="space-y-6 animate-fade-in-up">
+      {/* Header */}
+      <div
+        className="flex flex-col justify-between gap-4 md:flex-row md:items-center pb-6"
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">{t('strategies.title')}</h1>
-          <p className="mt-2 text-zinc-500">{t('strategies.subtitle')}</p>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            {t('strategies.title')}
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            {t('strategies.subtitle')}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-4">
+
+        <div className="flex flex-wrap gap-3 items-center">
+          {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--text-tertiary)' }} />
             <input
               type="text"
               placeholder={t('strategies.searchPlaceholder')}
-              className="h-10 rounded-md border border-zinc-200 pl-10 pr-4 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black transition-colors"
+              className="h-9 pl-9 pr-4 text-sm font-mono"
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                color: 'var(--text-primary)',
+                width: '200px',
+              }}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--neon-green)'}
+              onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
             />
           </div>
         </div>
       </div>
 
+      {/* Cards */}
       {loading ? (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-80 animate-pulse rounded-xl bg-zinc-100"></div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div
+              key={i}
+              className="h-60 rounded animate-pulse"
+              style={{ background: 'var(--bg-card)' }}
+            />
           ))}
         </div>
+      ) : filteredStrategies.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <TrendingUp size={40} className="mb-4" style={{ color: 'var(--text-tertiary)' }} />
+          <p className="font-mono text-sm" style={{ color: 'var(--text-secondary)' }}>
+            // NO_AGENTS_FOUND
+          </p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredStrategies.map((strategy) => (
-            <div key={strategy.id} className="group flex flex-col justify-between rounded-xl border border-zinc-200 bg-white p-6 transition hover:border-black">
-              <div>
-                <div className="mb-6 flex items-start justify-between">
-                  <div>
-                    <div className="mb-3 flex items-center gap-2">
-                      <span className="inline-block border border-zinc-200 rounded-full bg-zinc-50 px-2.5 py-0.5 text-xs font-medium text-zinc-600 uppercase tracking-wide">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredStrategies.map((strategy) => {
+            const tier = tierColor(strategy.category);
+            const pnlPositive = strategy.pnlContribution >= 0;
+
+            return (
+              <div
+                key={strategy.id}
+                className="group flex flex-col justify-between rounded p-5 transition-all duration-200"
+                style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-hover)';
+                  (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-hover)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
+                  (e.currentTarget as HTMLElement).style.background = 'var(--bg-card)';
+                }}
+              >
+                <div>
+                  <div className="mb-4 flex items-start justify-between">
+                    <div>
+                      <span
+                        className="inline-block text-[10px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded mb-2"
+                        style={{ background: tier.bg, color: tier.text, border: `1px solid ${tier.border}` }}
+                      >
                         {strategy.category}
                       </span>
+                      <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                        {strategy.name}
+                      </h3>
                     </div>
-                    <h3 className="text-lg font-bold text-zinc-900">{strategy.name}</h3>
                   </div>
-                </div>
 
-                <div className="mb-6 space-y-4">
-                  <div className="flex justify-between text-sm items-center">
-                    <span className="text-zinc-500">{t('strategies.card.apr')}</span>
-                    <span className={`font-mono font-bold ${strategy.pnlContribution >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                       {strategy.pnlContribution > 0 ? '+' : ''}{strategy.pnlContribution.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-3 mb-5">
+                    {/* PnL */}
                     <div className="flex justify-between text-sm items-center">
-                      <span className="text-zinc-500">{t('strategies.card.tvl')}</span>
-                      <span className="font-mono font-medium text-zinc-900">${strategy.currentTvl.toLocaleString()}</span>
+                      <span className="font-mono text-xs uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
+                        {t('strategies.card.apr')}
+                      </span>
+                      <span
+                        className="font-mono font-bold"
+                        style={{ color: pnlPositive ? 'var(--green)' : 'var(--red)' }}
+                      >
+                        {pnlPositive ? '+' : ''}{strategy.pnlContribution.toFixed(2)}
+                      </span>
                     </div>
-                    <div className="w-full rounded-full bg-zinc-100 h-1">
-                      <div
-                        className="h-1 rounded-full bg-black"
-                        style={{ width: `${strategy.maxTvl > 0 ? (strategy.currentTvl / strategy.maxTvl) * 100 : 0}%` }}
-                      ></div>
+
+                    {/* TVL + Bar */}
+                    <div>
+                      <div className="flex justify-between text-sm items-center mb-1.5">
+                        <span className="font-mono text-xs uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
+                          {t('strategies.card.tvl')}
+                        </span>
+                        <span className="font-mono text-sm" style={{ color: 'var(--text-primary)' }}>
+                          ${strategy.currentTvl.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="w-full h-0.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${strategy.maxTvl > 0 ? (strategy.currentTvl / strategy.maxTvl) * 100 : 0}%`,
+                            background: 'linear-gradient(90deg, var(--neon-green), var(--green))',
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="border-t border-zinc-100 pt-4">
                 <Link
                   to={`/strategies/${strategy.id}`}
-                  className="flex w-full items-center justify-center gap-2 rounded-md bg-white border border-zinc-200 py-2.5 text-sm font-medium text-zinc-900 transition hover:bg-zinc-50 hover:border-zinc-300"
+                  className="flex items-center justify-between text-sm font-mono font-bold transition-all group-hover:gap-3 pt-4"
+                  style={{
+                    color: 'var(--text-secondary)',
+                    borderTop: '1px solid var(--border)',
+                  }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--neon-green)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'}
                 >
-                  <TrendingUp size={16} />
                   {t('strategies.card.hire')}
+                  <ArrowRight size={14} />
                 </Link>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

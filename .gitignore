@@ -22,3 +22,7 @@ node_modules/
 # OS
 .DS_Store
 Thumbs.db
+
+# dev2
+视觉设计哲学.md
+ClawFi.md

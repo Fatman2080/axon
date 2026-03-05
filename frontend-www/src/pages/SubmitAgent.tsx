@@ -39,7 +39,7 @@ const SubmitAgent = () => {
     }
   };
 
-  const command = `npx clwafi-cli deploy --key ${
+  const command = `npx clawfi-cli deploy --key ${
     currentUser?.agentPublicKey || currentUser?.walletAddress || 'YOUR_AGENT_PUBLIC_KEY'
   }`;
 
@@ -50,41 +50,82 @@ const SubmitAgent = () => {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-12 pb-20 pt-10">
+    <div className="mx-auto max-w-3xl space-y-10 pb-20 pt-10 animate-fade-in-up">
+      {/* Header */}
       <div className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-zinc-900 mb-4">{t('submitAgent.title')}</h1>
-        <p className="text-xl text-zinc-500 max-w-2xl mx-auto">{t('submitAgent.subtitle')}</p>
+        <div
+          className="inline-block text-xs font-mono uppercase tracking-widest px-3 py-1 rounded mb-4"
+          style={{
+            background: 'var(--neon-green-dim)',
+            color: 'var(--neon-green)',
+            border: '1px solid rgba(0,240,255,0.2)',
+          }}
+        >
+          Agent Deployment Portal
+        </div>
+        <h1 className="text-4xl font-extrabold tracking-tight mb-3" style={{ color: 'var(--text-primary)' }}>
+          {t('submitAgent.title')}
+        </h1>
+        <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>
+          {t('submitAgent.subtitle')}
+        </p>
       </div>
 
-      <div className="animate-fade-in space-y-8">
+      <div className="space-y-6">
+        {/* Access Gate */}
         {!hasAccess ? (
-          <div className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 text-zinc-400">
-              <Lock size={32} />
+          <div
+            className="relative overflow-hidden rounded p-8 text-center"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+          >
+            <div
+              className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)' }}
+            >
+              <Lock size={28} style={{ color: 'var(--text-tertiary)' }} />
             </div>
-            <h2 className="text-2xl font-bold text-zinc-900 mb-2">{t('submitAgent.access.denied')}</h2>
-            <p className="text-zinc-500 max-w-md mx-auto mb-8">{t('submitAgent.access.apply')}</p>
+            <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+              {t('submitAgent.access.denied')}
+            </h2>
+            <p className="max-w-md mx-auto mb-8 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              {t('submitAgent.access.apply')}
+            </p>
 
             <div className="mx-auto max-w-sm space-y-4">
               {!currentUser && (
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600">
-                  Login will continue with X OAuth automatically after you submit invite code.
+                <div
+                  className="rounded p-3 text-xs font-mono text-left"
+                  style={{
+                    background: 'rgba(0,240,255,0.04)',
+                    border: '1px solid rgba(0,240,255,0.15)',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  // Login will continue with X OAuth automatically after you submit invite code.
                 </div>
               )}
 
               <div className="relative">
-                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+                <Key className="absolute left-3 top-1/2 -translate-y-1/2" size={16} style={{ color: 'var(--text-tertiary)' }} />
                 <input
                   type="text"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
                   placeholder={t('submitAgent.access.placeholder')}
-                  className="w-full rounded-lg border border-zinc-200 py-3 pl-10 pr-4 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black"
+                  className="w-full py-3 pl-10 pr-4 text-sm font-mono"
+                  style={{
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '4px',
+                    color: 'var(--text-primary)',
+                  }}
+                  onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--neon-green)'}
+                  onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
                 />
               </div>
 
               {error && (
-                <div className="text-sm text-red-600 flex items-center justify-center gap-1">
+                <div className="text-sm flex items-center justify-center gap-1.5 font-mono" style={{ color: 'var(--red)' }}>
                   <AlertTriangle size={14} />
                   {error}
                 </div>
@@ -93,16 +134,17 @@ const SubmitAgent = () => {
               <button
                 onClick={handleVerify}
                 disabled={!inviteCode || isVerifying || loading}
-                className="w-full rounded-lg bg-black py-3 text-sm font-bold text-white transition hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 text-sm font-bold rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: 'var(--neon-green)', color: '#000', fontFamily: 'var(--font-mono)' }}
               >
                 {isVerifying ? (
                   <span className="flex items-center justify-center gap-2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
                     {t('submitAgent.access.check')}
                   </span>
                 ) : (
                   <span className="flex items-center justify-center gap-2">
-                    {!currentUser && <Twitter size={16} />}
+                    {!currentUser && <Twitter size={14} />}
                     {t('submitAgent.access.submit')}
                   </span>
                 )}
@@ -110,39 +152,71 @@ const SubmitAgent = () => {
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-8 text-center animate-fade-in">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-              <CheckCircle size={32} />
+          <div
+            className="rounded p-8 text-center"
+            style={{ background: 'var(--green-dim)', border: '1px solid rgba(0,255,102,0.2)' }}
+          >
+            <div
+              className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded"
+              style={{ background: 'rgba(0,255,102,0.15)' }}
+            >
+              <CheckCircle size={28} style={{ color: 'var(--green)' }} />
             </div>
-            <h2 className="text-2xl font-bold text-emerald-900 mb-2">{t('submitAgent.access.granted')}</h2>
-            <p className="text-emerald-700">Assigned Agent Public Key: {currentUser?.agentPublicKey}</p>
+            <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--green)' }}>
+              {t('submitAgent.access.granted')}
+            </h2>
+            <p className="font-mono text-xs" style={{ color: 'var(--text-secondary)' }}>
+              Assigned Agent Key:{' '}
+              <span style={{ color: 'var(--neon-green)' }}>{currentUser?.agentPublicKey}</span>
+            </p>
           </div>
         )}
 
-        <div className={`relative transition-all duration-500 ${!hasAccess ? 'opacity-40 grayscale blur-[2px] pointer-events-none select-none' : ''}`}>
-          <div className="rounded-xl bg-zinc-900 p-8 shadow-2xl shadow-zinc-200">
-            <label className="mb-4 block text-sm font-bold text-zinc-400 uppercase tracking-wider">{t('submitAgent.command.label')}</label>
-            <div className="group relative flex items-center rounded-lg bg-black p-4 font-mono text-emerald-400">
-              <Terminal size={20} className="mr-3 shrink-0 text-zinc-500" />
-              <span className="break-all">{command}</span>
+        {/* Command Terminal */}
+        <div
+          className={`relative transition-all duration-500 terminal-frame ${!hasAccess ? 'opacity-30 grayscale blur-[2px] pointer-events-none select-none' : ''}`}
+        >
+          <div
+            className="rounded p-7 shadow-2xl"
+            style={{ background: '#0D0E10', border: '1px solid rgba(255,255,255,0.06)' }}
+          >
+            <label
+              className="mb-4 block text-xs font-mono font-bold uppercase tracking-widest"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              {t('submitAgent.command.label')}
+            </label>
+            <div
+              className="group relative flex items-center rounded p-4 font-mono"
+              style={{ background: 'var(--bg-void)', border: '1px solid rgba(0,240,255,0.1)' }}
+            >
+              <Terminal size={16} className="mr-3 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+              <span className="break-all text-sm" style={{ color: 'var(--green)' }}>{command}</span>
               <button
                 onClick={handleCopy}
                 disabled={!hasAccess}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-zinc-800 p-2 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1.5 transition-all"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--neon-green)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
               >
-                {copied ? <CheckCircle size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                {copied ? <CheckCircle size={14} style={{ color: 'var(--green)' }} /> : <Copy size={14} style={{ color: 'var(--text-tertiary)' }} />}
               </button>
             </div>
-            <div className="mt-4 flex items-start gap-2 text-xs text-zinc-500">
-              <Shield size={14} className="mt-0.5" />
+            <div className="mt-4 flex items-start gap-2 text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>
+              <Shield size={12} className="mt-0.5 shrink-0" />
               This command will install the local CLI tool and authenticate your session.
             </div>
           </div>
+
           {!hasAccess && (
             <div className="absolute inset-0 z-10 flex items-center justify-center">
-              <div className="rounded-full bg-zinc-900/90 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm shadow-lg">
-                <Lock size={14} className="inline mr-2 mb-0.5" />
-                Locked
+              <div
+                className="rounded px-4 py-2 text-sm font-mono flex items-center gap-2"
+                style={{ background: 'rgba(10,10,12,0.9)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+              >
+                <Lock size={12} />
+                ACCESS_LOCKED
               </div>
             </div>
           )}

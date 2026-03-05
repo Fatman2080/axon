@@ -3,9 +3,9 @@ import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { fetchUser } from '../store/slices/userSlice';
 import { fetchStrategies } from '../store/slices/strategySlice';
 import {
-  User, Mail, Wallet, Calendar, Bell, Shield, Code, Clock,
-  CheckCircle, XCircle, Copy, ExternalLink, Settings, LogOut,
-  ChevronRight, Award, Briefcase, DollarSign
+  User, Wallet, Calendar,
+  CheckCircle, Copy, Code,
+  ChevronRight, Award, Briefcase, DollarSign, LogOut
 } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import { useLanguage } from '../context/LanguageContext';
@@ -21,23 +21,14 @@ import {
   Legend,
   Filler,
 } from 'chart.js';
+import { logoutUser } from '../store/slices/userSlice';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 const Profile = () => {
   const dispatch = useAppDispatch();
   const { currentUser: user, loading: userLoading } = useAppSelector((state) => state.user);
   const { items: strategies, loading: strategiesLoading } = useAppSelector((state) => state.strategies);
-  const [activeTab, setActiveTab] = useState('portfolio');
   const [agentHistory, setAgentHistory] = useState<number[]>([]);
   const [chartPeriod, setChartPeriod] = useState('1W');
   const { t } = useLanguage();
@@ -63,21 +54,37 @@ const Profile = () => {
   const loading = userLoading || strategiesLoading;
 
   if (loading) {
-    return <div className="h-96 w-full animate-pulse rounded-xl bg-zinc-100"></div>;
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-32 rounded animate-pulse" style={{ background: 'var(--bg-card)' }} />
+        ))}
+      </div>
+    );
   }
 
   if (!user) {
     return (
-      <div className="mx-auto max-w-md py-20 text-center">
-        <User size={48} className="mx-auto mb-4 text-zinc-300" />
-        <h2 className="text-xl font-bold text-zinc-900 mb-2">{t('profile.loginRequired') || 'Login Required'}</h2>
-        <p className="text-sm text-zinc-500 mb-6">{t('profile.loginDesc') || 'Please login with X to view your profile.'}</p>
+      <div className="mx-auto max-w-md py-24 text-center animate-fade-in-up">
+        <div
+          className="h-16 w-16 mx-auto mb-6 rounded flex items-center justify-center"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+        >
+          <User size={28} style={{ color: 'var(--text-tertiary)' }} />
+        </div>
+        <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+          {t('profile.loginRequired') || 'Login Required'}
+        </h2>
+        <p className="text-sm mb-8" style={{ color: 'var(--text-secondary)' }}>
+          {t('profile.loginDesc') || 'Please login with X to view your profile.'}
+        </p>
         <button
           onClick={() => {
             const nextPath = window.location.pathname;
             window.location.href = authApi.getXOAuthStartUrl(undefined, nextPath);
           }}
-          className="inline-flex items-center gap-2 rounded-full bg-black px-6 py-2.5 text-sm font-bold text-white transition hover:bg-zinc-800"
+          className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded"
+          style={{ background: 'var(--text-primary)', color: '#000' }}
         >
           {t('nav.connectWallet') || 'Login with X'}
         </button>
@@ -86,7 +93,6 @@ const Profile = () => {
   }
 
   const mySubmissions = strategies.filter(s => user.agentPublicKey ? s.id === user.agentPublicKey : false);
-
   const accountValue = user.totalInvestment ?? 0;
   const totalPnl = user.totalProfit ?? 0;
   const totalInvestment = accountValue;
@@ -94,24 +100,20 @@ const Profile = () => {
   const agentCount = user.agentPublicKey ? 1 : (user.agentCount ?? 0);
   const lpShares = user.lpShares ?? 0;
 
-  const chartSeries = agentHistory.length > 0
-    ? agentHistory
-    : [];
+  const chartSeries = agentHistory.length > 0 ? agentHistory : [];
 
   const chartData = {
     labels: Array.from({ length: chartSeries.length }, (_, i) => `Day ${i + 1}`),
-    datasets: [
-      {
-        label: t('profile.portfolio'),
-        data: chartSeries,
-        borderColor: '#10b981', // Emerald 500
-        backgroundColor: 'rgba(16, 185, 129, 0.05)',
-        tension: 0.4,
-        fill: true,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-      },
-    ],
+    datasets: [{
+      label: t('profile.portfolio'),
+      data: chartSeries,
+      borderColor: '#00FF66',
+      backgroundColor: 'rgba(0, 255, 102, 0.04)',
+      tension: 0.4,
+      fill: true,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+    }],
   };
 
   const chartOptions = {
@@ -122,137 +124,156 @@ const Profile = () => {
       tooltip: {
         mode: 'index' as const,
         intersect: false,
-        backgroundColor: '#18181b',
-        titleColor: '#fff',
-        bodyColor: '#fff',
-        borderColor: '#27272a',
+        backgroundColor: '#16181A',
+        titleColor: '#8E929B',
+        bodyColor: '#E8EAED',
+        borderColor: 'rgba(255,255,255,0.07)',
         borderWidth: 1,
       },
     },
     scales: {
       x: { display: false },
-      y: { 
-        display: false,
-        grid: { display: false } 
-      },
+      y: { display: false, grid: { display: false } },
     },
-    interaction: {
-      mode: 'nearest' as const,
-      axis: 'x' as const,
-      intersect: false,
-    },
+    interaction: { mode: 'nearest' as const, axis: 'x' as const, intersect: false },
   };
 
+  const summaryCards = [
+    { label: t('profile.totalEquity'), value: `$${totalInvestment.toLocaleString()}`, icon: Wallet, color: 'var(--neon-green)' },
+    { label: t('profile.unrealizedPnL'), value: `${totalProfit > 0 ? '+' : ''}$${totalProfit.toLocaleString()}`, icon: Award, color: totalProfit >= 0 ? 'var(--green)' : 'var(--red)' },
+    { label: t('profile.activeAgents'), value: `${agentCount}`, icon: Briefcase, color: 'var(--tier-manager)' },
+    { label: t('profile.vaultShares'), value: lpShares.toLocaleString(), icon: DollarSign, color: 'var(--tier-partner)' },
+  ];
+
   return (
-    <div className="mx-auto max-w-6xl pb-20">
-      {/* Header Profile Section */}
-      <div className="mb-8 flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-        <div className="flex items-center gap-6">
-          <div className="relative h-24 w-24 shrink-0">
-            <div className="h-full w-full overflow-hidden rounded-full border-2 border-zinc-100 bg-zinc-50">
+    <div className="mx-auto max-w-5xl pb-20 animate-fade-in-up">
+      {/* Profile Header */}
+      <div
+        className="mb-6 flex flex-col gap-5 md:flex-row md:items-start md:justify-between p-6 rounded"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        <div className="flex items-center gap-5">
+          <div className="relative shrink-0">
+            <div
+              className="h-16 w-16 overflow-hidden rounded"
+              style={{ border: '2px solid var(--border)' }}
+            >
               {user.avatar ? (
                 <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-zinc-300">
-                  <User size={40} />
+                <div className="flex h-full w-full items-center justify-center" style={{ background: 'var(--bg-input)' }}>
+                  <User size={28} style={{ color: 'var(--text-tertiary)' }} />
                 </div>
               )}
             </div>
-            <div className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-white">
-              <CheckCircle size={14} className="text-white" />
+            <div
+              className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full"
+              style={{ background: 'var(--green)' }}
+            >
+              <CheckCircle size={12} className="text-black" />
             </div>
           </div>
 
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{user.name}</h1>
-              <span className={`rounded-md px-2 py-0.5 text-xs font-bold uppercase tracking-wider ${
-                user.level === 'vip' ? 'bg-amber-100 text-amber-700' : 'bg-zinc-100 text-zinc-600'
-              }`}>
-                {user.level}
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{user.name}</h1>
+              <span
+                className="text-[10px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded"
+                style={{
+                  background: user.level === 'vip' ? 'rgba(255,184,0,0.1)' : 'rgba(142,146,155,0.1)',
+                  color: user.level === 'vip' ? 'var(--tier-partner)' : 'var(--tier-intern)',
+                  border: user.level === 'vip' ? '1px solid rgba(255,184,0,0.2)' : '1px solid rgba(142,146,155,0.2)',
+                }}
+              >
+                {user.level || 'INTERN'}
               </span>
             </div>
-            <div className="mt-2 flex items-center gap-4 text-sm text-zinc-500">
-              <div className="flex items-center gap-1.5 font-mono">
-                <Wallet size={14} />
+            <div className="flex items-center gap-4 text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>
+              <span className="flex items-center gap-1.5">
+                <Wallet size={12} />
                 {user.agentPublicKey
                   ? `${user.agentPublicKey.slice(0, 6)}...${user.agentPublicKey.slice(-4)}`
                   : (user.walletAddress || '-')}
-                <Copy size={12} className="cursor-pointer hover:text-black" />
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Calendar size={14} />
-                {t('profile.joined')} {(user as any).createdAt ? new Date((user as any).createdAt).toLocaleDateString() : user.joinedAt ? new Date(user.joinedAt).toLocaleDateString() : '-'}
-              </div>
+                <Copy size={10} className="cursor-pointer" style={{ color: 'var(--text-tertiary)' }} />
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Calendar size={12} />
+                {t('profile.joined')}{' '}
+                {(user as any).createdAt
+                  ? new Date((user as any).createdAt).toLocaleDateString()
+                  : user.joinedAt ? new Date(user.joinedAt).toLocaleDateString() : '-'}
+              </span>
             </div>
           </div>
         </div>
 
-        <button className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
-          <LogOut size={16} />
+        <button
+          onClick={() => dispatch(logoutUser())}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded self-start"
+          style={{
+            background: 'var(--red-dim)',
+            color: 'var(--red)',
+            border: '1px solid rgba(255,42,42,0.2)',
+          }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,42,42,0.15)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--red-dim)'}
+        >
+          <LogOut size={14} />
+          Logout
         </button>
       </div>
 
-      {/* Account Summary Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <div className="flex items-center gap-2 text-zinc-500 mb-2">
-            <Wallet size={16} />
-            <span className="text-xs font-medium">{t('profile.totalEquity')}</span>
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        {summaryCards.map(card => (
+          <div
+            key={card.label}
+            className="rounded p-4"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+          >
+            <div className="flex items-center gap-2 mb-2" style={{ color: 'var(--text-tertiary)' }}>
+              <card.icon size={14} />
+              <span className="text-xs font-mono uppercase tracking-widest">{card.label}</span>
+            </div>
+            <div className="text-xl font-bold font-mono" style={{ color: card.color }}>
+              {card.value}
+            </div>
           </div>
-          <div className="text-xl font-bold text-zinc-900 font-mono">
-            ${totalInvestment.toLocaleString()}
-          </div>
-        </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <div className="flex items-center gap-2 text-zinc-500 mb-2">
-            <Award size={16} />
-            <span className="text-xs font-medium">{t('profile.unrealizedPnL')}</span>
-          </div>
-          <div className={`text-xl font-bold font-mono ${totalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            {totalProfit > 0 ? '+' : ''}${totalProfit.toLocaleString()}
-          </div>
-        </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <div className="flex items-center gap-2 text-zinc-500 mb-2">
-            <Briefcase size={16} />
-            <span className="text-xs font-medium">{t('profile.activeAgents')}</span>
-          </div>
-          <div className="text-xl font-bold text-zinc-900 font-mono">{agentCount}</div>
-        </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <div className="flex items-center gap-2 text-zinc-500 mb-2">
-            <DollarSign size={16} />
-            <span className="text-xs font-medium">{t('profile.vaultShares')}</span>
-          </div>
-          <div className="text-xl font-bold text-zinc-900 font-mono">{lpShares.toLocaleString()}</div>
-        </div>
+        ))}
       </div>
 
-      {/* Portfolio Chart - Full Width */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 mb-8">
-        <div className="mb-6 flex items-end justify-between">
+      {/* Portfolio Chart */}
+      <div
+        className="rounded p-6 mb-6"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        <div className="mb-5 flex items-end justify-between">
           <div>
-            <div className="text-sm font-medium text-zinc-500 mb-1">{t('profile.portfolio')}</div>
-            <div className="text-3xl font-bold text-zinc-900 font-mono tracking-tight">
+            <div className="text-xs font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>
+              {t('profile.portfolio')}
+            </div>
+            <div className="text-3xl font-bold font-mono tracking-tight" style={{ color: 'var(--text-primary)' }}>
               ${(totalInvestment + totalProfit).toLocaleString()}
             </div>
             <div className="mt-1 flex items-center gap-2 text-sm">
-              <span className={`font-medium ${totalPnl >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              <span className="font-mono" style={{ color: totalPnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
                 {totalPnl > 0 ? '+' : ''}${totalPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 {totalInvestment > 0 && totalPnl !== 0 && ` (${((totalPnl / (totalInvestment - totalPnl)) * 100).toFixed(1)}%)`}
               </span>
             </div>
           </div>
           {chartSeries.length > 0 && (
-            <div className="flex gap-2">
+            <div className="flex gap-1">
               {['1D', '1W', '1M', 'ALL'].map(p => (
                 <button
                   key={p}
                   onClick={() => setChartPeriod(p)}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    chartPeriod === p ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'
-                  }`}
+                  className="px-3 py-1 text-xs font-mono rounded transition-all"
+                  style={{
+                    background: chartPeriod === p ? 'rgba(0,255,102,0.1)' : 'transparent',
+                    color: chartPeriod === p ? 'var(--green)' : 'var(--text-tertiary)',
+                    border: chartPeriod === p ? '1px solid rgba(0,255,102,0.2)' : '1px solid var(--border)',
+                  }}
                 >
                   {p}
                 </button>
@@ -260,67 +281,88 @@ const Profile = () => {
             </div>
           )}
         </div>
+
         {chartSeries.length > 0 ? (
-          <div className="h-[280px] w-full">
+          <div className="h-[240px] w-full">
             <Line data={chartData} options={chartOptions} />
           </div>
         ) : (
-          <div className="h-[280px] w-full flex items-center justify-center text-zinc-400 text-sm">
-            {t('profile.noChartData') || 'No performance data available yet'}
+          <div className="h-[240px] w-full flex items-center justify-center text-sm font-mono" style={{ color: 'var(--text-tertiary)' }}>
+            // NO_HISTORY — agent not yet connected
           </div>
         )}
       </div>
 
-      {/* Submissions List - Full Width */}
+      {/* Strategy Submissions */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-zinc-900">{t('profile.myStrategies')}</h2>
-          <button className="text-sm font-medium text-zinc-500 hover:text-black">{t('profile.viewAll')}</button>
+          <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>{t('profile.myStrategies')}</h2>
+          <button className="text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>{t('profile.viewAll')}</button>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           {mySubmissions.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-              <Briefcase className="mx-auto mb-3 text-zinc-400" size={32} />
-              <p className="text-sm font-medium text-zinc-900">{t('profile.noStrategies')}</p>
-              <p className="text-xs text-zinc-500 mt-1">{t('profile.startBuilding')}</p>
+            <div
+              className="rounded p-8 text-center"
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px dashed rgba(255,255,255,0.1)',
+              }}
+            >
+              <Briefcase className="mx-auto mb-3" size={28} style={{ color: 'var(--text-tertiary)' }} />
+              <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>{t('profile.noStrategies')}</p>
+              <p className="text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>{t('profile.startBuilding')}</p>
             </div>
           ) : (
             mySubmissions.map((strategy) => (
-              <div key={strategy.id} className="group flex items-center justify-between rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-black">
+              <div
+                key={strategy.id}
+                className="group flex items-center justify-between rounded p-4 transition-all"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-hover)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
+              >
                 <div className="flex items-center gap-4">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                    strategy.status === 'active' ? 'bg-emerald-50 text-emerald-600' :
-                    strategy.status === 'pending' ? 'bg-amber-50 text-amber-600' :
-                    'bg-zinc-100 text-zinc-500'
-                  }`}>
-                    <Code size={20} />
+                  <div
+                    className="flex h-9 w-9 items-center justify-center rounded"
+                    style={{
+                      background: strategy.status === 'active' ? 'var(--green-dim)' :
+                        strategy.status === 'pending' ? 'rgba(255,184,0,0.08)' : 'rgba(255,255,255,0.04)',
+                      color: strategy.status === 'active' ? 'var(--green)' :
+                        strategy.status === 'pending' ? 'var(--tier-partner)' : 'var(--text-tertiary)',
+                    }}
+                  >
+                    <Code size={16} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-zinc-900">{strategy.name}</h3>
-                      <span className={`rounded-sm px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                        strategy.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
-                        strategy.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                        'bg-zinc-100 text-zinc-600'
-                      }`}>
+                      <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{strategy.name}</h3>
+                      <span
+                        className="text-[9px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
+                        style={{
+                          background: strategy.status === 'active' ? 'var(--green-dim)' :
+                            strategy.status === 'pending' ? 'rgba(255,184,0,0.08)' : 'rgba(255,255,255,0.04)',
+                          color: strategy.status === 'active' ? 'var(--green)' :
+                            strategy.status === 'pending' ? 'var(--tier-partner)' : 'var(--text-tertiary)',
+                        }}
+                      >
                         {strategy.status}
                       </span>
                     </div>
-                    <div className="text-xs text-zinc-500 font-mono mt-0.5">
+                    <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
                       {strategy.category.toUpperCase()}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-5">
                   <div className="hidden text-right sm:block">
-                    <div className="text-xs text-zinc-500">{t('profile.sharpe')}</div>
-                    <div className="font-mono font-medium text-zinc-900">
+                    <div className="text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>{t('profile.sharpe')}</div>
+                    <div className="font-mono font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
                       {strategy.backtestMetrics?.sharpeRatio.toFixed(2) ?? '-'}
                     </div>
                   </div>
-                  <ChevronRight size={16} className="text-zinc-300 group-hover:text-black transition-colors" />
+                  <ChevronRight size={14} style={{ color: 'var(--text-tertiary)' }} className="group-hover:text-white transition-colors" />
                 </div>
               </div>
             ))

@@ -8,7 +8,7 @@
     "dbPath": "../data/openfi.db"
   },
   "agentPool": {
-    "fixedKey": "01234567890123456789012345678901"
+    "fixedKey": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   },
   "hyperliquid": {
     "baseURL": "https://api.hyperliquid.xyz"

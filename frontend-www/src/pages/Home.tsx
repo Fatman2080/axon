@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { fetchStrategies } from '../store/slices/strategySlice';
 import { Link } from 'react-router-dom';
-import { ArrowRight, TrendingUp, Coins, Shield, Database, Zap, BarChart3, Lock } from 'lucide-react';
-import { VaultStats, VaultOverview, DailySlotsResponse } from '../types';
+import { ArrowRight, Shield, Lock, BarChart3, Database, Eye, Award } from 'lucide-react';
+import { VaultOverview, DailySlotsResponse } from "../types";
 import { useLanguage } from '../context/LanguageContext';
 import { marketApi } from '../services/api';
 
@@ -16,12 +16,35 @@ const defaultStats: VaultOverview = {
   positions: [],
   recentFills: [],
 };
+const StatCard = ({ label, value, accent }: { label: string; value: string; accent?: string }) => (
+  <div
+    className="p-5 rounded cyber-card tracking-tight"
+    style={{
+      background: 'var(--bg-card)',
+    }}
+  >
+    <div className="text-xs font-mono uppercase tracking-widest mb-2" style={{ color: 'var(--text-tertiary)' }}>
+      {label}
+    </div>
+    <div
+      className="text-2xl font-bold font-mono"
+      style={{ color: accent || 'var(--text-primary)' }}
+    >
+      {value}
+    </div>
+  </div>
+);
+
+/* ═══════════════════════════════════════════
+   Architecture Diagram — Canvas-based animated flow
+   ═══════════════════════════════════════════ */
+/* Architecture Diagram hidden per user request 
+const ArchitectureDiagram = () => { ... } */
 
 const Home = () => {
   const dispatch = useAppDispatch();
   const { items: strategies } = useAppSelector((state) => state.strategies);
   const [dailySlots, setDailySlots] = useState<DailySlotsResponse | null>(null);
-  const [countdown, setCountdown] = useState('');
   const [vaultStats, setVaultStats] = useState<VaultOverview | null>(null);
   const { t } = useLanguage();
 
@@ -33,7 +56,6 @@ const Home = () => {
     dispatch(fetchStrategies());
     marketApi.getVaultOverview().then(setVaultStats).catch(() => {});
     fetchSlots();
-
     const refreshInterval = setInterval(fetchSlots, 30000);
     return () => clearInterval(refreshInterval);
   }, [dispatch]);
@@ -44,15 +66,7 @@ const Home = () => {
       const now = Date.now();
       const resetTime = new Date(dailySlots.resetsAt).getTime();
       const diff = resetTime - now;
-      if (diff <= 0) {
-        setCountdown('00:00:00');
-        fetchSlots();
-        return;
-      }
-      const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
-      const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
-      const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
-      setCountdown(`${h}:${m}:${s}`);
+      if (diff <= 0) { fetchSlots(); return; }
     };
     tick();
     const timer = setInterval(tick, 1000);
@@ -60,230 +74,271 @@ const Home = () => {
   }, [dailySlots]);
 
   const stats = vaultStats ?? defaultStats;
-  const agentCount = stats.agentCount || strategies.length;
-  const tvlValue = stats.totalTvl;
-  const totalPnl = stats.totalPnl ?? 0;
-  const apy = tvlValue > 0 && totalPnl !== 0 ? (totalPnl / (tvlValue - totalPnl)) * 100 : 0;
+  const agentCount = stats?.agentCount || strategies?.length || 0;
+  const tvlValue = stats?.totalTvl ?? 0;
+  const totalPnl = stats?.totalPnl ?? 0;
+
+  const fmtUsd = (v: number) =>
+    v >= 1000000
+      ? `$${(v / 1000000).toFixed(1)}M`
+      : `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+  const features = [
+    {
+      icon: Eye,
+      title: t('home.cards.rideVolatility.title'),
+      desc: t('home.cards.rideVolatility.desc'),
+      action: t('home.cards.rideVolatility.action'),
+      href: '/submit-agent',
+      accent: '#00FF66',
+      number: '01',
+    },
+    {
+      icon: Award,
+      title: t('home.cards.copyWhales.title'),
+      desc: t('home.cards.copyWhales.desc'),
+      action: t('home.cards.copyWhales.action'),
+      href: '/submit-agent',
+      accent: '#00FF41',
+      number: '02',
+    },
+    {
+      icon: Lock,
+      title: t('home.cards.openClawEdge.title'),
+      desc: t('home.cards.openClawEdge.desc'),
+      action: t('home.cards.openClawEdge.action'),
+      href: '/submit-agent',
+      accent: '#FFB800',
+      number: '03',
+    },
+  ];
+
+  const riskItems = [
+    { icon: Shield, title: t('home.risk.hardConstraints.title'), desc: t('home.risk.hardConstraints.desc'), color: 'var(--green)' },
+    { icon: Lock, title: t('home.risk.nonCustodial.title'), desc: t('home.risk.nonCustodial.desc'), color: 'var(--neon-green)' },
+    { icon: BarChart3, title: t('home.risk.promotion.title'), desc: t('home.risk.promotion.desc'), color: 'var(--tier-analyst)' },
+    { icon: Database, title: t('home.risk.verifiable.title'), desc: t('home.risk.verifiable.desc'), color: 'var(--tier-manager)' },
+  ];
 
   return (
-    <div className="space-y-24 pb-20">
-      {/* Hero Section */}
-      <section className="relative pt-20 pb-16 text-center max-w-5xl mx-auto px-4">
-        <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-zinc-50/50 px-3 py-1 text-xs font-medium text-zinc-600 mb-8 backdrop-blur-sm">
-          <span className="flex h-2 w-2 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+    <div className="space-y-20 pb-24 animate-fade-in-up">
+
+      {/* ── Hero ── */}
+      <section className="relative pt-12 pb-8 max-w-5xl mx-auto text-center">
+        {/* Live badge */}
+        <div className="inline-flex items-center gap-2 mb-8">
+          <span
+            className="flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded"
+            style={{
+              background: 'var(--green-dim)',
+              color: 'var(--green)',
+              border: '1px solid rgba(0,255,102,0.2)',
+            }}
+          >
+            <span className="status-dot" />
+            {t('home.tag')}
           </span>
-          {t('home.tag')}
         </div>
-        
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-zinc-900 mb-8 leading-[1.1]">
-          {t('home.title').split(' ').slice(0, 3).join(' ')} <br />
-          <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-             {t('home.title').split(' ').slice(3).join(' ')}
+
+        <h1
+          className="text-5xl md:text-7xl font-black tracking-[-0.04em] mb-6 leading-[1.05] font-mono"
+          style={{ 
+            color: 'var(--text-primary)',
+            textShadow: '0 0 40px rgba(0, 255, 65, 0.15)'
+          }}
+        >
+          {t('home.titleStart')}
+          <span
+            style={{
+              color: 'var(--neon-green)',
+              textShadow: '0 0 20px rgba(0, 255, 65, 0.4)'
+            }}
+          >
+            {t('home.titleHighlight')}
           </span>
+          {t('home.titleEnd')}
         </h1>
-        
-        <p className="text-xl text-zinc-500 max-w-2xl mx-auto mb-12 leading-relaxed">
+
+        <p className="text-lg md:text-xl max-w-2xl mx-auto mb-4 leading-relaxed font-mono" style={{ color: 'var(--text-secondary)' }}>
           {t('home.subtitle')}
-          <span className="block mt-2 font-medium text-zinc-900">
-            {t('home.subtitleBold')}
-          </span>
         </p>
-        
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <p className="text-base font-semibold mb-10 font-mono" style={{ color: 'var(--text-primary)' }}>
+          {t('home.subtitleBold')}
+        </p>
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
             to="/submit-agent"
-            className="h-12 px-8 rounded-full bg-zinc-900 text-white font-medium flex items-center justify-center hover:bg-zinc-800 transition-all hover:scale-105 active:scale-95"
+            className="h-11 px-8 rounded text-sm font-bold flex items-center gap-2 transition-all hover:-translate-y-px animate-pulse-glow"
+            style={{ background: 'var(--neon-green)', color: '#000' }}
           >
             {t('home.ctaApply')}
+            <ArrowRight size={16} />
           </Link>
           <Link
             to="/strategies"
-            className="h-12 px-8 rounded-full border border-zinc-200 text-zinc-900 font-medium flex items-center justify-center hover:bg-zinc-50 transition-all"
+            className="h-11 px-8 rounded text-sm font-medium flex items-center gap-2 transition-all"
+            style={{
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-hover)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}
           >
             {t('home.ctaSee')}
           </Link>
         </div>
 
-        {/* Daily Slots Counter */}
-        <div className="mt-8 flex flex-col items-center gap-2 animate-fade-in-up">
-          <div className="flex items-center gap-2 text-sm font-medium text-zinc-600">
+        {/* Daily slots */}
+        <div className="mt-10 flex flex-col items-center gap-2">
+          <div className="flex items-center gap-2 text-sm font-mono" style={{ color: 'var(--text-secondary)' }}>
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: 'var(--red)' }} />
+              <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: 'var(--red)' }} />
             </span>
-            {t('home.dailySlots.label')} <span className="font-mono font-bold text-zinc-900">{dailySlots ? `${dailySlots.remaining} / ${dailySlots.total}` : '— / —'}</span> {t('home.dailySlots.remaining')}
+            {t('home.dailySlots.label')}{' '}
+            <span className="font-bold" style={{ color: 'var(--text-primary)' }}>
+              {dailySlots ? `${dailySlots.remaining} / ${dailySlots.total}` : '— / —'}
+            </span>
+            {' '}{t('home.dailySlots.remaining')}
           </div>
-          <div className="h-1.5 w-64 rounded-full bg-zinc-100 overflow-hidden">
+          <div className="h-1 w-56 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
             <div
-              className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-1000 ease-out"
-              style={{ width: `${dailySlots ? (dailySlots.remaining / dailySlots.total) * 100 : 0}%` }}
-            ></div>
+              className="h-full transition-all duration-1000 ease-out"
+              style={{
+                width: `${dailySlots ? (dailySlots.remaining / dailySlots.total) * 100 : 0}%`,
+                background: 'linear-gradient(90deg, var(--green), var(--neon-green))',
+              }}
+            />
           </div>
-          <p className="text-xs text-zinc-400 font-mono">{t('home.dailySlots.resets')} {countdown || '--:--:--'}</p>
+          <p className="text-xs font-mono animate-pulse" style={{ color: 'var(--text-tertiary)' }}>
+            {t('home.dailySlots.resets')}
+          </p>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-24 border-t border-zinc-100 pt-12">
-          <div>
-            <div className="text-3xl font-bold tracking-tight text-zinc-900 mb-1">
-              ${tvlValue >= 1000000 ? (tvlValue / 1000000).toFixed(1) + 'M+' : tvlValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </div>
-            <div className="text-sm text-zinc-500 font-medium">{t('home.stats.tvl')}</div>
-          </div>
-          <div>
-            <div className="text-3xl font-bold tracking-tight text-zinc-900 mb-1">
-              {agentCount > 0 ? agentCount : '0'}+
-            </div>
-            <div className="text-sm text-zinc-500 font-medium">{t('home.stats.agents')}</div>
-          </div>
-          <div>
-            <div className="text-3xl font-bold tracking-tight text-zinc-900 mb-1">
-              {apy !== 0 ? `${apy.toFixed(1)}%` : '0.0%'}
-            </div>
-            <div className="text-sm text-zinc-500 font-medium">{t('home.stats.apy')}</div>
-          </div>
-          <div>
-            <div className="text-3xl font-bold tracking-tight text-zinc-900 mb-1">
-              {totalPnl >= 0 ? '+' : ''}${Math.abs(totalPnl) >= 1000000 ? (totalPnl / 1000000).toFixed(1) + 'M' : totalPnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </div>
-            <div className="text-sm text-zinc-500 font-medium">{t('home.stats.yield')}</div>
-          </div>
+        <div
+          className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-16 pt-12"
+          style={{ borderTop: '1px solid var(--border)' }}
+        >
+          <StatCard label={t('home.stats.tvl')} value={fmtUsd(tvlValue)} accent="var(--neon-green)" />
+          <StatCard label={t('home.stats.agents')} value={`${agentCount}+`} accent="var(--green)" />
+          <StatCard label={t('home.stats.apy')} value="--" accent="var(--tier-partner)" />
+          <StatCard
+            label={t('home.stats.yield')}
+            value={`${totalPnl >= 0 ? '+' : ''}${fmtUsd(Math.abs(totalPnl))}`}
+            accent={totalPnl >= 0 ? 'var(--green)' : 'var(--red)'}
+          />
         </div>
       </section>
 
-      {/* Feature Grid - "Open Claw" Style */}
-      <section className="max-w-[1600px] mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: Vault */}
-          <div className="group relative rounded-2xl border border-zinc-200 bg-white p-8 hover:border-zinc-300 transition-colors h-[400px] flex flex-col justify-between overflow-hidden">
-            <div className="relative z-10">
-              <div className="h-12 w-12 rounded-xl bg-zinc-100 flex items-center justify-center mb-6 text-zinc-900">
-                <TrendingUp size={24} />
-              </div>
-              <h3 className="text-2xl font-bold text-zinc-900 mb-3">{t('home.cards.rideVolatility.title')}</h3>
-              <p className="text-zinc-500 leading-relaxed">
-                {t('home.cards.rideVolatility.desc')}
-              </p>
-            </div>
-            <div className="absolute right-[-20px] bottom-[-20px] opacity-5 group-hover:opacity-10 transition-opacity">
-              <TrendingUp size={200} />
-            </div>
-            <Link to="/submit-agent" className="relative z-10 flex items-center gap-2 text-sm font-bold text-zinc-900 hover:gap-3 transition-all">
-              {t('home.cards.rideVolatility.action')} <ArrowRight size={16} />
-            </Link>
-          </div>
+      {/* ── Visual Architecture Diagram (Hidden) ── */}
+      {/* <ArchitectureDiagram /> */}
 
-          {/* Card 2: Marketplace */}
-          <div className="group relative rounded-2xl border border-zinc-200 bg-white p-8 hover:border-zinc-300 transition-colors h-[400px] flex flex-col justify-between overflow-hidden">
-            <div className="relative z-10">
-              <div className="h-12 w-12 rounded-xl bg-zinc-100 flex items-center justify-center mb-6 text-zinc-900">
-                <Coins size={24} />
+      {/* ── Feature Cards — Modern Fintech Bento Style ── */}
+      <section className="max-w-[1200px] mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-px rounded-xl overflow-hidden" style={{ background: 'var(--border)' }}>
+          {features.map((f, i) => (
+            <div
+              key={i}
+              className="group relative flex flex-col justify-between p-8 min-h-[320px] transition-all duration-300 overflow-hidden"
+              style={{ background: 'var(--bg-card)' }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = 'rgba(22,24,26,1)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = 'var(--bg-card)';
+              }}
+            >
+              {/* Top number */}
+              <div className="flex items-start justify-between mb-8">
+                <span className="text-[64px] font-black font-mono leading-none opacity-[0.04] group-hover:opacity-[0.08] transition-opacity select-none" style={{ color: f.accent }}>
+                  {f.number}
+                </span>
+                <div
+                  className="h-11 w-11 rounded-lg flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+                  style={{ background: `${f.accent}10`, border: `1px solid ${f.accent}30` }}
+                >
+                  <f.icon size={22} style={{ color: f.accent }} />
+                </div>
               </div>
-              <h3 className="text-2xl font-bold text-zinc-900 mb-3">{t('home.cards.copyWhales.title')}</h3>
-              <p className="text-zinc-500 leading-relaxed">
-                {t('home.cards.copyWhales.desc')}
-              </p>
-            </div>
-            <div className="absolute right-[-20px] bottom-[-20px] opacity-5 group-hover:opacity-10 transition-opacity">
-              <Coins size={200} />
-            </div>
-            <Link to="/strategies" className="relative z-10 flex items-center gap-2 text-sm font-bold text-zinc-900 hover:gap-3 transition-all">
-              {t('home.cards.copyWhales.action')} <ArrowRight size={16} />
-            </Link>
-          </div>
 
-          {/* Card 3: Developer */}
-          <div className="group relative rounded-2xl border border-zinc-200 bg-zinc-900 p-8 hover:border-zinc-700 transition-colors h-[400px] flex flex-col justify-between overflow-hidden">
-            <div className="relative z-10">
-              <div className="h-12 w-12 rounded-xl bg-zinc-800 flex items-center justify-center mb-6 text-white">
-                <Zap size={24} />
+              <div>
+                <h3 className="text-lg font-bold mb-3 tracking-tight font-mono" style={{ color: 'var(--text-primary)' }}>
+                  {f.title}
+                </h3>
+                <p className="text-sm leading-relaxed mb-6 font-mono" style={{ color: 'var(--text-secondary)' }}>
+                  {f.desc}
+                </p>
+
+                <Link
+                  to={f.href}
+                  className="inline-flex items-center gap-2 text-sm font-bold font-mono transition-all group-hover:gap-3"
+                  style={{ color: f.accent }}
+                >
+                  {f.action}
+                  <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
+                </Link>
               </div>
-              <h3 className="text-2xl font-bold text-white mb-3">{t('home.cards.openClawEdge.title')}</h3>
-              <p className="text-zinc-400 leading-relaxed">
-                {t('home.cards.openClawEdge.desc')}
-              </p>
+
+              {/* Bottom accent line */}
+              <div
+                className="absolute bottom-0 left-0 w-full h-px transition-all duration-500 group-hover:h-[2px]"
+                style={{ background: `linear-gradient(90deg, transparent, ${f.accent}, transparent)`, opacity: 0.3 }}
+              />
             </div>
-            <div className="absolute right-[-20px] bottom-[-20px] opacity-5 group-hover:opacity-10 transition-opacity">
-              <Zap size={200} className="text-white" />
-            </div>
-            <Link to="/submit-agent" className="relative z-10 flex items-center gap-2 text-sm font-bold text-white hover:gap-3 transition-all">
-              {t('home.cards.openClawEdge.action')} <ArrowRight size={16} />
-            </Link>
-          </div>
+          ))}
         </div>
       </section>
 
-
-
-      {/* How it works */}
-      <section className="max-w-5xl mx-auto px-4 py-16">
-        <div className="mb-16 text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 mb-4">{t('home.risk.title')}</h2>
-          <p className="text-zinc-500 max-w-2xl mx-auto">
+      {/* ── Risk Management ── */}
+      <section className="max-w-5xl mx-auto">
+        <div className="text-center mb-12">
+          <div
+            className="inline-block text-xs font-mono uppercase tracking-widest px-3 py-1 rounded mb-4"
+            style={{
+              background: 'rgba(138,43,226,0.08)',
+              color: 'var(--tier-manager)',
+              border: '1px solid rgba(138,43,226,0.2)',
+            }}
+          >
+            RISK_FRAMEWORK
+          </div>
+          <h2 className="text-3xl font-extrabold tracking-tight mb-3 font-mono" style={{ color: 'var(--text-primary)' }}>
+            {t('home.risk.title')}
+          </h2>
+          <p className="max-w-2xl mx-auto font-mono" style={{ color: 'var(--text-secondary)' }}>
             {t('home.risk.subtitle')}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          <div className="flex gap-6">
-            <div className="shrink-0">
-              <div className="h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <Shield size={24} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {riskItems.map((item, i) => (
+            <div
+              key={i}
+              className="flex gap-5 p-6 rounded cyber-card"
+              style={{ background: 'var(--bg-card)' }}
+            >
+              <div
+                className="shrink-0 h-10 w-10 rounded flex items-center justify-center"
+                style={{ background: `${item.color}14`, border: `1px solid ${item.color}30` }}
+              >
+                <item.icon size={20} style={{ color: item.color }} />
+              </div>
+              <div>
+                <h3 className="font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
+                  {item.title}
+                </h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {item.desc}
+                </p>
               </div>
             </div>
-            <div>
-              <h3 className="text-xl font-bold text-zinc-900 mb-2">{t('home.risk.hardConstraints.title')}</h3>
-              <p className="text-zinc-500 leading-relaxed">
-                {t('home.risk.hardConstraints.desc')}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex gap-6">
-            <div className="shrink-0">
-              <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                <Lock size={24} />
-              </div>
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-zinc-900 mb-2">{t('home.risk.nonCustodial.title')}</h3>
-              <p className="text-zinc-500 leading-relaxed">
-                {t('home.risk.nonCustodial.desc')}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-6">
-            <div className="shrink-0">
-              <div className="h-12 w-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
-                <BarChart3 size={24} />
-              </div>
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-zinc-900 mb-2">{t('home.risk.promotion.title')}</h3>
-              <p className="text-zinc-500 leading-relaxed mb-3">
-                {t('home.risk.promotion.desc')}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-6">
-            <div className="shrink-0">
-              <div className="h-12 w-12 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
-                <Database size={24} />
-              </div>
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-zinc-900 mb-2">{t('home.risk.verifiable.title')}</h3>
-              <p className="text-zinc-500 leading-relaxed">
-                {t('home.risk.verifiable.desc')}
-              </p>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
+
     </div>
   );
 };

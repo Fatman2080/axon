@@ -8,6 +8,7 @@ import Agents from './pages/Agents';
 import Profile from './pages/Profile';
 import SubmitAgent from './pages/SubmitAgent';
 import XAuthCallback from './pages/XAuthCallback';
+import Docs from './pages/Docs';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="/agents" element={<Agents />} />
           <Route path="/submit-agent" element={<SubmitAgent />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/docs" element={<Docs />} />
           <Route path="/auth/x/callback" element={<XAuthCallback />} />
         </Routes>
       </Layout>

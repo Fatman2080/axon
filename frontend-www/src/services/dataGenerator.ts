@@ -70,9 +70,9 @@ export const generateStrategies = (count: number): Strategy[] => {
         maxPosition: 1000,
       },
       social: {
-        twitter: 'https://twitter.com/clwafi',
-        website: 'https://clwafi.io',
-        discord: 'https://discord.gg/clwafi'
+        twitter: 'https://twitter.com/clawfi',
+        website: 'https://clawfi.io',
+        discord: 'https://discord.gg/clawfi'
       },
       rating: (Math.floor(Math.random() * 20) + 30) / 10,
       reviews: generateReviews(Math.floor(Math.random() * 5)),
