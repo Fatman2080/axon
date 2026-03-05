@@ -8,6 +8,12 @@ export default defineConfig({
   server: {
     port: 9334,
     host: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:9333',
+        changeOrigin: true,
+      }
+    }
   },
   build: {
     sourcemap: 'hidden',

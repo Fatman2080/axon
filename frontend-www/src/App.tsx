@@ -9,6 +9,8 @@ import Profile from './pages/Profile';
 import SubmitAgent from './pages/SubmitAgent';
 import XAuthCallback from './pages/XAuthCallback';
 import Docs from './pages/Docs';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 
 function App() {
   return (
@@ -18,10 +20,12 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/strategies" element={<Strategies />} />
           <Route path="/strategies/:id" element={<StrategyDetail />} />
-          <Route path="/agents" element={<Agents />} />
+          <Route path="/vault" element={<Agents />} />
           <Route path="/submit-agent" element={<SubmitAgent />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/docs" element={<Docs />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="/auth/x/callback" element={<XAuthCallback />} />
         </Routes>
       </Layout>

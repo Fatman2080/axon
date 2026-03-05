@@ -7,5 +7,11 @@ export default defineConfig({
   server: {
     port: 9335,
     host: true,
+    proxy: {
+      '/admin/api': {
+        target: 'http://localhost:9333',
+        changeOrigin: true,
+      }
+    }
   },
 });

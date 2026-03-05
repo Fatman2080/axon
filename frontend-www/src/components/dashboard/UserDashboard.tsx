@@ -187,7 +187,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user }) => {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-zinc-900">{t('dashboard.myAgents')}</h2>
-          <Link to="/agents" className="text-sm font-medium text-zinc-500 hover:text-black flex items-center gap-1">
+          <Link to="/vault" className="text-sm font-medium text-zinc-500 hover:text-black flex items-center gap-1">
             {t('dashboard.viewAll')} <ArrowRight size={14} />
           </Link>
         </div>

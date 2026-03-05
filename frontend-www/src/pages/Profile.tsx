@@ -177,16 +177,6 @@ const Profile = () => {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{user.name}</h1>
-              <span
-                className="text-[10px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded"
-                style={{
-                  background: user.level === 'vip' ? 'rgba(255,184,0,0.1)' : 'rgba(142,146,155,0.1)',
-                  color: user.level === 'vip' ? 'var(--tier-partner)' : 'var(--tier-intern)',
-                  border: user.level === 'vip' ? '1px solid rgba(255,184,0,0.2)' : '1px solid rgba(142,146,155,0.2)',
-                }}
-              >
-                {user.level || 'INTERN'}
-              </span>
             </div>
             <div className="flex items-center gap-4 text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>
               <span className="flex items-center gap-1.5">

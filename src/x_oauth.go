@@ -74,7 +74,7 @@ func buildRedirectURL(base string, params map[string]string) string {
 func (s *Server) buildXAuthorizeURL(state string, codeChallenge string) string {
 	base := strings.TrimSpace(s.xOAuth.AuthorizeURL)
 	if base == "" {
-		base = "https://twitter.com/i/oauth2/authorize"
+		base = "https://x.com/i/oauth2/authorize"
 	}
 	scopes := strings.TrimSpace(s.xOAuth.Scopes)
 	if scopes == "" {
@@ -96,7 +96,7 @@ func (s *Server) buildXAuthorizeURL(state string, codeChallenge string) string {
 func (s *Server) exchangeXOAuthToken(code string, codeVerifier string) (string, error) {
 	tokenURL := strings.TrimSpace(s.xOAuth.TokenURL)
 	if tokenURL == "" {
-		tokenURL = "https://api.twitter.com/2/oauth2/token"
+		tokenURL = "https://api.x.com/2/oauth2/token"
 	}
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
@@ -150,7 +150,7 @@ func (s *Server) exchangeXOAuthToken(code string, codeVerifier string) (string, 
 func (s *Server) fetchXOAuthUser(accessToken string) (XOAuthUser, error) {
 	userInfoURL := strings.TrimSpace(s.xOAuth.UserInfoURL)
 	if userInfoURL == "" {
-		userInfoURL = "https://api.twitter.com/2/users/me"
+		userInfoURL = "https://api.x.com/2/users/me"
 	}
 
 	u, err := url.Parse(userInfoURL)

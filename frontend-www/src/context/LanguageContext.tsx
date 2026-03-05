@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { translations } from '../i18n/translations';
 
 type Language = 'en' | 'zh';
@@ -13,8 +13,18 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
+const getBrowserLanguage = (): Language => {
+  if (typeof window === 'undefined') return 'zh';
+  const parser = navigator.language || (navigator.languages && navigator.languages[0]) || '';
+  if (parser && parser.toLowerCase().startsWith('zh')) {
+    return 'zh';
+  }
+  return 'en';
+};
+
 export const LanguageProvider = ({ children }: { children: ReactNode }) => {
-  const [language, setLanguage] = useState<Language>('zh'); // Default to Chinese as requested
+  const [language, setLanguage] = useState<Language>(getBrowserLanguage()); 
+
 
   const t = (path: string) => {
     const keys = path.split('.');

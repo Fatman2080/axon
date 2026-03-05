@@ -30,10 +30,10 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const navigation = [
-    { name: t('nav.vault'), href: '/agents', icon: Coins },
+    { name: t('nav.vault'), href: '/vault', icon: Coins },
     { name: t('nav.strategies'), href: '/strategies', icon: Users },
     { name: t('nav.submitAgent'), href: '/submit-agent', icon: Bot },
-    { name: 'Docs', href: '/docs', icon: BookOpen },
+    { name: t('nav.docs'), href: '/docs', icon: BookOpen },
   ];
 
   const handleXLogin = (inviteCode?: string) => {
@@ -414,42 +414,39 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 <span className="text-base font-bold font-mono" style={{ color: 'var(--text-primary)' }}>CLAWFI</span>
               </Link>
               <p className="text-xs leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
-                The Crypto Wall Street for AI Agents. Trustless infrastructure for autonomous trading.
+                {t('footer.slogan')}
               </p>
             </div>
             {/* Product */}
             <div>
-              <h4 className="text-xs font-bold font-mono uppercase tracking-widest mb-4" style={{ color: 'var(--text-secondary)' }}>Product</h4>
+              <h4 className="text-xs font-bold font-mono uppercase tracking-widest mb-4" style={{ color: 'var(--text-secondary)' }}>{t('footer.product')}</h4>
               <ul className="space-y-2.5">
-                <li><Link to="/agents" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>Vault</Link></li>
-                <li><Link to="/strategies" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>Agent Market</Link></li>
-                <li><Link to="/submit-agent" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>Dispatch Agent</Link></li>
+                <li><Link to="/vault" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.vault')}</Link></li>
+                <li><Link to="/strategies" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.agentMarket')}</Link></li>
+                <li><Link to="/submit-agent" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.dispatchAgent')}</Link></li>
               </ul>
             </div>
             {/* Resources */}
             <div>
-              <h4 className="text-xs font-bold font-mono uppercase tracking-widest mb-4" style={{ color: 'var(--text-secondary)' }}>Resources</h4>
+              <h4 className="text-xs font-bold font-mono uppercase tracking-widest mb-4" style={{ color: 'var(--text-secondary)' }}>{t('footer.resources')}</h4>
               <ul className="space-y-2.5">
-                <li><Link to="/docs" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>Documentation</Link></li>
-                <li><a href="#" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>API Reference</a></li>
-                <li><a href="#" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>Whitepaper</a></li>
+                <li><Link to="/docs" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.documentation')}</Link></li>
               </ul>
             </div>
             {/* Community */}
             <div>
-              <h4 className="text-xs font-bold font-mono uppercase tracking-widest mb-4" style={{ color: 'var(--text-secondary)' }}>Community</h4>
+              <h4 className="text-xs font-bold font-mono uppercase tracking-widest mb-4" style={{ color: 'var(--text-secondary)' }}>{t('footer.community')}</h4>
               <ul className="space-y-2.5">
-                <li><a href="https://twitter.com/clawfi" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>X (Twitter)</a></li>
-                <li><a href="https://discord.gg/clawfi" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>Discord</a></li>
-                <li><a href="#" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>Telegram</a></li>
+                <li><a href="https://x.com/Clawfi2026" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>X (Twitter)</a></li>
+                <li><a href="https://t.me/+n5SRX51xPYk5OWU1" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>Telegram</a></li>
               </ul>
             </div>
           </div>
           <div className="pt-6 flex flex-col md:flex-row items-center justify-between gap-4" style={{ borderTop: '1px solid var(--border)' }}>
-            <p className="text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>© 2026 ClawFi Protocol. All rights reserved.</p>
+            <p className="text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>{t('footer.copyright')}</p>
             <div className="flex items-center gap-6">
-              <a href="#" className="text-xs font-mono hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>Terms of Service</a>
-              <a href="#" className="text-xs font-mono hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>Privacy Policy</a>
+              <Link to="/terms" className="text-xs font-mono hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.terms')}</Link>
+              <Link to="/privacy" className="text-xs font-mono hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.privacy')}</Link>
             </div>
           </div>
         </div>

@@ -25,8 +25,6 @@ const Agents = () => {
   const dispatch = useAppDispatch();
   const { currentUser: user } = useAppSelector((state) => state.user);
   const { t } = useLanguage();
-  const [actionTab, setActionTab] = useState('deposit');
-  const [amount, setAmount] = useState('');
   const [vaultOverview, setVaultOverview] = useState<VaultOverview | null>(null);
   const [agentHistory, setAgentHistory] = useState<number[]>([]);
   const [chartPeriod, setChartPeriod] = useState('1M');
@@ -136,8 +134,6 @@ const Agents = () => {
   const metricCards = [
     { label: t('vault.maxDrawdown'), value: `-${maxDrawdown.toFixed(2)}%`, color: 'var(--red)' },
     { label: t('vault.sharpeRatio'), value: sharpeRatio.toFixed(2), color: 'var(--text-primary)' },
-    { label: t('vault.depositors'), value: agentCount > 0 ? `${agentCount}` : '0', color: 'var(--text-primary)' },
-    { label: t('vault.managerFee'), value: '20%', color: 'var(--text-primary)' },
   ];
 
   return (
@@ -221,9 +217,9 @@ const Agents = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="max-w-5xl mx-auto">
         {/* Left: Chart + Stats */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6">
           {/* Chart */}
           <div
             className="h-[380px] rounded p-6"
@@ -267,7 +263,7 @@ const Agents = () => {
           </div>
 
           {/* Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {metricCards.map(m => (
               <div key={m.label} className="rounded p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                 <div className="text-xs font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>
@@ -288,93 +284,6 @@ const Agents = () => {
             <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
               {t('vault.description.content')}
             </p>
-          </div>
-        </div>
-
-        {/* Right: Action Panel */}
-        <div className="lg:col-span-1">
-          <div className="rounded overflow-hidden sticky top-20" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            {/* Tab buttons */}
-            <div className="flex" style={{ borderBottom: '1px solid var(--border)' }}>
-              {['deposit', 'withdraw'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActionTab(tab)}
-                  className="flex-1 py-3.5 text-sm font-bold font-mono uppercase tracking-wider transition-all"
-                  style={{
-                    background: actionTab === tab ? 'rgba(0,240,255,0.06)' : 'transparent',
-                    color: actionTab === tab ? 'var(--neon-green)' : 'var(--text-tertiary)',
-                    borderBottom: actionTab === tab ? '2px solid var(--neon-green)' : '2px solid transparent',
-                  }}
-                >
-                  {tab === 'deposit' ? t('vault.actions.deposit') : t('vault.actions.withdraw')}
-                </button>
-              ))}
-            </div>
-
-            <div className="p-6 space-y-5">
-              <div>
-                <div className="flex justify-between text-xs font-mono mb-2" style={{ color: 'var(--text-tertiary)' }}>
-                  <span>{t('vault.actions.asset')}</span>
-                  <span>{t('vault.actions.balance')}: {user?.lpValue ? user.lpValue.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '0.00'} USDC</span>
-                </div>
-                <div className="relative">
-                  <input
-                    type="number"
-                    placeholder="0.00"
-                    disabled
-                    className="w-full px-4 py-3 pr-16 text-lg font-mono cursor-not-allowed opacity-50"
-                    style={{
-                      background: 'var(--bg-input)',
-                      border: '1px solid var(--border)',
-                      color: 'var(--text-primary)',
-                      borderRadius: '4px',
-                    }}
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                  />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-mono" style={{ color: 'var(--text-tertiary)' }}>
-                    USDC
-                  </div>
-                </div>
-                <div className="flex gap-1.5 mt-2">
-                  {[25, 50, 75, 100].map(pct => (
-                    <button
-                      key={pct}
-                      disabled
-                      className="flex-1 py-1 text-xs font-mono rounded cursor-not-allowed opacity-40"
-                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-tertiary)' }}
-                    >
-                      {pct}%
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2.5 py-4" style={{ borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
-                {[
-                  { label: t('vault.actions.exchangeRate'), value: `1 HLP = ${sharePrice.toFixed(4)} USDC` },
-                  { label: t('vault.actions.estReceive'), value: '0.00 HLP' },
-                ].map(row => (
-                  <div key={row.label} className="flex justify-between text-sm">
-                    <span style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
-                    <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{row.value}</span>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                disabled
-                className="w-full py-3.5 text-sm font-bold font-mono uppercase tracking-wider rounded cursor-not-allowed opacity-40"
-                style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              >
-                {t('vault.actions.comingSoon')}
-              </button>
-
-              <div className="text-xs text-center font-mono" style={{ color: 'var(--text-tertiary)' }}>
-                {t('vault.actions.terms')}
-              </div>
-            </div>
           </div>
         </div>
       </div>

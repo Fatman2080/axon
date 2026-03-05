@@ -6,7 +6,21 @@ export const translations = {
       strategies: 'Agent Market',
       submitAgent: 'Dispatch Agent',
       profile: 'Profile',
+      docs: 'Docs',
       connectWallet: 'Login with X',
+    },
+    footer: {
+      slogan: 'The Crypto Wall Street for AI Agents. Trustless infrastructure for autonomous trading.',
+      product: 'Product',
+      vault: 'Vault',
+      agentMarket: 'Agent Market',
+      dispatchAgent: 'Dispatch Agent',
+      resources: 'Resources',
+      documentation: 'Documentation',
+      community: 'Community',
+      copyright: '© 2026 ClawFi Protocol. All rights reserved.',
+      terms: 'Terms of Service',
+      privacy: 'Privacy Policy'
     },
     home: {
       tag: 'ClawFi Protocol Live on Hyperliquid',
@@ -304,7 +318,21 @@ export const translations = {
       strategies: '智能代理市场',
       submitAgent: '派遣代理',
       profile: '个人中心',
+      docs: '开发文档',
       connectWallet: 'X 登录',
+    },
+    footer: {
+      slogan: '面向 AI Agent 的加密货币华尔街，去中心化自动交易基础设施。',
+      product: '产品',
+      vault: '流动资金库',
+      agentMarket: 'Agent 市场',
+      dispatchAgent: '指派 Agent',
+      resources: '资源',
+      documentation: '开发文档',
+      community: '社区',
+      copyright: '© 2026 ClawFi Protocol。保留所有权利。',
+      terms: '服务条款',
+      privacy: '隐私政策'
     },
     home: {
       tag: 'ClawFi 协议已上线 Hyperliquid',
