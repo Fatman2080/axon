@@ -220,7 +220,7 @@ const Home = () => {
 
         {/* Stats Grid */}
         <div
-          className="grid grid-cols-3 gap-3 mt-16 pt-12"
+          className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-16 pt-12"
           style={{ borderTop: '1px solid var(--border)' }}
         >
           <StatCard label={t('home.stats.tvl')} value={fmtUsd(tvlValue)} accent="var(--neon-green)" />

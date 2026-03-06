@@ -18,7 +18,7 @@ const Strategies = () => {
   const dispatch = useAppDispatch();
   const { items: strategies, loading } = useAppSelector((state) => state.strategies);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState('all');
+  const [filter] = useState('all');
   const { t } = useLanguage();
 
   useEffect(() => {
@@ -31,6 +31,24 @@ const Strategies = () => {
     const matchesSearch = strategy.name.toLowerCase().includes(searchTerm.toLowerCase());
     return isActive && matchesFilter && matchesSearch;
   });
+
+  const isMarketEnabled = import.meta.env.VITE_ENABLE_AGENT_MARKET !== 'false';
+
+  if (!isMarketEnabled) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 text-center animate-fade-in-up">
+        <div className="h-16 w-16 mb-6 rounded-full flex items-center justify-center" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <TrendingUp size={24} style={{ color: 'var(--text-tertiary)' }} />
+        </div>
+        <h2 className="text-xl font-bold tracking-tight mb-3" style={{ color: 'var(--text-primary)' }}>
+          {t('strategies.underConstructionTitle')}
+        </h2>
+        <p className="text-sm font-mono max-w-md" style={{ color: 'var(--text-secondary)' }}>
+          {t('strategies.underConstruction')}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -142,7 +160,7 @@ const Strategies = () => {
                       </span>
                     </div>
 
-                    {/* TVL + Bar */}
+                    {/* TVL */}
                     <div>
                       <div className="flex justify-between text-sm items-center mb-1.5">
                         <span className="font-mono text-xs uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
@@ -151,15 +169,6 @@ const Strategies = () => {
                         <span className="font-mono text-sm" style={{ color: 'var(--text-primary)' }}>
                           ${strategy.currentTvl.toLocaleString()}
                         </span>
-                      </div>
-                      <div className="w-full h-0.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${strategy.maxTvl > 0 ? (strategy.currentTvl / strategy.maxTvl) * 100 : 0}%`,
-                            background: 'linear-gradient(90deg, var(--neon-green), var(--green))',
-                          }}
-                        />
                       </div>
                     </div>
                   </div>

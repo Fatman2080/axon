@@ -118,7 +118,7 @@ export const translations = {
       status: 'Running',
       createdBy: 'Created by ClawFi Protocol',
       equity: 'Vault Equity',
-      apy: '30d APY',
+      apy: 'Total ROI',
       sharePrice: 'Share Price',
       totalFunds: 'Total Funds',
       maxDrawdown: 'Max Drawdown',
@@ -201,6 +201,8 @@ export const translations = {
         apr: 'PnL (30d)',
         hire: 'View Details',
       },
+      underConstructionTitle: 'Coming Soon',
+      underConstruction: 'The Agent Market is currently under construction. Please check back later.',
     },
     strategyDetail: {
       backToMarket: 'Back to Market',
@@ -227,15 +229,7 @@ export const translations = {
       manageDesc: 'This Agent currently manages {current}. As a {level}, the maximum authorized capital is {max}.',
       riskLevel: 'Risk Level',
       runningDays: 'Running Days',
-      vote: {
-        title: 'Vote for Manager',
-        pnlContribution: 'PnL Contribution',
-        accounted: 'Accounted in Vault Yield',
-        desc: 'As an LP, you can vote to increase this Agent\'s capital allocation cap from the Vault.',
-        button: 'Vote for Cap Increase',
-        perfFee: 'Performance Fee',
-        devShare: 'Dev Share',
-      },
+
       hiring: {
         title: 'Hiring More Agents?',
         desc: 'If you are a strategy developer, submit your AI Agent to join our fund team.',
@@ -433,7 +427,7 @@ export const translations = {
       status: '运行中',
       createdBy: '由 ClawFi 协议创建',
       equity: '国库权益',
-      apy: '30日年化',
+      apy: '总回报率',
       sharePrice: '份额净值',
       totalFunds: '总资金',
       maxDrawdown: '最大回撤',
@@ -516,6 +510,8 @@ export const translations = {
         apr: '贡献利润 (30d)',
         hire: '查看业绩',
       },
+      underConstructionTitle: '即将上线',
+      underConstruction: '代理市场目前正在建设中，请稍后再来查看。',
     },
     strategyDetail: {
       backToMarket: '返回市场',
@@ -542,15 +538,7 @@ export const translations = {
       manageDesc: '该 Agent 当前管理 {current}。作为 {level}，其最大授权资金为 {max}。',
       riskLevel: '风险等级',
       runningDays: '运行天数',
-      vote: {
-        title: '为经理人投票',
-        pnlContribution: 'PnL 贡献',
-        accounted: '已计入国库收益',
-        desc: '作为 LP (流动性提供者)，您可以投票支持该 Agent 获得更多的国库资金分配额度。',
-        button: '投票支持扩容 (Vote)',
-        perfFee: '绩效费',
-        devShare: '开发者分成',
-      },
+
       hiring: {
         title: '正在招聘更多 Agent？',
         desc: '如果您是策略开发者，请提交您的 AI Agent 加入我们的基金团队。',
