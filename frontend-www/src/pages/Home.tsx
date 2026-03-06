@@ -59,7 +59,7 @@ const Home = () => {
     dispatch(fetchStrategies());
     marketApi.getVaultOverview().then(setVaultStats).catch(() => {});
     marketApi.getTreasury().then(setTreasury).catch(() => {});
-    marketApi.getTreasuryHistory('30d').then(setTreasuryHistory).catch(() => {});
+    marketApi.getTreasuryHistory('30d').then(data => setTreasuryHistory(Array.isArray(data) ? data : [])).catch(() => {});
     fetchSlots();
     const refreshInterval = setInterval(fetchSlots, 60000);
     return () => clearInterval(refreshInterval);
@@ -245,15 +245,21 @@ const Home = () => {
             </div>
             <svg viewBox={`0 0 ${Math.max(treasuryHistory.length - 1, 1)} 100`} className="w-full" style={{ height: '120px' }} preserveAspectRatio="none">
               {(() => {
-                const values = treasuryHistory.map(s => s.totalFunds);
+                const rawValues = treasuryHistory.map(s => s.totalFunds || 0);
+                // filter out 0 values if there are valid ones
+                const validValues = rawValues.filter(v => v > 0);
+                const values = rawValues.map(v => (v > 0 ? v : (validValues[0] || 0)));
+                
                 const min = Math.min(...values);
                 const max = Math.max(...values);
-                const range = max - min || 1;
-                const points = values.map((v, i) => `${i},${100 - ((v - min) / range) * 90 - 5}`).join(' ');
+                const pMin = min === max ? min * 0.99 : min - (max - min) * 0.1;
+                const pMax = min === max ? max * 1.01 : max + (max - min) * 0.1;
+                const range = pMax - pMin || 1;
+                const points = values.map((v, i) => `${i},${100 - ((v - pMin) / range) * 100}`).join(' ');
                 return (
                   <>
-                    <polyline fill="none" stroke="var(--neon-green)" strokeWidth="0.8" points={points} />
-                    <polyline fill="url(#treasuryGrad)" stroke="none" points={`0,100 ${points} ${values.length - 1},100`} />
+                    <polyline fill="none" stroke="var(--neon-green)" strokeWidth="2" vectorEffect="non-scaling-stroke" points={points} />
+                    <polyline fill="url(#treasuryGrad)" stroke="none" points={`0,100 ${points} ${Math.max(values.length - 1, 1)},100`} />
                     <defs>
                       <linearGradient id="treasuryGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="var(--neon-green)" stopOpacity="0.15" />

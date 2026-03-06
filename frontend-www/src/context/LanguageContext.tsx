@@ -15,6 +15,12 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 const getBrowserLanguage = (): Language => {
   if (typeof window === 'undefined') return 'zh';
+  try {
+    const saved = localStorage.getItem('openfi_language');
+    if (saved === 'en' || saved === 'zh') return saved as Language;
+  } catch {
+    // ignore
+  }
   const parser = navigator.language || (navigator.languages && navigator.languages[0]) || '';
   if (parser && parser.toLowerCase().startsWith('zh')) {
     return 'zh';
@@ -25,7 +31,13 @@ const getBrowserLanguage = (): Language => {
 export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   const [language, setLanguage] = useState<Language>(getBrowserLanguage()); 
 
-
+  useEffect(() => {
+    try {
+      localStorage.setItem('openfi_language', language);
+    } catch {
+      // ignore
+    }
+  }, [language]);
   const t = (path: string) => {
     const keys = path.split('.');
     let current: any = translations[language];

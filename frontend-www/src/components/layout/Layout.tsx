@@ -173,9 +173,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     className="h-6 w-6 rounded-full"
                     style={{ border: '1px solid var(--border)' }}
                   />
-                  <span className="text-sm font-medium max-w-[100px] truncate" style={{ color: 'var(--text-primary)' }}>
-                    {user.name || 'Agent'}
-                  </span>
+                  {/* Removed user name to save space */}
                   <ChevronDown
                     size={14}
                     style={{
@@ -431,6 +429,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               <h4 className="text-xs font-bold font-mono uppercase tracking-widest mb-4" style={{ color: 'var(--text-secondary)' }}>{t('footer.resources')}</h4>
               <ul className="space-y-2.5">
                 <li><Link to="/docs" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.documentation')}</Link></li>
+                <li><a href="https://www.npmjs.com/package/clawfi-hyperliquid-skill" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>npm</a></li>
               </ul>
             </div>
             {/* Community */}

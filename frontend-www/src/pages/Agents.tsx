@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Info } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import { useLanguage } from '../context/LanguageContext';
 import { marketApi } from '../services/api';
@@ -22,7 +21,7 @@ const Agents = () => {
   const { t } = useLanguage();
   const [vaultOverview, setVaultOverview] = useState<VaultOverview | null>(null);
   const [treasuryHistory, setTreasuryHistory] = useState<TreasurySnapshot[]>([]);
-  const [chartPeriod, setChartPeriod] = useState('1M');
+  const [chartPeriod, setChartPeriod] = useState('1D');
 
   useEffect(() => {
     marketApi.getVaultOverview().then(setVaultOverview).catch(() => {
@@ -53,8 +52,24 @@ const Agents = () => {
   useEffect(() => {
     const loadTreasuryHistory = async () => {
       try {
-        const data = await marketApi.getTreasuryHistory(periodToApi(chartPeriod));
-        setTreasuryHistory(Array.isArray(data) ? data : []);
+        let data = await marketApi.getTreasuryHistory(periodToApi(chartPeriod));
+        if (Array.isArray(data)) {
+          if (chartPeriod !== '1D') {
+            const filtered = [];
+            const seen = new Set();
+            data.forEach((item) => {
+              const dateStr = new Date(item.createdAt).toDateString();
+              if (!seen.has(dateStr)) {
+                seen.add(dateStr);
+                filtered.push(item);
+              }
+            });
+            data = filtered;
+          }
+          setTreasuryHistory(data);
+        } else {
+          setTreasuryHistory([]);
+        }
       } catch {
         setTreasuryHistory([]);
       }
@@ -62,7 +77,7 @@ const Agents = () => {
     loadTreasuryHistory();
   }, [chartPeriod]);
 
-  const totalTvl = vaultOverview?.totalTvl ?? 0;
+  const totalTvl = (vaultOverview?.totalL1Value ?? 0) + (vaultOverview?.totalEvmBalance ?? 0);
   const totalPnl = vaultOverview?.totalPnl ?? 0;
   const agentCount = vaultOverview?.agentCount ?? 0;
   const totalInitialCapital = vaultOverview?.totalInitialCapital ?? 0;
@@ -91,7 +106,24 @@ const Agents = () => {
   const chartSeries = totalFundsHistory;
 
   const chartData = {
-    labels: Array.from({ length: chartSeries.length }, (_, i) => `Day ${i + 1}`),
+    labels: Array.from({ length: chartSeries.length }, (_, i) => {
+      const d = new Date();
+      const reverseIndex = chartSeries.length - 1 - i;
+      if (chartPeriod === '1D') {
+        d.setMinutes(d.getMinutes() - Math.round(reverseIndex * ((24 * 60) / Math.max(chartSeries.length - 1, 1))));
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      if (chartPeriod === '1W') {
+        d.setDate(d.getDate() - Math.round(reverseIndex * (6 / Math.max(chartSeries.length - 1, 1))));
+        return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      }
+      if (chartPeriod === '1M') {
+        d.setDate(d.getDate() - Math.round(reverseIndex * (29 / Math.max(chartSeries.length - 1, 1))));
+        return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      }
+      d.setDate(d.getDate() - Math.round(reverseIndex * (90 / Math.max(chartSeries.length - 1, 1))));
+      return d.toLocaleDateString([], { year: 'numeric', month: 'short' });
+    }),
     datasets: [{
       label: t('vault.totalFunds'),
       data: chartSeries,
@@ -120,7 +152,16 @@ const Agents = () => {
       },
     },
     scales: {
-      x: { display: false, grid: { display: false } },
+      x: { 
+        display: true, 
+        grid: { display: false },
+        ticks: {
+          maxTicksLimit: 7,
+          maxRotation: 0,
+          font: { family: 'JetBrains Mono, monospace', size: 10 },
+          color: '#555B66',
+        }
+      },
       y: {
         display: true,
         position: 'right' as const,
@@ -138,6 +179,7 @@ const Agents = () => {
   const metricCards = [
     { label: t('vault.maxDrawdown'), value: `-${maxDrawdown.toFixed(2)}%`, color: 'var(--red)' },
     { label: t('vault.sharpeRatio'), value: sharpeRatio.toFixed(2), color: 'var(--text-primary)' },
+    { label: t('vault.apy'), value: `${apy > 0 ? '+' : ''}${apy.toFixed(1)}%`, color: apy >= 0 ? 'var(--green)' : 'var(--red)' },
   ];
 
   return (
@@ -171,53 +213,6 @@ const Agents = () => {
             </div>
           </div>
 
-          <div className="flex gap-8">
-            {/* TVL */}
-            <div className="relative group cursor-help">
-              <div className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>
-                {t('vault.equity')} <Info size={12} style={{ color: 'var(--text-tertiary)' }} />
-              </div>
-              <div className="text-2xl font-bold font-mono" style={{ color: 'var(--neon-green)' }}>
-                ${totalTvl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-              </div>
-
-              {/* Hover Breakdown */}
-              <div
-                className="absolute top-full right-0 mt-2 w-72 rounded p-4 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-150 shadow-2xl"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-              >
-                <div className="text-xs font-bold font-mono uppercase tracking-widest mb-3 pb-2" style={{ color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)' }}>
-                  {t('vault.breakdown.title')}
-                </div>
-                <div className="space-y-3">
-                  {[
-                    { label: t('vault.breakdown.chain'), val: vaultOverview?.totalEvmBalance ?? 0, color: 'var(--tier-analyst)' },
-                    { label: t('vault.breakdown.hype'), val: vaultOverview?.totalL1Value ?? 0, color: 'var(--green)' },
-                  ].map(b => (
-                    <div key={b.label} className="flex justify-between text-xs items-center">
-                      <span className="flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                        <span className="w-2 h-2 rounded-full" style={{ background: b.color }} />
-                        {b.label}
-                      </span>
-                      <span className="font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
-                        ${b.val.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* APY */}
-            <div>
-              <div className="text-xs font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>
-                {t('vault.apy')}
-              </div>
-              <div className="text-2xl font-bold font-mono" style={{ color: 'var(--green)' }}>
-                {apy.toFixed(1)}%
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -267,7 +262,7 @@ const Agents = () => {
           </div>
 
           {/* Metrics */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {metricCards.map(m => (
               <div key={m.label} className="rounded p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                 <div className="text-xs font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>

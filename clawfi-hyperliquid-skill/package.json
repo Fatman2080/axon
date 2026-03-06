@@ -1,0 +1,23 @@
+{
+  "name": "clawfi-hyperliquid-skill",
+  "version": "1.0.7",
+  "description": "One-click installer for ClawFi x Hyperliquid Agent Skill. Automatically deploys trading skill documentation and installs Python dependencies.",
+  "main": "install.js",
+  "scripts": {
+    "start": "node install.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "clawfi",
+    "hyperliquid",
+    "agent",
+    "skill",
+    "trading"
+  ],
+  "author": "ClawFi",
+  "license": "ISC",
+  "type": "commonjs",
+  "bin": {
+    "install-clawfi": "./install.js"
+  }
+}

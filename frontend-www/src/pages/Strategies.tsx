@@ -32,7 +32,7 @@ const Strategies = () => {
     return isActive && matchesFilter && matchesSearch;
   });
 
-  const isMarketEnabled = import.meta.env.VITE_ENABLE_AGENT_MARKET !== 'false';
+  const isMarketEnabled = import.meta.env.VITE_ENABLE_STRATEGIES === 'true';
 
   if (!isMarketEnabled) {
     return (

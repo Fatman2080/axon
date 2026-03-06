@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { fetchStrategies } from '../store/slices/strategySlice';
 import {
   User, Wallet, Calendar,
-  CheckCircle, Copy, Code,
+  CheckCircle, Code,
   ChevronRight, Award, Briefcase, DollarSign, LogOut
 } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
@@ -29,7 +29,7 @@ const Profile = () => {
   const { currentUser: user, loading: userLoading } = useAppSelector((state) => state.user);
   const { items: strategies, loading: strategiesLoading } = useAppSelector((state) => state.strategies);
   const [agentHistory, setAgentHistory] = useState<number[]>([]);
-  const [chartPeriod, setChartPeriod] = useState('1W');
+  const chartPeriod = '1D';
   const [agentStats, setAgentStats] = useState<{ accountValue: number; totalPnl: number; initialCapital: number } | null>(null);
   const { t } = useLanguage();
 
@@ -48,18 +48,70 @@ const Profile = () => {
     }).catch(() => {});
   }, [user]);
 
+  const periodToApi = (period: string) => {
+    switch (period) {
+      case '1D': return '1d';
+      case '1W': return '7d';
+      case '1M': return '30d';
+      case 'ALL': return 'ALL';
+      default: return '7d';
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
     const loadData = async () => {
       try {
-        const historyData = await authApi.getAgentHistory(chartPeriod);
-        setAgentHistory(Array.isArray(historyData.history) ? historyData.history : []);
+        const historyData = await authApi.getAgentHistory(periodToApi(chartPeriod));
+        if (Array.isArray(historyData.history)) {
+          let hist = historyData.history;
+          let dts = Array.isArray(historyData.dates) ? historyData.dates : [];
+          
+          if (dts.length !== hist.length) {
+            dts = Array.from({ length: hist.length }, (_, i) => {
+              const d = new Date();
+              const reverseIndex = hist.length - 1 - i;
+              if (chartPeriod === '1D') {
+                d.setMinutes(d.getMinutes() - Math.round(reverseIndex * ((24 * 60) / Math.max(hist.length - 1, 1))));
+              } else if (chartPeriod === '1W') {
+                d.setDate(d.getDate() - Math.round(reverseIndex * (6 / Math.max(hist.length - 1, 1))));
+              } else if (chartPeriod === '1M') {
+                d.setDate(d.getDate() - Math.round(reverseIndex * (29 / Math.max(hist.length - 1, 1))));
+              } else {
+                d.setDate(d.getDate() - Math.round(reverseIndex * (90 / Math.max(hist.length - 1, 1))));
+              }
+              return d.toISOString();
+            });
+          }
+          
+          if (chartPeriod !== '1D' && dts.length > 0) {
+            const fHist: number[] = [];
+            const fDts: string[] = [];
+            const seen = new Set();
+            for (let i = 0; i < dts.length; i++) {
+              const dStr = new Date(dts[i]).toDateString();
+              if (!seen.has(dStr)) {
+                seen.add(dStr);
+                fHist.push(hist[i]);
+                fDts.push(dts[i]);
+              }
+            }
+            hist = fHist;
+            dts = fDts;
+          }
+          
+          const finalHist = hist as any;
+          finalHist.dates = dts;
+          setAgentHistory(finalHist);
+        } else {
+          setAgentHistory([]);
+        }
       } catch {
         setAgentHistory([]);
       }
     };
     loadData();
-  }, [user, chartPeriod]);
+  }, [user]);
 
   const loading = userLoading || strategiesLoading;
 
@@ -110,12 +162,22 @@ const Profile = () => {
   const totalProfit = totalPnl;
   const roi = initialCapital > 0 ? (totalPnl / initialCapital) * 100 : 0;
   const agentCount = user.agentPublicKey ? 1 : (user.agentCount ?? 0);
-  const lpShares = user.lpShares ?? 0;
 
   const chartSeries = agentHistory.length > 0 ? agentHistory : [];
 
   const chartData = {
-    labels: Array.from({ length: chartSeries.length }, (_, i) => `Day ${i + 1}`),
+    labels: (agentHistory as any).dates && (agentHistory as any).dates.length > 0
+      ? (agentHistory as any).dates.map((d: string) => {
+          const date = new Date(d);
+          if (chartPeriod === '1D') return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          if (chartPeriod === '1W') return [
+            date.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+            date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          ];
+          if (chartPeriod === 'ALL') return date.toLocaleDateString([], { year: 'numeric', month: 'short' });
+          return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        })
+      : Array.from({ length: chartSeries.length }, (_, i) => `Point ${i + 1}`),
     datasets: [{
       label: t('profile.portfolio'),
       data: chartSeries,
@@ -144,7 +206,16 @@ const Profile = () => {
       },
     },
     scales: {
-      x: { display: false },
+      x: { 
+        display: true, 
+        grid: { display: false },
+        ticks: {
+          maxTicksLimit: 6,
+          maxRotation: 0,
+          font: { family: 'monospace', size: 10 },
+          color: '#555B66',
+        }
+      },
       y: { display: false, grid: { display: false } },
     },
     interaction: { mode: 'nearest' as const, axis: 'x' as const, intersect: false },
@@ -191,13 +262,6 @@ const Profile = () => {
               <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{user.name}</h1>
             </div>
             <div className="flex items-center gap-4 text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>
-              <span className="flex items-center gap-1.5">
-                <Wallet size={12} />
-                {user.agentPublicKey
-                  ? `${user.agentPublicKey.slice(0, 6)}...${user.agentPublicKey.slice(-4)}`
-                  : (user.walletAddress || '-')}
-                <Copy size={10} className="cursor-pointer" style={{ color: 'var(--text-tertiary)' }} />
-              </span>
               <span className="flex items-center gap-1.5">
                 <Calendar size={12} />
                 {t('profile.joined')}{' '}
@@ -264,24 +328,6 @@ const Profile = () => {
               </span>
             </div>
           </div>
-          {chartSeries.length > 0 && (
-            <div className="flex gap-1">
-              {['1D', '1W', '1M', 'ALL'].map(p => (
-                <button
-                  key={p}
-                  onClick={() => setChartPeriod(p)}
-                  className="px-3 py-1 text-xs font-mono rounded transition-all"
-                  style={{
-                    background: chartPeriod === p ? 'rgba(0,255,102,0.1)' : 'transparent',
-                    color: chartPeriod === p ? 'var(--green)' : 'var(--text-tertiary)',
-                    border: chartPeriod === p ? '1px solid rgba(0,255,102,0.2)' : '1px solid var(--border)',
-                  }}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         {chartSeries.length > 0 ? (
@@ -298,7 +344,7 @@ const Profile = () => {
       {/* Strategy Submissions */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>{t('profile.myStrategies')}</h2>
+          <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>{t('profile.myAgents')}</h2>
           <button className="text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>{t('profile.viewAll')}</button>
         </div>
 
@@ -312,7 +358,7 @@ const Profile = () => {
               }}
             >
               <Briefcase className="mx-auto mb-3" size={28} style={{ color: 'var(--text-tertiary)' }} />
-              <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>{t('profile.noStrategies')}</p>
+              <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>{t('profile.noAgents')}</p>
               <p className="text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>{t('profile.startBuilding')}</p>
             </div>
           ) : (
@@ -338,7 +384,9 @@ const Profile = () => {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{strategy.name}</h3>
+                      <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                        {strategy.name === user.name ? (strategy.id.slice(0, 8) + '...' + strategy.id.slice(-6)) : (strategy.name || strategy.id)}
+                      </h3>
                       <span
                         className="text-[9px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
                         style={{
@@ -351,8 +399,14 @@ const Profile = () => {
                         {strategy.status}
                       </span>
                     </div>
-                    <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-                      {strategy.category.toUpperCase()}
+                    <div className="flex items-center gap-3 mt-1">
+                      <div className="text-[10px] font-mono" style={{ color: 'var(--text-tertiary)' }}>
+                        {strategy.category.toUpperCase()}
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] font-mono" style={{ color: 'var(--tier-intern)' }}>
+                        <Wallet size={10} />
+                        {strategy.id.slice(0, 6)}...{strategy.id.slice(-4)}
+                      </div>
                     </div>
                   </div>
                 </div>

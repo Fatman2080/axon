@@ -1,4 +1,5 @@
 import { createI18n } from 'vue-i18n';
+import { watch } from 'vue';
 const messages = {
     zh: {
         menu: {
@@ -404,6 +405,12 @@ const messages = {
 const getBrowserLanguage = () => {
     if (typeof window === 'undefined')
         return 'zh';
+    try {
+        const saved = localStorage.getItem('openfi_admin_language');
+        if (saved === 'en' || saved === 'zh') return saved;
+    } catch {
+        // ignore
+    }
     const parser = navigator.language || (navigator.languages && navigator.languages[0]) || '';
     if (parser && parser.toLowerCase().startsWith('zh')) {
         return 'zh';
@@ -415,5 +422,12 @@ const i18n = createI18n({
     locale: getBrowserLanguage(),
     fallbackLocale: 'en',
     messages
+});
+watch(() => i18n.global.locale.value, (newVal) => {
+    try {
+        localStorage.setItem('openfi_admin_language', newVal);
+    } catch {
+        // ignore
+    }
 });
 export default i18n;

@@ -36,8 +36,9 @@ const SubmitAgent = () => {
       await dispatch(fetchUser()).unwrap();
       setHasAccess(true);
       localStorage.setItem('agent_deploy_access', 'true');
-    } catch (e: any) {
-      setError(e?.response?.data?.error || t('submitAgent.access.invalid'));
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } };
+      setError(err?.response?.data?.error || t('submitAgent.access.invalid'));
     } finally {
       setIsVerifying(false);
     }
@@ -178,10 +179,6 @@ const SubmitAgent = () => {
             <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--green)' }}>
               {t('submitAgent.access.granted')}
             </h2>
-            <p className="font-mono text-xs" style={{ color: 'var(--text-secondary)' }}>
-              Assigned Agent Key:{' '}
-              <span style={{ color: 'var(--neon-green)' }}>{currentUser?.agentPublicKey}</span>
-            </p>
           </div>
         )}
 
@@ -200,15 +197,17 @@ const SubmitAgent = () => {
               {t('submitAgent.command.label')}
             </label>
             <div
-              className="group relative flex items-center rounded p-4 font-mono"
+              className="group flex items-center justify-between gap-4 rounded p-4 font-mono"
               style={{ background: 'var(--bg-void)', border: '1px solid rgba(0,240,255,0.1)' }}
             >
-              <Terminal size={16} className="mr-3 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-              <span className="break-all text-sm" style={{ color: 'var(--green)' }}>{command || t('submitAgent.command.loading')}</span>
+              <div className="flex items-center min-w-0">
+                <Terminal size={16} className="mr-3 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                <span className="break-all text-sm" style={{ color: 'var(--green)' }}>{command || t('submitAgent.command.loading')}</span>
+              </div>
               <button
                 onClick={handleCopy}
                 disabled={!hasAccess || !command}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1.5 transition-all"
+                className="shrink-0 rounded p-1.5 transition-all"
                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)' }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--neon-green)'}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}

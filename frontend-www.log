@@ -1,0 +1,220 @@
+
+> clawfi@0.0.0 dev
+> vite
+
+
+  VITE v6.4.1  ready in 406 ms
+
+  ➜  Local:   http://localhost:9334/
+  ➜  Network: http://192.168.1.110:9334/
+  ➜  Network: http://198.18.0.1:9334/
+11:50:19 PM [vite] (client) hmr update /src/pages/Home.tsx, /src/index.css
+12:14:07 AM [vite] (client) hmr update /src/pages/Home.tsx, /src/index.css
+12:14:59 AM [vite] (client) hmr update /src/components/layout/Layout.tsx, /src/index.css
+12:15:00 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+12:15:25 AM [vite] (client) hmr update /src/pages/SubmitAgent.tsx, /src/index.css
+12:15:26 AM [vite] (client) hmr update /src/components/layout/Layout.tsx, /src/index.css
+12:15:39 AM [vite] (client) hmr update /src/pages/SubmitAgent.tsx, /src/index.css
+12:16:45 AM [vite] (client) hmr update /src/components/layout/Layout.tsx, /src/index.css
+12:16:47 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+12:16:47 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+12:16:49 AM [vite] (client) hmr update /src/pages/Strategies.tsx, /src/index.css
+12:26:49 AM [vite] (client) hmr update /src/pages/DocsEN.tsx, /src/index.css
+12:26:49 AM [vite] (client) hmr invalidate /src/pages/DocsEN.tsx Could not Fast Refresh ("NAV" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:26:49 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:28:05 AM [vite] (client) hmr update /src/pages/DocsZH.tsx, /src/index.css
+12:28:14 AM [vite] (client) hmr update /src/pages/DocsEN.tsx, /src/index.css
+12:28:14 AM [vite] Internal server error: /Users/uniteyoo/Documents/openfi-server/frontend-www/src/pages/DocsEN.tsx: Unexpected token (3:0)
+
+  1 |   Shield, BarChart3, Code2, Copy, Check, AlertTriangle, Info, Globe, Activity,
+  2 |   Server, TrendingUp, Database, Hash
+> 3 | } from 'lucide-react';
+    | ^
+  4 |
+  5 | // Link is also removed since it's no longer used in the simplified content.
+  6 |
+  Plugin: vite:react-babel
+  File: /Users/uniteyoo/Documents/openfi-server/frontend-www/src/pages/DocsEN.tsx:3:0
+  1  |    Shield, BarChart3, Code2, Copy, Check, AlertTriangle, Info, Globe, Activity,
+  2  |    Server, TrendingUp, Database, Hash
+  3  |  } from 'lucide-react';
+     |  ^
+  4  |  
+  5  |  // Link is also removed since it's no longer used in the simplified content.
+      at constructor (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:365:19)
+      at TypeScriptParserMixin.raise (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:6599:19)
+      at TypeScriptParserMixin.unexpected (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:6619:16)
+      at TypeScriptParserMixin.parseExprAtom (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11442:22)
+      at TypeScriptParserMixin.parseExprAtom (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:4764:20)
+      at TypeScriptParserMixin.parseExprSubscripts (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11081:23)
+      at TypeScriptParserMixin.parseUpdate (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11066:21)
+      at TypeScriptParserMixin.parseMaybeUnary (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11046:23)
+      at TypeScriptParserMixin.parseMaybeUnary (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:9837:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10899:61)
+      at TypeScriptParserMixin.parseExprOps (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10904:23)
+      at TypeScriptParserMixin.parseMaybeConditional (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10881:23)
+      at TypeScriptParserMixin.parseMaybeAssign (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10831:21)
+      at TypeScriptParserMixin.parseMaybeAssign (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:9786:20)
+      at TypeScriptParserMixin.parseExpressionBase (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10784:23)
+      at /Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10780:39
+      at TypeScriptParserMixin.allowInAnd (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12421:16)
+      at TypeScriptParserMixin.parseExpression (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10780:17)
+      at TypeScriptParserMixin.parseStatementContent (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12895:23)
+      at TypeScriptParserMixin.parseStatementContent (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:9508:18)
+      at TypeScriptParserMixin.parseStatementLike (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12767:17)
+      at TypeScriptParserMixin.parseModuleItem (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12744:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:13316:36)
+      at TypeScriptParserMixin.parseBlockBody (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:13309:10)
+      at TypeScriptParserMixin.parseProgram (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12622:10)
+      at TypeScriptParserMixin.parseTopLevel (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12612:25)
+      at TypeScriptParserMixin.parse (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:14488:25)
+      at TypeScriptParserMixin.parse (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10126:18)
+      at parse (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:14522:38)
+      at parser (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/core/lib/parser/index.js:41:34)
+      at parser.next (<anonymous>)
+      at normalizeFile (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/core/lib/transformation/normalize-file.js:64:37)
+      at normalizeFile.next (<anonymous>)
+      at run (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/core/lib/transformation/index.js:22:50)
+      at run.next (<anonymous>)
+      at transform (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/core/lib/transform.js:22:33)
+      at transform.next (<anonymous>)
+      at step (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/gensync/index.js:261:32)
+      at /Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/gensync/index.js:223:11)
+      at /Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/gensync/index.js:189:28
+      at /Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/core/lib/gensync-utils/async.js:67:7
+      at /Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/gensync/index.js:113:33
+      at step (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/gensync/index.js:287:14)
+      at /Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/gensync/index.js:223:11)
+12:28:15 AM [vite] (client) hmr update /src/pages/DocsZH.tsx, /src/index.css
+12:28:51 AM [vite] (client) hmr update /src/pages/DocsEN.tsx, /src/index.css
+12:28:52 AM [vite] (client) hmr invalidate /src/pages/DocsEN.tsx Could not Fast Refresh ("NAV" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:28:52 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:29:12 AM [vite] (client) hmr update /src/pages/DocsEN.tsx, /src/index.css
+12:29:12 AM [vite] (client) hmr invalidate /src/pages/DocsEN.tsx Could not Fast Refresh ("NAV" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:29:12 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:29:14 AM [vite] (client) hmr update /src/pages/DocsZH.tsx, /src/index.css
+12:29:14 AM [vite] (client) hmr invalidate /src/pages/DocsZH.tsx Could not Fast Refresh ("NAV_ZH" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:29:14 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:30:12 AM [vite] (client) hmr update /src/pages/DocsEN.tsx, /src/index.css
+12:30:12 AM [vite] (client) hmr invalidate /src/pages/DocsEN.tsx Could not Fast Refresh ("NAV" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:30:12 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:34:33 AM [vite] (client) hmr update /src/pages/DocsEN.tsx, /src/index.css
+12:34:33 AM [vite] (client) hmr invalidate /src/pages/DocsEN.tsx Could not Fast Refresh ("NAV" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:34:33 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:35:04 AM [vite] (client) hmr update /src/pages/DocsZH.tsx, /src/index.css
+12:35:04 AM [vite] (client) hmr invalidate /src/pages/DocsZH.tsx Could not Fast Refresh ("NAV_ZH" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:35:04 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:37:10 AM [vite] (client) hmr update /src/pages/DocsEN.tsx, /src/index.css
+12:37:10 AM [vite] Internal server error: /Users/uniteyoo/Documents/openfi-server/frontend-www/src/pages/DocsEN.tsx: Unexpected token, expected "}" (357:80)
+
+  355 |           ['Set Leverage', <Mono>exchange.update_leverage(leverage, coin, is_cross=False)</Mono>],
+  356 |           ['Market Open', <Mono>exchange.market_open(coin, is_buy, size)</Mono>],
+> 357 |           ['Limit Order', <Mono>exchange.order(coin, is_buy, sz, price, {"limit": {"tif": "Gtc"}})</Mono>],
+      |                                                                                 ^
+  358 |           ['Stop Loss', <Mono>exchange.order(coin, is_buy, sz, price, {"trigger": {...}}, reduce_only=True)</Mono>],
+  359 |         ]}
+  360 |       />
+  Plugin: vite:react-babel
+  File: /Users/uniteyoo/Documents/openfi-server/frontend-www/src/pages/DocsEN.tsx:357:80
+  355|            ['Set Leverage', <Mono>exchange.update_leverage(leverage, coin, is_cross=False)</Mono>],
+  356|            ['Market Open', <Mono>exchange.market_open(coin, is_buy, size)</Mono>],
+  357|            ['Limit Order', <Mono>exchange.order(coin, is_buy, sz, price, {"limit": {"tif": "Gtc"}})</Mono>],
+     |                                                                                  ^
+  358|            ['Stop Loss', <Mono>exchange.order(coin, is_buy, sz, price, {"trigger": {...}}, reduce_only=True)</Mono>],
+  359|          ]}
+      at constructor (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:365:19)
+      at TypeScriptParserMixin.raise (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:6599:19)
+      at TypeScriptParserMixin.unexpected (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:6619:16)
+      at TypeScriptParserMixin.expect (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:6899:12)
+      at TypeScriptParserMixin.jsxParseExpressionContainer (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:4637:10)
+      at TypeScriptParserMixin.jsxParseElementAt (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:4711:36)
+      at TypeScriptParserMixin.jsxParseElement (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:4749:17)
+      at TypeScriptParserMixin.parseExprAtom (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:4759:19)
+      at TypeScriptParserMixin.parseExprSubscripts (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11081:23)
+      at TypeScriptParserMixin.parseUpdate (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11066:21)
+      at TypeScriptParserMixin.parseMaybeUnary (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11046:23)
+      at TypeScriptParserMixin.parseMaybeUnary (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:9837:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10899:61)
+      at TypeScriptParserMixin.parseExprOps (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10904:23)
+      at TypeScriptParserMixin.parseMaybeConditional (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10881:23)
+      at TypeScriptParserMixin.parseMaybeAssign (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10831:21)
+      at /Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:9775:39
+      at TypeScriptParserMixin.tryParse (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:6907:20)
+      at TypeScriptParserMixin.parseMaybeAssign (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:9775:18)
+      at /Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10800:39
+      at TypeScriptParserMixin.allowInAnd (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12426:12)
+      at TypeScriptParserMixin.parseMaybeAssignAllowIn (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10800:17)
+      at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12493:17)
+      at TypeScriptParserMixin.parseExprListItem (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12175:18)
+      at TypeScriptParserMixin.parseExprList (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12150:22)
+      at TypeScriptParserMixin.parseArrayLike (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12057:26)
+      at TypeScriptParserMixin.parseArrayLike (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:9193:24)
+      at TypeScriptParserMixin.parseExprAtom (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11335:23)
+      at TypeScriptParserMixin.parseExprAtom (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:4764:20)
+      at TypeScriptParserMixin.parseExprSubscripts (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11081:23)
+      at TypeScriptParserMixin.parseUpdate (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11066:21)
+      at TypeScriptParserMixin.parseMaybeUnary (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11046:23)
+      at TypeScriptParserMixin.parseMaybeUnary (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:9837:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10899:61)
+      at TypeScriptParserMixin.parseExprOps (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10904:23)
+      at TypeScriptParserMixin.parseMaybeConditional (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10881:23)
+      at TypeScriptParserMixin.parseMaybeAssign (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10831:21)
+      at TypeScriptParserMixin.parseMaybeAssign (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:9786:20)
+      at /Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10800:39
+      at TypeScriptParserMixin.allowInAnd (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12426:12)
+      at TypeScriptParserMixin.parseMaybeAssignAllowIn (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:10800:17)
+      at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12493:17)
+      at TypeScriptParserMixin.parseExprListItem (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12175:18)
+      at TypeScriptParserMixin.parseExprList (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12150:22)
+      at TypeScriptParserMixin.parseArrayLike (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:12057:26)
+      at TypeScriptParserMixin.parseArrayLike (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:9193:24)
+      at TypeScriptParserMixin.parseExprAtom (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11335:23)
+      at TypeScriptParserMixin.parseExprAtom (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:4764:20)
+      at TypeScriptParserMixin.parseExprSubscripts (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11081:23)
+      at TypeScriptParserMixin.parseUpdate (/Users/uniteyoo/Documents/openfi-server/frontend-www/node_modules/@babel/parser/lib/index.js:11066:21)
+12:37:20 AM [vite] (client) hmr update /src/pages/DocsEN.tsx, /src/index.css
+12:37:20 AM [vite] (client) hmr invalidate /src/pages/DocsEN.tsx Could not Fast Refresh ("NAV" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:37:20 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:37:47 AM [vite] (client) hmr update /src/pages/DocsEN.tsx, /src/index.css
+12:37:47 AM [vite] (client) hmr invalidate /src/pages/DocsEN.tsx Could not Fast Refresh ("NAV" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:37:47 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:37:47 AM [vite] (client) hmr update /src/pages/DocsZH.tsx, /src/index.css
+12:37:47 AM [vite] (client) hmr invalidate /src/pages/DocsZH.tsx Could not Fast Refresh ("NAV_ZH" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:37:47 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:40:11 AM [vite] (client) hmr update /src/pages/DocsEN.tsx, /src/index.css
+12:40:12 AM [vite] (client) hmr invalidate /src/pages/DocsEN.tsx Could not Fast Refresh ("NAV" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:40:12 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:40:31 AM [vite] (client) hmr update /src/pages/DocsZH.tsx, /src/index.css
+12:40:31 AM [vite] (client) hmr invalidate /src/pages/DocsZH.tsx Could not Fast Refresh ("NAV_ZH" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:40:31 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:42:30 AM [vite] (client) hmr update /src/pages/Agents.tsx, /src/index.css
+12:42:35 AM [vite] (client) hmr update /src/components/layout/Layout.tsx, /src/index.css
+12:43:05 AM [vite] (client) hmr update /src/pages/DocsEN.tsx, /src/index.css
+12:43:05 AM [vite] (client) hmr invalidate /src/pages/DocsEN.tsx Could not Fast Refresh ("NAV" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:43:05 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:43:11 AM [vite] (client) hmr update /src/pages/DocsZH.tsx, /src/index.css
+12:43:11 AM [vite] (client) hmr invalidate /src/pages/DocsZH.tsx Could not Fast Refresh ("NAV_ZH" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:43:11 AM [vite] (client) hmr update /src/index.css, /src/pages/Docs.tsx
+12:45:22 AM [vite] (client) hmr update /src/context/LanguageContext.tsx, /src/index.css
+12:45:22 AM [vite] (client) hmr invalidate /src/context/LanguageContext.tsx Could not Fast Refresh ("useLanguage" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+12:45:22 AM [vite] (client) page reload src/context/LanguageContext.tsx
+12:45:33 AM [vite] (client) hmr update /src/pages/Agents.tsx, /src/index.css
+12:45:48 AM [vite] (client) hmr update /src/pages/Profile.tsx, /src/index.css
+12:48:43 AM [vite] (client) hmr update /src/pages/Agents.tsx, /src/index.css
+12:49:07 AM [vite] (client) hmr update /src/pages/Profile.tsx, /src/index.css
+12:50:36 AM [vite] (client) hmr update /src/pages/Agents.tsx, /src/index.css
+12:50:49 AM [vite] (client) hmr update /src/pages/Profile.tsx, /src/index.css
+12:52:50 AM [vite] (client) hmr update /src/pages/Agents.tsx, /src/index.css
+12:53:03 AM [vite] (client) hmr update /src/pages/Profile.tsx, /src/index.css
+12:54:31 AM [vite] (client) hmr update /src/pages/Profile.tsx, /src/index.css
+12:54:43 AM [vite] (client) hmr update /src/pages/Profile.tsx, /src/index.css
+12:56:03 AM [vite] (client) hmr update /src/pages/Agents.tsx, /src/index.css
+12:56:11 AM [vite] (client) hmr update /src/pages/Profile.tsx, /src/index.css
+12:57:58 AM [vite] (client) hmr update /src/pages/Profile.tsx, /src/index.css
+12:59:57 AM [vite] (client) hmr update /src/pages/Profile.tsx, /src/index.css
+1:01:38 AM [vite] (client) hmr update /src/pages/Profile.tsx, /src/index.css
+1:03:37 AM [vite] (client) hmr update /src/pages/Agents.tsx, /src/index.css
+1:03:46 AM [vite] (client) hmr update /src/pages/Agents.tsx, /src/index.css
+1:04:36 AM [vite] (client) hmr update /src/pages/Agents.tsx, /src/index.css
