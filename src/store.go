@@ -12,6 +12,7 @@ import (
 )
 
 var errInviteCodeNotFound = errors.New("invite code not found")
+var errNoSlotsRemaining = errors.New("no_slots_remaining")
 
 type Store struct {
 	db *sql.DB
@@ -142,7 +143,9 @@ func (s *Store) initSchema() error {
 		`CREATE INDEX IF NOT EXISTS idx_agents_user_id ON agents(user_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_users_x_id ON users(x_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_invite_code_usages_user ON invite_code_usages(user_id);`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_invite_code_usages_user_unique ON invite_code_usages(user_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_accounts_status ON agent_accounts(status);`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_accounts_assigned_user_unique ON agent_accounts(assigned_user_id) WHERE assigned_user_id IS NOT NULL;`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_snapshots_pub_created ON agent_snapshots(public_key, created_at);`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_fills_pub_time ON agent_fills(public_key, fill_time);`,
 		`CREATE INDEX IF NOT EXISTS idx_oauth_states_provider_created ON oauth_states(provider, created_at);`,
@@ -179,6 +182,66 @@ func (s *Store) initSchema() error {
 
 		// performance fee column
 		`ALTER TABLE agent_accounts ADD COLUMN performance_fee REAL NOT NULL DEFAULT 0.2`,
+
+		// initial capital from on-chain vault
+		`ALTER TABLE agent_accounts ADD COLUMN initial_capital REAL NOT NULL DEFAULT 0`,
+
+		// agent_vaults — discovered from Allocator contract
+		`CREATE TABLE IF NOT EXISTS agent_vaults (
+			vault_address TEXT PRIMARY KEY,
+			user_address TEXT NOT NULL DEFAULT '',
+			evm_balance REAL NOT NULL DEFAULT 0,
+			initial_capital REAL NOT NULL DEFAULT 0,
+			valid INTEGER NOT NULL DEFAULT 0,
+			allocator_address TEXT NOT NULL DEFAULT '',
+			account_value REAL NOT NULL DEFAULT 0,
+			unrealized_pnl REAL NOT NULL DEFAULT 0,
+			last_synced_at TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_vaults_user ON agent_vaults(user_address)`,
+
+		// sync status tracking for agent_vaults
+		`ALTER TABLE agent_vaults ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'ok'`,
+		`ALTER TABLE agent_vaults ADD COLUMN sync_error TEXT NOT NULL DEFAULT ''`,
+
+		// treasury snapshots — global treasury stats time series
+		`CREATE TABLE IF NOT EXISTS treasury_snapshots (
+			id TEXT PRIMARY KEY,
+			vault_evm REAL NOT NULL DEFAULT 0,
+			vault_perps REAL NOT NULL DEFAULT 0,
+			vault_spot REAL NOT NULL DEFAULT 0,
+			vault_pnl REAL NOT NULL DEFAULT 0,
+			vault_capital REAL NOT NULL DEFAULT 0,
+			allocator_evm REAL NOT NULL DEFAULT 0,
+			allocator_perps REAL NOT NULL DEFAULT 0,
+			allocator_spot REAL NOT NULL DEFAULT 0,
+			owner_evm REAL NOT NULL DEFAULT 0,
+			owner_perps REAL NOT NULL DEFAULT 0,
+			owner_spot REAL NOT NULL DEFAULT 0,
+			total_funds REAL NOT NULL DEFAULT 0,
+			vault_count INTEGER NOT NULL DEFAULT 0,
+			active_vault_count INTEGER NOT NULL DEFAULT 0,
+			allocator_address TEXT NOT NULL DEFAULT '',
+			owner_address TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_treasury_snapshots_created ON treasury_snapshots(created_at)`,
+
+		// platform snapshots — platform-level time series
+		`CREATE TABLE IF NOT EXISTS platform_snapshots (
+			id TEXT PRIMARY KEY,
+			total_tvl REAL NOT NULL DEFAULT 0,
+			total_pnl REAL NOT NULL DEFAULT 0,
+			total_capital REAL NOT NULL DEFAULT 0,
+			user_count INTEGER NOT NULL DEFAULT 0,
+			active_agent_count INTEGER NOT NULL DEFAULT 0,
+			total_agent_count INTEGER NOT NULL DEFAULT 0,
+			total_trades INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_platform_snapshots_created ON platform_snapshots(created_at)`,
 	}
 
 	for _, stmt := range schema {
@@ -210,36 +273,28 @@ func (s *Store) consumeNonce(nonce string, wallet string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
+	defer func() { _ = tx.Rollback() }()
 
 	var storedWallet string
 	var createdAt string
 	var used int
 	err = tx.QueryRow(`SELECT IFNULL(wallet_address, ''), created_at, used FROM nonces WHERE nonce = ?`, nonce).Scan(&storedWallet, &createdAt, &used)
 	if errors.Is(err, sql.ErrNoRows) {
-		_ = tx.Rollback()
 		return false, nil
 	}
 	if err != nil {
 		return false, err
 	}
 	if used == 1 {
-		_ = tx.Rollback()
 		return false, nil
 	}
 	if storedWallet != "" && wallet != "" && storedWallet != wallet {
-		_ = tx.Rollback()
 		return false, nil
 	}
 
 	created, parseErr := time.Parse(time.RFC3339, createdAt)
 	if parseErr == nil {
 		if time.Since(created) > 15*time.Minute {
-			_ = tx.Rollback()
 			return false, nil
 		}
 	}
@@ -277,11 +332,7 @@ func (s *Store) consumeOAuthState(provider string, state string, ttl time.Durati
 	if err != nil {
 		return OAuthState{}, err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
+	defer func() { _ = tx.Rollback() }()
 
 	item := OAuthState{}
 	var used int
@@ -300,8 +351,8 @@ func (s *Store) consumeOAuthState(provider string, state string, ttl time.Durati
 	if used == 1 {
 		return OAuthState{}, errors.New("oauth state already consumed")
 	}
-	createdAt, parseErr := time.Parse(time.RFC3339, item.CreatedAt)
-	if parseErr != nil || time.Since(createdAt) > ttl {
+	createdAtTime, parseErr := time.Parse(time.RFC3339, item.CreatedAt)
+	if parseErr != nil || time.Since(createdAtTime) > ttl {
 		return OAuthState{}, errors.New("oauth state expired")
 	}
 
@@ -399,6 +450,19 @@ func (s *Store) getUserByID(id string) (User, error) {
 	return user, nil
 }
 
+func (s *Store) getUserByName(name string) (User, error) {
+	var payload string
+	err := s.db.QueryRow(`SELECT data_json FROM users WHERE lower(name) = lower(?)`, strings.TrimSpace(name)).Scan(&payload)
+	if err != nil {
+		return User{}, err
+	}
+	var user User
+	if err := json.Unmarshal([]byte(payload), &user); err != nil {
+		return User{}, err
+	}
+	return user, nil
+}
+
 func (s *Store) listUsers(search string) ([]User, error) {
 	query := `SELECT data_json FROM users`
 	args := make([]any, 0)
@@ -456,7 +520,51 @@ func (s *Store) listInviteCodes() ([]InviteCode, error) {
 		}
 		items = append(items, item)
 	}
-	return items, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Batch load usage info for codes that have been used
+	usedCodeIDs := make([]string, 0)
+	codeIndexMap := make(map[string]int)
+	for i, item := range items {
+		if item.UsedCount > 0 {
+			usedCodeIDs = append(usedCodeIDs, item.ID)
+			codeIndexMap[item.ID] = i
+		}
+	}
+
+	if len(usedCodeIDs) > 0 {
+		placeholders := strings.TrimRight(strings.Repeat("?,", len(usedCodeIDs)), ",")
+		args := make([]any, 0, len(usedCodeIDs))
+		for _, id := range usedCodeIDs {
+			args = append(args, id)
+		}
+		usageRows, err := s.db.Query(`
+			SELECT u.code_id, u.user_id, IFNULL(usr.name, ''), u.used_at
+			FROM invite_code_usages u
+			LEFT JOIN users usr ON usr.id = u.user_id
+			WHERE u.code_id IN (`+placeholders+`)
+			ORDER BY u.used_at DESC`, args...)
+		if err == nil {
+			defer usageRows.Close()
+			for usageRows.Next() {
+				var codeID, userID, userName, usedAt string
+				if err := usageRows.Scan(&codeID, &userID, &userName, &usedAt); err != nil {
+					continue
+				}
+				if idx, ok := codeIndexMap[codeID]; ok {
+					items[idx].UsedByUsers = append(items[idx].UsedByUsers, InviteCodeUser{
+						UserID:   userID,
+						UserName: userName,
+						UsedAt:   usedAt,
+					})
+				}
+			}
+		}
+	}
+
+	return items, nil
 }
 
 func (s *Store) createInviteCode(code InviteCode) (InviteCode, error) {
@@ -479,7 +587,7 @@ func (s *Store) createInviteCode(code InviteCode) (InviteCode, error) {
 	return code, nil
 }
 
-func (s *Store) updateInviteCode(id string, patch InviteCode) (InviteCode, error) {
+func (s *Store) updateInviteCode(id string, description *string, maxUses *int, status *string) (InviteCode, error) {
 	var item InviteCode
 	err := s.db.QueryRow(`
 		SELECT id, code, IFNULL(description, ''), status, IFNULL(max_uses, 0), used_count, created_at
@@ -489,14 +597,18 @@ func (s *Store) updateInviteCode(id string, patch InviteCode) (InviteCode, error
 		return InviteCode{}, err
 	}
 
-	if patch.Description != "" {
-		item.Description = patch.Description
+	if description != nil {
+		item.Description = strings.TrimSpace(*description)
 	}
-	if patch.MaxUses > 0 {
-		item.MaxUses = patch.MaxUses
+	if maxUses != nil {
+		if *maxUses < 0 {
+			item.MaxUses = 0
+		} else {
+			item.MaxUses = *maxUses
+		}
 	}
-	if patch.Status != "" {
-		item.Status = patch.Status
+	if status != nil && strings.TrimSpace(*status) != "" {
+		item.Status = strings.TrimSpace(*status)
 	}
 
 	_, err = s.db.Exec(`
@@ -623,11 +735,7 @@ func (s *Store) consumeInviteCodeForUser(code string, userID string) (InviteCode
 	if err != nil {
 		return InviteCode{}, err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
+	defer func() { _ = tx.Rollback() }()
 
 	var invite InviteCode
 	err = tx.QueryRow(`
@@ -673,526 +781,6 @@ func (s *Store) consumeInviteCodeForUser(code string, userID string) (InviteCode
 	}
 	invite.UsedCount += 1
 	return invite, nil
-}
-
-func (s *Store) importAgentPrivateKeys(privateKeys []string, fixedKey string) (AgentImportResult, error) {
-	result := AgentImportResult{PublicKeys: make([]string, 0)}
-	for _, pk := range privateKeys {
-		pub, err := derivePublicKeyFromPrivateKey(pk)
-		if err != nil {
-			result.Invalid++
-			continue
-		}
-		encrypted, err := encryptSecret(pk, fixedKey)
-		if err != nil {
-			return result, err
-		}
-		item := AgentAccount{
-			ID:        newID("acct"),
-			PublicKey: pub,
-			Status:    "unused",
-			CreatedAt: nowISO(),
-		}
-		_, err = s.db.Exec(`
-			INSERT INTO agent_accounts(id, public_key, encrypted_private_key, status, created_at)
-			VALUES(?, ?, ?, ?, ?)`,
-			item.ID,
-			item.PublicKey,
-			encrypted,
-			item.Status,
-			item.CreatedAt,
-		)
-		if err != nil {
-			if strings.Contains(strings.ToLower(err.Error()), "unique") {
-				result.Duplicates++
-				continue
-			}
-			return result, err
-		}
-		result.Imported++
-		result.PublicKeys = append(result.PublicKeys, pub)
-	}
-	return result, nil
-}
-
-func (s *Store) listAgentAccounts(status string) ([]AgentAccount, error) {
-	query := `
-		SELECT a.id, a.public_key, a.status, IFNULL(a.assigned_user_id, ''), IFNULL(u.name, ''), IFNULL(a.assigned_at, ''), a.created_at
-		FROM agent_accounts a
-		LEFT JOIN users u ON u.id = a.assigned_user_id
-		WHERE 1=1`
-	args := make([]any, 0)
-	if status != "" {
-		query += ` AND a.status = ?`
-		args = append(args, status)
-	}
-	query += ` ORDER BY a.created_at DESC`
-
-	rows, err := s.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	items := make([]AgentAccount, 0)
-	for rows.Next() {
-		item := AgentAccount{}
-		if err := rows.Scan(
-			&item.ID,
-			&item.PublicKey,
-			&item.Status,
-			&item.AssignedUserID,
-			&item.AssignedUserName,
-			&item.AssignedAt,
-			&item.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, item)
-	}
-	return items, rows.Err()
-}
-
-func (s *Store) assignUnusedAgentAccount(userID string) (AgentAccount, error) {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return AgentAccount{}, err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	item := AgentAccount{}
-	err = tx.QueryRow(`
-		SELECT id, public_key, status, IFNULL(assigned_user_id, ''), IFNULL(assigned_at, ''), created_at
-		FROM agent_accounts
-		WHERE status = 'unused'
-		ORDER BY created_at ASC
-		LIMIT 1`,
-	).Scan(&item.ID, &item.PublicKey, &item.Status, &item.AssignedUserID, &item.AssignedAt, &item.CreatedAt)
-	if err != nil {
-		return AgentAccount{}, err
-	}
-
-	item.Status = "assigned"
-	item.AssignedUserID = userID
-	item.AssignedAt = nowISO()
-	if _, err = tx.Exec(`
-		UPDATE agent_accounts
-		SET status = 'assigned', assigned_user_id = ?, assigned_at = ?
-		WHERE id = ?`,
-		item.AssignedUserID,
-		item.AssignedAt,
-		item.ID,
-	); err != nil {
-		return AgentAccount{}, err
-	}
-	if err = tx.Commit(); err != nil {
-		return AgentAccount{}, err
-	}
-	return item, nil
-}
-
-func (s *Store) consumeInviteAndAssignAccount(code string, userID string) (InviteCode, AgentAccount, error) {
-	code = strings.ToUpper(strings.TrimSpace(code))
-	if code == "" {
-		return InviteCode{}, AgentAccount{}, errors.New("empty invite code")
-	}
-
-	tx, err := s.db.Begin()
-	if err != nil {
-		return InviteCode{}, AgentAccount{}, err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	var invite InviteCode
-	err = tx.QueryRow(`
-		SELECT id, code, IFNULL(description, ''), status, IFNULL(max_uses, 0), used_count, created_at
-		FROM invite_codes
-		WHERE code = ?`, code,
-	).Scan(&invite.ID, &invite.Code, &invite.Description, &invite.Status, &invite.MaxUses, &invite.UsedCount, &invite.CreatedAt)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return InviteCode{}, AgentAccount{}, errInviteCodeNotFound
-		}
-		return InviteCode{}, AgentAccount{}, err
-	}
-	if invite.Status != "active" {
-		return InviteCode{}, AgentAccount{}, errors.New("invite code inactive")
-	}
-	if invite.MaxUses > 0 && invite.UsedCount >= invite.MaxUses {
-		return InviteCode{}, AgentAccount{}, errors.New("invite code limit reached")
-	}
-
-	var usageCount int
-	if err = tx.QueryRow(`SELECT COUNT(1) FROM invite_code_usages WHERE user_id = ?`, userID).Scan(&usageCount); err != nil {
-		return InviteCode{}, AgentAccount{}, err
-	}
-	if usageCount > 0 {
-		return InviteCode{}, AgentAccount{}, errors.New("user already used invite code")
-	}
-
-	account := AgentAccount{}
-	err = tx.QueryRow(`
-		SELECT id, public_key, status, IFNULL(assigned_user_id, ''), IFNULL(assigned_at, ''), created_at
-		FROM agent_accounts
-		WHERE status = 'unused'
-		ORDER BY created_at ASC
-		LIMIT 1`,
-	).Scan(&account.ID, &account.PublicKey, &account.Status, &account.AssignedUserID, &account.AssignedAt, &account.CreatedAt)
-	if err != nil {
-		return InviteCode{}, AgentAccount{}, err
-	}
-
-	if _, err = tx.Exec(`UPDATE invite_codes SET used_count = used_count + 1 WHERE id = ?`, invite.ID); err != nil {
-		return InviteCode{}, AgentAccount{}, err
-	}
-	if _, err = tx.Exec(`
-		INSERT INTO invite_code_usages(id, code_id, code, user_id, used_at)
-		VALUES(?, ?, ?, ?, ?)`,
-		newID("invite_use"),
-		invite.ID,
-		invite.Code,
-		userID,
-		nowISO(),
-	); err != nil {
-		return InviteCode{}, AgentAccount{}, err
-	}
-
-	account.Status = "assigned"
-	account.AssignedUserID = userID
-	account.AssignedAt = nowISO()
-	if _, err = tx.Exec(`
-		UPDATE agent_accounts
-		SET status = 'assigned', assigned_user_id = ?, assigned_at = ?
-		WHERE id = ?`,
-		account.AssignedUserID,
-		account.AssignedAt,
-		account.ID,
-	); err != nil {
-		return InviteCode{}, AgentAccount{}, err
-	}
-
-	if err = tx.Commit(); err != nil {
-		return InviteCode{}, AgentAccount{}, err
-	}
-	invite.UsedCount += 1
-	return invite, account, nil
-}
-
-func (s *Store) getAgentAccountByUserID(userID string) (AgentAccount, error) {
-	item := AgentAccount{}
-	err := s.db.QueryRow(`
-		SELECT id, public_key, status, IFNULL(assigned_user_id, ''), IFNULL(assigned_at, ''), created_at
-		FROM agent_accounts
-		WHERE assigned_user_id = ?
-		ORDER BY assigned_at DESC
-		LIMIT 1`, userID,
-	).Scan(&item.ID, &item.PublicKey, &item.Status, &item.AssignedUserID, &item.AssignedAt, &item.CreatedAt)
-	if err != nil {
-		return AgentAccount{}, err
-	}
-	return item, nil
-}
-
-func (s *Store) saveAgentSnapshot(publicKey string, accountValue float64, unrealizedPNL float64, source string) (AgentSnapshot, error) {
-	item := AgentSnapshot{
-		ID:            newID("snap"),
-		PublicKey:     publicKey,
-		AccountValue:  accountValue,
-		UnrealizedPNL: unrealizedPNL,
-		Source:        source,
-		CreatedAt:     nowISO(),
-	}
-	_, err := s.db.Exec(`
-		INSERT INTO agent_snapshots(id, public_key, account_value, unrealized_pnl, source, created_at)
-		VALUES(?, ?, ?, ?, ?, ?)`,
-		item.ID,
-		item.PublicKey,
-		item.AccountValue,
-		item.UnrealizedPNL,
-		item.Source,
-		item.CreatedAt,
-	)
-	if err != nil {
-		return AgentSnapshot{}, err
-	}
-	return item, nil
-}
-
-func (s *Store) listAgentSnapshots(publicKey string, limit int, period string) ([]AgentSnapshot, error) {
-	if limit <= 0 || limit > 1000 {
-		limit = 200
-	}
-
-	// Compute time filter from period
-	var since string
-	switch strings.ToUpper(strings.TrimSpace(period)) {
-	case "1D":
-		since = time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339)
-	case "1W":
-		since = time.Now().UTC().Add(-7 * 24 * time.Hour).Format(time.RFC3339)
-	case "1M":
-		since = time.Now().UTC().Add(-30 * 24 * time.Hour).Format(time.RFC3339)
-	default:
-		// ALL or empty — no time filter
-	}
-
-	args := []any{strings.ToLower(publicKey)}
-	query := `
-		SELECT id, public_key, account_value, unrealized_pnl, source, created_at
-		FROM agent_snapshots
-		WHERE public_key = ?`
-	if since != "" {
-		query += ` AND created_at >= ?`
-		args = append(args, since)
-	}
-	query += `
-		ORDER BY created_at DESC
-		LIMIT ?`
-	args = append(args, limit)
-
-	rows, err := s.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	items := make([]AgentSnapshot, 0)
-	for rows.Next() {
-		item := AgentSnapshot{}
-		if err := rows.Scan(&item.ID, &item.PublicKey, &item.AccountValue, &item.UnrealizedPNL, &item.Source, &item.CreatedAt); err != nil {
-			return nil, err
-		}
-		items = append(items, item)
-	}
-	return items, rows.Err()
-}
-
-func (s *Store) listAgentStats(search string) ([]AgentMarketItem, error) {
-	query := `
-		SELECT a.public_key,
-		       IFNULL(a.name, ''),
-		       IFNULL(a.description, ''),
-		       IFNULL(a.assigned_user_id, ''),
-		       IFNULL(u.name, ''),
-		       IFNULL(latest.account_value, 0),
-		       IFNULL(latest.account_value, 0) - IFNULL(first.account_value, 0),
-		       IFNULL(latest.created_at, ''),
-		       IFNULL(a.vault_address, ''),
-		       IFNULL(a.evm_balance, 0),
-		       IFNULL(a.agent_status, 'inactive'),
-		       IFNULL(a.performance_fee, 0.2)
-		FROM agent_accounts a
-		LEFT JOIN users u ON u.id = a.assigned_user_id
-		LEFT JOIN (
-			SELECT public_key, account_value, created_at
-			FROM agent_snapshots s1
-			WHERE s1.created_at = (
-				SELECT MAX(s2.created_at) FROM agent_snapshots s2 WHERE s2.public_key = s1.public_key
-			)
-		) latest ON latest.public_key = a.public_key
-		LEFT JOIN (
-			SELECT public_key, account_value
-			FROM agent_snapshots s1
-			WHERE s1.created_at = (
-				SELECT MIN(s2.created_at) FROM agent_snapshots s2 WHERE s2.public_key = s1.public_key
-			)
-		) first ON first.public_key = a.public_key
-		WHERE a.status = 'assigned'`
-	args := make([]any, 0)
-	if s := strings.TrimSpace(search); s != "" {
-		query += ` AND (lower(a.public_key) LIKE ? OR lower(u.name) LIKE ? OR lower(a.name) LIKE ?)`
-		pattern := "%" + strings.ToLower(s) + "%"
-		args = append(args, pattern, pattern, pattern)
-	}
-	query += ` ORDER BY a.assigned_at DESC`
-
-	rows, err := s.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	items := make([]AgentMarketItem, 0)
-	for rows.Next() {
-		var item AgentMarketItem
-		if err := rows.Scan(
-			&item.PublicKey,
-			&item.Name,
-			&item.Description,
-			&item.UserID,
-			&item.UserName,
-			&item.AccountValue,
-			&item.TotalPnL,
-			&item.LastSyncedAt,
-			&item.VaultAddress,
-			&item.EVMBalance,
-			&item.AgentStatus,
-			&item.PerformanceFee,
-		); err != nil {
-			return nil, err
-		}
-		item.TVL = item.AccountValue + item.EVMBalance
-		items = append(items, item)
-	}
-	return items, rows.Err()
-}
-
-func (s *Store) getAgentStats(publicKey string) (AgentMarketItem, error) {
-	publicKey = strings.ToLower(strings.TrimSpace(publicKey))
-	var item AgentMarketItem
-	err := s.db.QueryRow(`
-		SELECT a.public_key,
-		       IFNULL(a.name, ''),
-		       IFNULL(a.description, ''),
-		       IFNULL(a.assigned_user_id, ''),
-		       IFNULL(u.name, ''),
-		       IFNULL(latest.account_value, 0),
-		       IFNULL(latest.account_value, 0) - IFNULL(first.account_value, 0),
-		       IFNULL(latest.created_at, ''),
-		       IFNULL(a.vault_address, ''),
-		       IFNULL(a.evm_balance, 0),
-		       IFNULL(a.agent_status, 'inactive'),
-		       IFNULL(a.performance_fee, 0.2)
-		FROM agent_accounts a
-		LEFT JOIN users u ON u.id = a.assigned_user_id
-		LEFT JOIN (
-			SELECT public_key, account_value, created_at
-			FROM agent_snapshots s1
-			WHERE s1.created_at = (
-				SELECT MAX(s2.created_at) FROM agent_snapshots s2 WHERE s2.public_key = s1.public_key
-			)
-		) latest ON latest.public_key = a.public_key
-		LEFT JOIN (
-			SELECT public_key, account_value
-			FROM agent_snapshots s1
-			WHERE s1.created_at = (
-				SELECT MIN(s2.created_at) FROM agent_snapshots s2 WHERE s2.public_key = s1.public_key
-			)
-		) first ON first.public_key = a.public_key
-		WHERE a.public_key = ? AND a.status = 'assigned'`,
-		publicKey,
-	).Scan(
-		&item.PublicKey,
-		&item.Name,
-		&item.Description,
-		&item.UserID,
-		&item.UserName,
-		&item.AccountValue,
-		&item.TotalPnL,
-		&item.LastSyncedAt,
-		&item.VaultAddress,
-		&item.EVMBalance,
-		&item.AgentStatus,
-		&item.PerformanceFee,
-	)
-	if err != nil {
-		return AgentMarketItem{}, err
-	}
-	item.TVL = item.AccountValue + item.EVMBalance
-	return item, nil
-}
-
-func (s *Store) updateVaultData(publicKey string, vaultAddress string, evmBalance float64, agentStatus string) error {
-	publicKey = strings.ToLower(strings.TrimSpace(publicKey))
-	_, err := s.db.Exec(`
-		UPDATE agent_accounts
-		SET vault_address = ?, evm_balance = ?, agent_status = ?
-		WHERE public_key = ?`,
-		strings.TrimSpace(vaultAddress),
-		evmBalance,
-		strings.TrimSpace(agentStatus),
-		publicKey,
-	)
-	return err
-}
-
-func (s *Store) updateAgentProfile(publicKey string, name string, description string, performanceFee float64) error {
-	publicKey = strings.ToLower(strings.TrimSpace(publicKey))
-	res, err := s.db.Exec(`
-		UPDATE agent_accounts
-		SET name = ?, description = ?, performance_fee = ?
-		WHERE public_key = ?`,
-		strings.TrimSpace(name),
-		strings.TrimSpace(description),
-		performanceFee,
-		publicKey,
-	)
-	if err != nil {
-		return err
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		return sql.ErrNoRows
-	}
-	return nil
-}
-
-func (s *Store) upsertAgentFill(publicKey string, fillID string, fillTime int64, rawJSON string) error {
-	if fillID == "" {
-		fillID = fmt.Sprintf("%s_%d", strings.ToLower(publicKey), fillTime)
-	}
-	_, err := s.db.Exec(`
-		INSERT INTO agent_fills(id, public_key, fill_time, data_json, created_at)
-		VALUES(?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
-			fill_time = excluded.fill_time,
-			data_json = excluded.data_json`,
-		fillID,
-		strings.ToLower(publicKey),
-		fillTime,
-		rawJSON,
-		nowISO(),
-	)
-	return err
-}
-
-func (s *Store) listAgentFills(publicKey string, limit int) ([]VaultFill, error) {
-	if limit <= 0 || limit > 500 {
-		limit = 50
-	}
-	rows, err := s.db.Query(`
-		SELECT data_json FROM agent_fills
-		WHERE public_key = ?
-		ORDER BY fill_time DESC
-		LIMIT ?`,
-		strings.ToLower(publicKey),
-		limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	fills := make([]VaultFill, 0)
-	for rows.Next() {
-		var raw string
-		if err := rows.Scan(&raw); err != nil {
-			return nil, err
-		}
-		var f VaultFill
-		if err := json.Unmarshal([]byte(raw), &f); err != nil {
-			continue
-		}
-		fills = append(fills, f)
-	}
-	return fills, nil
-}
-
-func (s *Store) getAgentCreatedAt(publicKey string) string {
-	publicKey = strings.ToLower(strings.TrimSpace(publicKey))
-	var createdAt string
-	s.db.QueryRow(`SELECT created_at FROM agent_accounts WHERE public_key = ?`, publicKey).Scan(&createdAt)
-	return createdAt
 }
 
 func (s *Store) verifyInviteCode(code string) (bool, string, error) {
@@ -1252,10 +840,14 @@ func (s *Store) createAdmin(email string, name string, password string) (AdminUs
 
 	id := newID("admin")
 	createdAt := nowISO()
-	_, err := s.db.Exec(`
+	passwordHash, err := hashPasswordStrong(trimmedPassword)
+	if err != nil {
+		return AdminUser{}, err
+	}
+	_, err = s.db.Exec(`
 		INSERT INTO admins(id, email, password_hash, name, created_at)
 		VALUES(?, ?, ?, ?, ?)
-	`, id, trimmedEmail, hashPassword(trimmedPassword), trimmedName, createdAt)
+	`, id, trimmedEmail, passwordHash, trimmedName, createdAt)
 	if err != nil {
 		return AdminUser{}, err
 	}
@@ -1272,7 +864,11 @@ func (s *Store) updateAdminPassword(id string, newPassword string) error {
 		return errors.New("admin password required")
 	}
 
-	res, err := s.db.Exec(`UPDATE admins SET password_hash = ? WHERE id = ?`, hashPassword(trimmedPassword), trimmedID)
+	passwordHash, err := hashPasswordStrong(trimmedPassword)
+	if err != nil {
+		return err
+	}
+	res, err := s.db.Exec(`UPDATE admins SET password_hash = ? WHERE id = ?`, passwordHash, trimmedID)
 	if err != nil {
 		return err
 	}
@@ -1383,15 +979,55 @@ func (s *Store) deleteUsers(ids []string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
+	defer func() { _ = tx.Rollback() }()
 
-	if _, err = tx.Exec(`UPDATE agent_accounts SET assigned_user_id = NULL, assigned_at = NULL WHERE assigned_user_id IN (`+placeholders+`)`, args...); err != nil {
+	// Release agent accounts bound to deleted users.
+	if _, err = tx.Exec(`UPDATE agent_accounts
+		SET status = 'unused',
+		    assigned_user_id = NULL,
+		    assigned_at = NULL,
+		    vault_address = '',
+		    evm_balance = 0,
+		    agent_status = 'inactive',
+		    initial_capital = 0
+		WHERE assigned_user_id IN (`+placeholders+`)`, args...); err != nil {
 		return 0, err
 	}
+
+	// Roll back invite code usage counters before removing usage rows.
+	usageRows, qErr := tx.Query(`SELECT code_id, COUNT(1) FROM invite_code_usages WHERE user_id IN (`+placeholders+`) GROUP BY code_id`, args...)
+	if qErr != nil {
+		return 0, qErr
+	}
+	type usageDelta struct {
+		codeID string
+		count  int
+	}
+	deltas := make([]usageDelta, 0)
+	for usageRows.Next() {
+		var d usageDelta
+		if err = usageRows.Scan(&d.codeID, &d.count); err != nil {
+			_ = usageRows.Close()
+			return 0, err
+		}
+		deltas = append(deltas, d)
+	}
+	if err = usageRows.Err(); err != nil {
+		_ = usageRows.Close()
+		return 0, err
+	}
+	_ = usageRows.Close()
+	for _, d := range deltas {
+		if _, err = tx.Exec(`UPDATE invite_codes
+			SET used_count = CASE
+				WHEN used_count > ? THEN used_count - ?
+				ELSE 0
+			END
+			WHERE id = ?`, d.count, d.count, d.codeID); err != nil {
+			return 0, err
+		}
+	}
+
 	if _, err = tx.Exec(`DELETE FROM invite_code_usages WHERE user_id IN (`+placeholders+`)`, args...); err != nil {
 		return 0, err
 	}
@@ -1399,57 +1035,6 @@ func (s *Store) deleteUsers(ids []string) (int, error) {
 		return 0, err
 	}
 	res, err := tx.Exec(`DELETE FROM users WHERE id IN (`+placeholders+`)`, args...)
-	if err != nil {
-		return 0, err
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return 0, err
-	}
-	if err = tx.Commit(); err != nil {
-		return 0, err
-	}
-	return int(affected), nil
-}
-
-func (s *Store) deleteAgentAccounts(publicKeys []string) (int, error) {
-	filtered := make([]string, 0, len(publicKeys))
-	for _, pk := range publicKeys {
-		trimmed := strings.TrimSpace(pk)
-		if trimmed != "" {
-			filtered = append(filtered, strings.ToLower(trimmed))
-		}
-	}
-	if len(filtered) == 0 {
-		return 0, nil
-	}
-
-	placeholders := strings.TrimRight(strings.Repeat("?,", len(filtered)), ",")
-	args := make([]any, 0, len(filtered))
-	for _, pk := range filtered {
-		args = append(args, pk)
-	}
-
-	tx, err := s.db.Begin()
-	if err != nil {
-		return 0, err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	if _, err = tx.Exec(`DELETE FROM agent_snapshots WHERE public_key IN (`+placeholders+`)`, args...); err != nil {
-		return 0, err
-	}
-	if _, err = tx.Exec(`DELETE FROM agent_fills WHERE public_key IN (`+placeholders+`)`, args...); err != nil {
-		return 0, err
-	}
-	if _, err = tx.Exec(`DELETE FROM agent_reviews WHERE public_key IN (`+placeholders+`)`, args...); err != nil {
-		return 0, err
-	}
-	res, err := tx.Exec(`DELETE FROM agent_accounts WHERE public_key IN (`+placeholders+`)`, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -1478,6 +1063,15 @@ func (s *Store) setSetting(key string, value string) error {
 	return err
 }
 
+func (s *Store) setSettingTx(tx *sql.Tx, key string, value string) error {
+	_, err := tx.Exec(`
+		INSERT INTO settings(key, value, updated_at) VALUES(?, ?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+		key, value, nowISO(),
+	)
+	return err
+}
+
 func (s *Store) getSettingDefault(key string, defaultVal string) string {
 	val, err := s.getSetting(key)
 	if err != nil || strings.TrimSpace(val) == "" {
@@ -1486,43 +1080,19 @@ func (s *Store) getSettingDefault(key string, defaultVal string) string {
 	return val
 }
 
-func (s *Store) listAssignedPublicKeys() ([]string, error) {
-	rows, err := s.db.Query(`SELECT public_key FROM agent_accounts WHERE status = 'assigned'`)
+func (s *Store) getSettingDefaultTx(tx *sql.Tx, key string, defaultVal string) (string, error) {
+	var val string
+	err := tx.QueryRow(`SELECT value FROM settings WHERE key = ?`, key).Scan(&val)
+	if errors.Is(err, sql.ErrNoRows) {
+		return defaultVal, nil
+	}
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	defer rows.Close()
-
-	keys := make([]string, 0)
-	for rows.Next() {
-		var key string
-		if err := rows.Scan(&key); err != nil {
-			return nil, err
-		}
-		keys = append(keys, key)
+	if strings.TrimSpace(val) == "" {
+		return defaultVal, nil
 	}
-	return keys, rows.Err()
-}
-
-func (s *Store) dashboardStats() (DashboardStats, error) {
-	stats := DashboardStats{}
-	queries := []struct {
-		query string
-		dest  *int
-	}{
-		{`SELECT COUNT(1) FROM users`, &stats.TotalUsers},
-		{`SELECT COUNT(1) FROM agent_accounts`, &stats.TotalAgentAccounts},
-		{`SELECT COUNT(1) FROM agent_accounts WHERE status = 'assigned'`, &stats.AssignedAgents},
-		{`SELECT COUNT(1) FROM agent_accounts WHERE status = 'unused'`, &stats.UnusedAgents},
-		{`SELECT COUNT(1) FROM invite_codes`, &stats.TotalInviteCodes},
-		{`SELECT COUNT(1) FROM invite_codes WHERE status = 'active'`, &stats.ActiveInviteCodes},
-	}
-	for _, item := range queries {
-		if err := s.db.QueryRow(item.query).Scan(item.dest); err != nil {
-			return DashboardStats{}, err
-		}
-	}
-	return stats, nil
+	return val, nil
 }
 
 func (s *Store) getDailySlots() (DailySlots, error) {
@@ -1578,26 +1148,104 @@ func (s *Store) getDailySlots() (DailySlots, error) {
 	}, nil
 }
 
+func (s *Store) consumeDailySlotTx(tx *sql.Tx) error {
+	totalStr, err := s.getSettingDefaultTx(tx, "daily_slots_total", "1000")
+	if err != nil {
+		return err
+	}
+	resetHourStr, err := s.getSettingDefaultTx(tx, "daily_slots_reset_hour", "0")
+	if err != nil {
+		return err
+	}
+	consumedStr, err := s.getSettingDefaultTx(tx, "daily_slots_consumed", "0")
+	if err != nil {
+		return err
+	}
+	resetAtStr, err := s.getSettingDefaultTx(tx, "daily_slots_reset_at", "")
+	if err != nil {
+		return err
+	}
+
+	total, _ := strconv.Atoi(totalStr)
+	if total <= 0 {
+		total = 1000
+	}
+	resetHour, _ := strconv.Atoi(resetHourStr)
+	if resetHour < 0 || resetHour > 23 {
+		resetHour = 0
+	}
+	consumed, _ := strconv.Atoi(consumedStr)
+
+	now := time.Now().UTC()
+	cycleStart := time.Date(now.Year(), now.Month(), now.Day(), resetHour, 0, 0, 0, time.UTC)
+	if now.Before(cycleStart) {
+		cycleStart = cycleStart.Add(-24 * time.Hour)
+	}
+
+	needsReset := false
+	if resetAtStr == "" {
+		needsReset = true
+	} else {
+		storedResetAt, parseErr := time.Parse(time.RFC3339, resetAtStr)
+		if parseErr != nil || storedResetAt.Before(cycleStart) {
+			needsReset = true
+		}
+	}
+	if needsReset {
+		consumed = 0
+		if err := s.setSettingTx(tx, "daily_slots_consumed", "0"); err != nil {
+			return err
+		}
+		if err := s.setSettingTx(tx, "daily_slots_reset_at", cycleStart.Format(time.RFC3339)); err != nil {
+			return err
+		}
+	}
+
+	if consumed >= total {
+		return errNoSlotsRemaining
+	}
+	if err := s.setSettingTx(tx, "daily_slots_consumed", strconv.Itoa(consumed)); err != nil {
+		return err
+	}
+	res, err := tx.Exec(`
+		UPDATE settings
+		SET value = CAST(value AS INTEGER) + 1, updated_at = ?
+		WHERE key = 'daily_slots_consumed'
+		  AND CAST(value AS INTEGER) < ?`,
+		nowISO(), total,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return errNoSlotsRemaining
+	}
+
+	return nil
+}
+
 func (s *Store) consumeDailySlot() (DailySlots, error) {
-	// Ensure cycle is current first
-	slots, err := s.getDailySlots()
+	tx, err := s.db.Begin()
 	if err != nil {
 		return DailySlots{}, err
 	}
-	if slots.Remaining <= 0 {
-		return slots, errors.New("no_slots_remaining")
-	}
+	defer func() { _ = tx.Rollback() }()
 
-	newConsumed := slots.Consumed + 1
-	if err := s.setSetting("daily_slots_consumed", strconv.Itoa(newConsumed)); err != nil {
+	if err := s.consumeDailySlotTx(tx); err != nil {
+		if errors.Is(err, errNoSlotsRemaining) {
+			current, _ := s.getDailySlots()
+			return current, err
+		}
 		return DailySlots{}, err
 	}
-	slots.Consumed = newConsumed
-	slots.Remaining = slots.Total - newConsumed
-	if slots.Remaining < 0 {
-		slots.Remaining = 0
+	if err := tx.Commit(); err != nil {
+		return DailySlots{}, err
 	}
-	return slots, nil
+	return s.getDailySlots()
 }
 
 func boolToInt(v bool) int {

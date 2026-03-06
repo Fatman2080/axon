@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type tokenClaims struct {
@@ -73,9 +75,17 @@ func randomNonce() (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-func hashPassword(password string) string {
-	sum := sha256.Sum256([]byte(password))
-	return hex.EncodeToString(sum[:])
+func hashPasswordStrong(password string) (string, error) {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashed), nil
+}
+
+func verifyPassword(password string, storedHash string) bool {
+	trimmed := strings.TrimSpace(storedHash)
+	return bcrypt.CompareHashAndPassword([]byte(trimmed), []byte(password)) == nil
 }
 
 func parseSIWEMessage(message string) (wallet string, nonce string, err error) {

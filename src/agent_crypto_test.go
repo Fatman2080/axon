@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"reflect"
@@ -104,6 +105,29 @@ func TestDecryptPrivateKeyPayload_HexKey(t *testing.T) {
 	}
 }
 
+func TestDecryptPrivateKeyPayload_Base64Nonce12Format(t *testing.T) {
+	expected := []string{"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}
+	encrypted := encryptKeyListNonce12Base64(t, expected, testFixedKeyUTF8)
+	wrapped := map[string]any{
+		"status":         "ok",
+		"format":         "AES-GCM-256",
+		"encrypted_data": encrypted,
+		"count":          len(expected),
+	}
+	raw, err := json.Marshal(wrapped)
+	if err != nil {
+		t.Fatalf("marshal payload failed: %v", err)
+	}
+
+	actual, err := decryptPrivateKeyPayload(string(raw), testFixedKeyUTF8)
+	if err != nil {
+		t.Fatalf("decrypt failed: %v", err)
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("unexpected result: %+v", actual)
+	}
+}
+
 func TestDeriveAES256Key_UTF8Fallback(t *testing.T) {
 	key, err := deriveAES256Key(testFixedKeyUTF8)
 	if err != nil {
@@ -128,7 +152,73 @@ func TestDeriveAES256Key_HexPreferred(t *testing.T) {
 	}
 }
 
+func TestDecryptPrivateKeyPayload_SupportsNonce16TagCiphertextLayout(t *testing.T) {
+	expected := []string{"1111111111111111111111111111111111111111111111111111111111111111"}
+	encrypted := encryptKeyListNonce16TagCiphertext(t, expected, testFixedKeyUTF8)
+	wrapped := map[string]any{
+		"status":         "ok",
+		"format":         "AES-GCM-256",
+		"encrypted_data": encrypted,
+		"count":          len(expected),
+	}
+	raw, err := json.Marshal(wrapped)
+	if err != nil {
+		t.Fatalf("marshal payload failed: %v", err)
+	}
+	actual, err := decryptPrivateKeyPayload(string(raw), testFixedKeyUTF8)
+	if err != nil {
+		t.Fatalf("decrypt failed: %v", err)
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("unexpected result: %+v", actual)
+	}
+}
+
 func encryptKeyList(t *testing.T, keys []string, fixedKey string) string {
+	t.Helper()
+	key, err := deriveAES256Key(fixedKey)
+	if err != nil {
+		t.Fatalf("derive key failed: %v", err)
+	}
+	nonce := make([]byte, 12)
+	for i := range nonce {
+		nonce[i] = byte(i + 1)
+	}
+	raw, err := json.Marshal(keys)
+	if err != nil {
+		t.Fatalf("marshal keys failed: %v", err)
+	}
+	ciphertextWithTag, err := aesGCMEncrypt(key, nonce, raw)
+	if err != nil {
+		t.Fatalf("encrypt failed: %v", err)
+	}
+	combined := append(append([]byte{}, nonce...), ciphertextWithTag...)
+	return hex.EncodeToString(combined)
+}
+
+func encryptKeyListNonce12Base64(t *testing.T, keys []string, fixedKey string) string {
+	t.Helper()
+	key, err := deriveAES256Key(fixedKey)
+	if err != nil {
+		t.Fatalf("derive key failed: %v", err)
+	}
+	nonce := make([]byte, 12)
+	for i := range nonce {
+		nonce[i] = byte(i + 11)
+	}
+	raw, err := json.Marshal(keys)
+	if err != nil {
+		t.Fatalf("marshal keys failed: %v", err)
+	}
+	ciphertextWithTag, err := aesGCMEncrypt(key, nonce, raw)
+	if err != nil {
+		t.Fatalf("encrypt failed: %v", err)
+	}
+	combined := append(append([]byte{}, nonce...), ciphertextWithTag...)
+	return base64.StdEncoding.EncodeToString(combined)
+}
+
+func encryptKeyListNonce16TagCiphertext(t *testing.T, keys []string, fixedKey string) string {
 	t.Helper()
 	key, err := deriveAES256Key(fixedKey)
 	if err != nil {
@@ -146,12 +236,12 @@ func encryptKeyList(t *testing.T, keys []string, fixedKey string) string {
 	if err != nil {
 		t.Fatalf("encrypt failed: %v", err)
 	}
-	if len(ciphertextWithTag) <= 16 {
-		t.Fatalf("ciphertext too short")
-	}
 	tag := ciphertextWithTag[len(ciphertextWithTag)-16:]
 	ciphertext := ciphertextWithTag[:len(ciphertextWithTag)-16]
-	combined := append(append(append([]byte{}, nonce...), tag...), ciphertext...)
+	combined := make([]byte, 0, len(nonce)+len(tag)+len(ciphertext))
+	combined = append(combined, nonce...)
+	combined = append(combined, tag...)
+	combined = append(combined, ciphertext...)
 	return hex.EncodeToString(combined)
 }
 

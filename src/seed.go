@@ -21,10 +21,14 @@ func (s *Store) seedAdminIfNeeded() error {
 	}
 	const defaultEmail = "admin@openfi.local"
 	const defaultName = "System Admin"
+	passwordHash, err := hashPasswordStrong(tempPassword)
+	if err != nil {
+		return err
+	}
 	_, err = s.db.Exec(`
 		INSERT INTO admins(id, email, password_hash, name, created_at)
 		VALUES(?, ?, ?, ?, ?)
-	`, newID("admin"), defaultEmail, hashPassword(tempPassword), defaultName, nowISO())
+	`, newID("admin"), defaultEmail, passwordHash, defaultName, nowISO())
 	if err == nil {
 		logInfo("seed", "bootstrap admin created: email=%s temporary_password=%s (please change immediately)", defaultEmail, tempPassword)
 	}

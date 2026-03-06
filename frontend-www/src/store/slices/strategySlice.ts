@@ -31,7 +31,7 @@ function mapAgentToStrategy(agent: AgentMarketItem): Strategy {
     id: agent.publicKey,
     name,
     description: agent.description || '',
-    category: ((agent as any).category as Strategy['category']) || 'trend',
+    category: agent.category || 'trend',
     minInvestment: 0,
     riskLevel: 'medium',
     expectedReturn: 0,
@@ -65,6 +65,12 @@ export const fetchStrategies = createAsyncThunk(
   async () => {
     const agents = await marketApi.getAgentMarket();
     return agents.map(mapAgentToStrategy);
+  },
+  {
+    condition: (_, { getState }) => {
+      const { strategies } = getState() as { strategies: StrategyState };
+      if (strategies.loading) return false;
+    },
   }
 );
 

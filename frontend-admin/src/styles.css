@@ -670,6 +670,15 @@ label {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+.addr-cell {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+.addr-cell:hover {
+  color: #2563eb;
+}
+
 .badge {
   border: 1px solid #d0d5dd;
   padding: 0.15rem 0.4rem;

@@ -27,9 +27,6 @@ func main() {
 		logFatal("main", "failed to load config: %v", err)
 	}
 
-	// Parse raw config JSON for one-time migration of legacy fields to DB.
-	legacySettings := parseLegacySettings(*configPath)
-
 	if err := os.MkdirAll(filepath.Dir(cfg.Storage.DBPath), 0o755); err != nil {
 		logFatal("main", "failed to create data directory: %v", err)
 	}
@@ -48,23 +45,12 @@ func main() {
 		logFatal("main", "failed to seed data: %v", err)
 	}
 
-	// Load admin-managed settings from DB (xOAuth, contracts, sync).
-	// On first run, migrate legacy values from config.json if DB is empty.
-	migrateLegacySetting(store, "xoauth_client_id", legacySettings.XOAuth.ClientID)
-	migrateLegacySetting(store, "xoauth_client_secret", legacySettings.XOAuth.ClientSecret)
-	migrateLegacySetting(store, "xoauth_scopes", legacySettings.XOAuth.Scopes)
-	migrateLegacySetting(store, "contracts_rpc_url", legacySettings.Contracts.RPCURL)
-	migrateLegacySetting(store, "contracts_allocator_address", legacySettings.Contracts.AllocatorAddress)
-	if legacySettings.Sync.IntervalSeconds > 0 {
-		migrateLegacySetting(store, "sync_interval_seconds", strconv.Itoa(legacySettings.Sync.IntervalSeconds))
-	}
-
 	xoauthClientID := store.getSettingDefault("xoauth_client_id", "")
 	xoauthClientSecret := store.getSettingDefault("xoauth_client_secret", "")
 	xoauthScopes := store.getSettingDefault("xoauth_scopes", "users.read tweet.read offline.access")
 	contractRPCURL := store.getSettingDefault("contracts_rpc_url", "")
 	contractAllocator := store.getSettingDefault("contracts_allocator_address", "")
-	syncIntervalStr := store.getSettingDefault("sync_interval_seconds", "1800")
+	syncIntervalStr := store.getSettingDefault("sync_interval_seconds", "60")
 	syncInterval, _ := strconv.Atoi(syncIntervalStr)
 	if syncInterval < 0 {
 		syncInterval = 0

@@ -2,9 +2,6 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
-import { useI18n } from "vue-i18n";
-
-const { t } = useI18n();
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -19,7 +16,7 @@ const submit = async () => {
     await auth.login(email.value, password.value);
     await router.push("/dashboard");
   } catch (err: any) {
-    error.value = err?.response?.data?.error || t("login.error");
+    error.value = err?.response?.data?.error || "登录失败，请检查凭据";
   }
 };
 </script>
@@ -27,18 +24,17 @@ const submit = async () => {
 <template>
   <div class="login-page">
     <form class="panel login-panel" @submit.prevent="submit">
-      <h1>{{ t("login.title") }}</h1>
-      <p class="muted">{{ t("login.desc") }}</p>
+      <h1>管理后台登录</h1>
 
-      <label>{{ t("common.email") }}</label>
+      <label>邮箱</label>
       <input v-model="email" type="email" required />
 
-      <label>{{ t("common.password") }}</label>
+      <label>密码</label>
       <input v-model="password" type="password" required />
 
       <p v-if="error" class="error">{{ error }}</p>
       <button class="btn btn-primary" :disabled="auth.loading">
-        {{ auth.loading ? t("login.loading") : t("login.submit") }}
+        {{ auth.loading ? "登录中..." : "进入控制台" }}
       </button>
     </form>
   </div>

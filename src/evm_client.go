@@ -23,23 +23,27 @@ type EVMClient struct {
 
 // AgentInfo holds the on-chain status and EVM USDC balance for a single agent.
 type AgentInfo struct {
-	VaultAddress common.Address
-	Status       string  // "inactive", "active", "revoked"
-	EVMBalance   float64 // USDC on EVM (6 decimals converted to float)
+	VaultAddress   common.Address
+	Status         string  // "inactive", "active"
+	EVMBalance     float64 // USDC on EVM (6 decimals converted to float)
+	InitialCapital float64 // initial capital deposited (6 decimals converted to float)
 }
 
-// Agent status string constants matching the contract enum.
+// Agent status: active (vault user matches agent) or inactive (otherwise).
 const (
 	AgentStatusInactive = "inactive"
 	AgentStatusActive   = "active"
-	AgentStatusRevoked  = "revoked"
 )
 
 // Function selectors (first 4 bytes of keccak256 hash).
 var (
-	selectorAgentVaults = crypto.Keccak256([]byte("agentVaults(address)"))[:4]
-	selectorUSDC        = crypto.Keccak256([]byte("USDC()"))[:4]
-	selectorGetAgentsInfo = crypto.Keccak256([]byte("getAgentsInfo(address[])"))[:4]
+	selectorUsdc             = crypto.Keccak256([]byte("usdc()"))[:4]
+	selectorUserVault        = crypto.Keccak256([]byte("userVault(address)"))[:4]
+	selectorGetVaultsInfo    = crypto.Keccak256([]byte("getVaultsInfo(address[])"))[:4]
+	selectorVaultCount       = crypto.Keccak256([]byte("vaultCount()"))[:4]
+	selectorGetVaultsByRange = crypto.Keccak256([]byte("getVaultsByRange(uint256,uint256)"))[:4]
+	selectorOwner            = crypto.Keccak256([]byte("owner()"))[:4]
+	selectorBalanceOf        = crypto.Keccak256([]byte("balanceOf(address)"))[:4]
 )
 
 // NewEVMClient dials the RPC endpoint, reads the USDC address from the
@@ -58,27 +62,115 @@ func NewEVMClient(rpcURL string, allocatorAddr string) (*EVMClient, error) {
 		allocatorAddress: common.HexToAddress(allocatorAddr),
 	}
 
-	// Read USDC() from Allocator and cache.
-	usdcAddr, err := ec.callAddress(ctx, ec.allocatorAddress, selectorUSDC, nil)
+	// Read usdc() from Allocator and cache.
+	usdcAddr, err := ec.callAddress(ctx, ec.allocatorAddress, selectorUsdc, nil)
 	if err != nil {
 		client.Close()
-		return nil, fmt.Errorf("evm read USDC address: %w", err)
+		return nil, fmt.Errorf("evm read usdc address: %w", err)
 	}
 	ec.usdcAddress = usdcAddr
 	return ec, nil
 }
 
-// GetVaultAddress calls Allocator.agentVaults(address) and returns the vault
-// proxy address for the given agent public key.
+// GetVaultAddress calls Allocator.userVault(address) and returns the vault
+// proxy address for the given agent user address.
 func (ec *EVMClient) GetVaultAddress(agentPubKey common.Address) (common.Address, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	return ec.callAddress(ctx, ec.allocatorAddress, selectorAgentVaults, &agentPubKey)
+	return ec.callAddress(ctx, ec.allocatorAddress, selectorUserVault, &agentPubKey)
 }
 
-// GetAgentsInfo calls Allocator.getAgentsInfo(address[]) which returns
-// (Status[] statuses, uint256[] balances) in a single RPC call.
-// It also fetches vault addresses individually (agentVaults mapping).
+// GetVaultCount calls Allocator.vaultCount() and returns the total number of vaults.
+func (ec *EVMClient) GetVaultCount() (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	out, err := ec.client.CallContract(ctx, ethereum.CallMsg{
+		To:   &ec.allocatorAddress,
+		Data: selectorVaultCount,
+	}, nil)
+	if err != nil {
+		return 0, fmt.Errorf("vaultCount call: %w", err)
+	}
+	if len(out) < 32 {
+		return 0, fmt.Errorf("vaultCount response too short: %d", len(out))
+	}
+	count := new(big.Int).SetBytes(out[:32])
+	return int(count.Int64()), nil
+}
+
+// GetVaultsByRange calls Allocator.getVaultsByRange(uint256,uint256) and returns
+// vault addresses in the specified range.
+func (ec *EVMClient) GetVaultsByRange(start, count int) ([]common.Address, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	data := make([]byte, 0, 4+64)
+	data = append(data, selectorGetVaultsByRange...)
+	data = append(data, common.LeftPadBytes(big.NewInt(int64(start)).Bytes(), 32)...)
+	data = append(data, common.LeftPadBytes(big.NewInt(int64(count)).Bytes(), 32)...)
+
+	out, err := ec.client.CallContract(ctx, ethereum.CallMsg{
+		To:   &ec.allocatorAddress,
+		Data: data,
+	}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("getVaultsByRange call: %w", err)
+	}
+
+	// ABI: returns address[] — offset(32) + length(32) + n*32
+	if len(out) < 64 {
+		return nil, fmt.Errorf("getVaultsByRange response too short: %d", len(out))
+	}
+	offset := new(big.Int).SetBytes(out[0:32]).Int64()
+	if int(offset)+32 > len(out) {
+		return nil, fmt.Errorf("getVaultsByRange invalid offset: %d", offset)
+	}
+	n := new(big.Int).SetBytes(out[offset : offset+32]).Int64()
+	base := int(offset) + 32
+
+	addrs := make([]common.Address, 0, n)
+	for i := 0; i < int(n); i++ {
+		pos := base + i*32
+		if pos+32 > len(out) {
+			break
+		}
+		addrs = append(addrs, common.BytesToAddress(out[pos+12:pos+32]))
+	}
+	return addrs, nil
+}
+
+// GetVaultsInfo queries vault info for a batch of vault addresses.
+// Returns (users, balances, valids, capitals) decoded into vaultInfo slices.
+func (ec *EVMClient) GetVaultsInfo(vaultAddrs []common.Address) ([]vaultInfo, error) {
+	if len(vaultAddrs) == 0 {
+		return nil, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	data := make([]byte, 0, 4+32+32+len(vaultAddrs)*32)
+	data = append(data, selectorGetVaultsInfo...)
+	data = append(data, common.LeftPadBytes(big.NewInt(32).Bytes(), 32)...)
+	data = append(data, common.LeftPadBytes(big.NewInt(int64(len(vaultAddrs))).Bytes(), 32)...)
+	for _, addr := range vaultAddrs {
+		data = append(data, common.LeftPadBytes(addr.Bytes(), 32)...)
+	}
+
+	out, err := ec.client.CallContract(ctx, ethereum.CallMsg{
+		To:   &ec.allocatorAddress,
+		Data: data,
+	}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("getVaultsInfo call: %w", err)
+	}
+	return decodeVaultsInfoResponse(out, len(vaultAddrs))
+}
+
+// GetAgentsInfo queries agent status and EVM balance for each agent address.
+// Flow: userVault(agent) → vault address, then getVaultsInfo(vaults[]) → (users[], balances[], valids[]).
+// Status is "active" if the vault's current user matches the agent, "inactive" otherwise.
 func (ec *EVMClient) GetAgentsInfo(agents []common.Address) (map[common.Address]AgentInfo, error) {
 	result := make(map[common.Address]AgentInfo, len(agents))
 	if len(agents) == 0 {
@@ -88,13 +180,37 @@ func (ec *EVMClient) GetAgentsInfo(agents []common.Address) (map[common.Address]
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// ABI encode: getAgentsInfo(address[])
-	// offset to dynamic array (32 bytes) + length (32 bytes) + N * 32 bytes
-	data := make([]byte, 0, 4+32+32+len(agents)*32)
-	data = append(data, selectorGetAgentsInfo...)
-	data = append(data, common.LeftPadBytes(big.NewInt(32).Bytes(), 32)...) // offset
-	data = append(data, common.LeftPadBytes(big.NewInt(int64(len(agents))).Bytes(), 32)...) // length
-	for _, addr := range agents {
+	// Step 1: Get vault address for each agent via userVault(address)
+	type agentVault struct {
+		agent common.Address
+		vault common.Address
+	}
+	var withVaults []agentVault
+
+	for _, agent := range agents {
+		vaultAddr, err := ec.callAddress(ctx, ec.allocatorAddress, selectorUserVault, &agent)
+		if err != nil || vaultAddr == (common.Address{}) {
+			result[agent] = AgentInfo{Status: AgentStatusInactive}
+			continue
+		}
+		withVaults = append(withVaults, agentVault{agent: agent, vault: vaultAddr})
+	}
+
+	if len(withVaults) == 0 {
+		return result, nil
+	}
+
+	// Step 2: Batch getVaultsInfo(address[]) for all vault addresses
+	vaultAddrs := make([]common.Address, len(withVaults))
+	for i, av := range withVaults {
+		vaultAddrs[i] = av.vault
+	}
+
+	data := make([]byte, 0, 4+32+32+len(vaultAddrs)*32)
+	data = append(data, selectorGetVaultsInfo...)
+	data = append(data, common.LeftPadBytes(big.NewInt(32).Bytes(), 32)...)              // offset
+	data = append(data, common.LeftPadBytes(big.NewInt(int64(len(vaultAddrs))).Bytes(), 32)...) // length
+	for _, addr := range vaultAddrs {
 		data = append(data, common.LeftPadBytes(addr.Bytes(), 32)...)
 	}
 
@@ -103,81 +219,135 @@ func (ec *EVMClient) GetAgentsInfo(agents []common.Address) (map[common.Address]
 		Data: data,
 	}, nil)
 	if err != nil {
-		return nil, fmt.Errorf("getAgentsInfo call: %w", err)
+		return nil, fmt.Errorf("getVaultsInfo call: %w", err)
 	}
 
-	// Decode ABI response: (Status[], uint256[])
-	// Two dynamic arrays, so first 64 bytes are offsets
-	n := len(agents)
-	infos, err := decodeAgentsInfoResponse(out, n)
+	vInfos, err := decodeVaultsInfoResponse(out, len(vaultAddrs))
 	if err != nil {
 		return nil, err
 	}
 
-	// Fetch vault addresses in parallel context (they're from the mapping, not batch)
-	for i, addr := range agents {
-		vaultAddr, vErr := ec.callAddress(ctx, ec.allocatorAddress, selectorAgentVaults, &addr)
-		if vErr != nil {
-			// Non-fatal: use zero address
-			vaultAddr = common.Address{}
+	// Step 3: Build results — vault's user must match agent to be "active"
+	for i, av := range withVaults {
+		info := AgentInfo{
+			VaultAddress:   av.vault,
+			EVMBalance:     vInfos[i].balance,
+			InitialCapital: vInfos[i].capital,
 		}
-		result[addr] = AgentInfo{
-			VaultAddress: vaultAddr,
-			Status:       infos[i].Status,
-			EVMBalance:   infos[i].EVMBalance,
+		if vInfos[i].valid && vInfos[i].user == av.agent {
+			info.Status = AgentStatusActive
+		} else {
+			info.Status = AgentStatusInactive
 		}
+		result[av.agent] = info
 	}
 
 	return result, nil
 }
 
-// decodeAgentsInfoResponse decodes the ABI response from getAgentsInfo.
-// Returns (Status[], uint256[]) as two dynamic arrays.
-func decodeAgentsInfoResponse(out []byte, n int) ([]AgentInfo, error) {
-	// Minimum size: 2 offsets (64) + 2 lengths (64) + 2*n*32 data
-	minLen := 64 + 64 + 2*n*32
-	if len(out) < minLen {
-		return nil, fmt.Errorf("getAgentsInfo response too short: %d < %d", len(out), minLen)
+// vaultInfo holds decoded data from a single entry in getVaultsInfo response.
+type vaultInfo struct {
+	user    common.Address
+	balance float64
+	valid   bool
+	capital float64
+}
+
+// decodeVaultsInfoResponse decodes the ABI response from getVaultsInfo.
+// Contract returns (address[] users, uint256[] balances, bool[] valids, uint256[] capitals).
+func decodeVaultsInfoResponse(out []byte, n int) ([]vaultInfo, error) {
+	// 4 offset words (users, balances, valids, capitals) = 128 bytes minimum
+	if len(out) < 128 {
+		return nil, fmt.Errorf("getVaultsInfo response too short: %d", len(out))
 	}
 
-	// Read offsets to the two dynamic arrays
-	offsetStatuses := new(big.Int).SetBytes(out[0:32]).Int64()
+	offsetUsers := new(big.Int).SetBytes(out[0:32]).Int64()
 	offsetBalances := new(big.Int).SetBytes(out[32:64]).Int64()
+	offsetValids := new(big.Int).SetBytes(out[64:96]).Int64()
+	offsetCapitals := new(big.Int).SetBytes(out[96:128]).Int64()
 
-	infos := make([]AgentInfo, n)
+	// Minimum size check against the last array
+	minLen := int(offsetCapitals) + 32 + n*32
+	if len(out) < minLen {
+		return nil, fmt.Errorf("getVaultsInfo response too short: %d < %d", len(out), minLen)
+	}
 
-	// Parse statuses array: [offset] -> length(32) + n*32 elements
-	sBase := int(offsetStatuses) + 32 // skip length word
+	infos := make([]vaultInfo, n)
+
+	// Parse users array
+	uBase := int(offsetUsers) + 32 // skip length word
 	for i := 0; i < n; i++ {
-		pos := sBase + i*32
+		pos := uBase + i*32
 		if pos+32 > len(out) {
 			break
 		}
-		statusVal := new(big.Int).SetBytes(out[pos : pos+32]).Int64()
-		switch statusVal {
-		case 0:
-			infos[i].Status = AgentStatusInactive
-		case 1:
-			infos[i].Status = AgentStatusActive
-		case 2:
-			infos[i].Status = AgentStatusRevoked
-		default:
-			infos[i].Status = AgentStatusInactive
-		}
+		infos[i].user = common.BytesToAddress(out[pos+12 : pos+32])
 	}
 
-	// Parse balances array: [offset] -> length(32) + n*32 elements
-	bBase := int(offsetBalances) + 32 // skip length word
+	// Parse balances array
+	bBase := int(offsetBalances) + 32
 	for i := 0; i < n; i++ {
 		pos := bBase + i*32
 		if pos+32 > len(out) {
 			break
 		}
 		bal := new(big.Int).SetBytes(out[pos : pos+32])
-		infos[i].EVMBalance = usdcToFloat(bal)
+		infos[i].balance = usdcToFloat(bal)
+	}
+
+	// Parse valids array
+	vBase := int(offsetValids) + 32
+	for i := 0; i < n; i++ {
+		pos := vBase + i*32
+		if pos+32 > len(out) {
+			break
+		}
+		infos[i].valid = new(big.Int).SetBytes(out[pos:pos+32]).Sign() != 0
+	}
+
+	// Parse capitals array
+	cBase := int(offsetCapitals) + 32
+	for i := 0; i < n; i++ {
+		pos := cBase + i*32
+		if pos+32 > len(out) {
+			break
+		}
+		cap := new(big.Int).SetBytes(out[pos : pos+32])
+		infos[i].capital = usdcToFloat(cap)
 	}
 
 	return infos, nil
+}
+
+// GetAllocatorOwner calls Allocator.owner() and returns the owner address.
+func (ec *EVMClient) GetAllocatorOwner() (common.Address, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	return ec.callAddress(ctx, ec.allocatorAddress, selectorOwner, nil)
+}
+
+// GetUSDCBalance calls USDC.balanceOf(addr) and returns the balance as float64.
+func (ec *EVMClient) GetUSDCBalance(addr common.Address) (float64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	data := make([]byte, 0, 4+32)
+	data = append(data, selectorBalanceOf...)
+	data = append(data, common.LeftPadBytes(addr.Bytes(), 32)...)
+
+	to := ec.usdcAddress
+	out, err := ec.client.CallContract(ctx, ethereum.CallMsg{
+		To:   &to,
+		Data: data,
+	}, nil)
+	if err != nil {
+		return 0, fmt.Errorf("balanceOf call: %w", err)
+	}
+	if len(out) < 32 {
+		return 0, fmt.Errorf("balanceOf response too short: %d", len(out))
+	}
+	bal := new(big.Int).SetBytes(out[:32])
+	return usdcToFloat(bal), nil
 }
 
 // callAddress performs an eth_call that returns a single address value.

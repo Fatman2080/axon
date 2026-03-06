@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"net/http"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -23,11 +24,13 @@ func (s *Server) registerAdminRoutes(g *echo.Group) {
 	secured.PATCH("/admins/:id/password", s.handleAdminUpdateAdminPassword)
 	secured.DELETE("/admins/:id", s.handleAdminDeleteAdmin)
 	secured.GET("/dashboard", s.handleAdminDashboard)
+	secured.GET("/dashboard/trends", s.handleAdminDashboardTrends)
+
+	secured.GET("/agents/:publicKey/performance", s.handleAdminAgentPerformance)
+	secured.GET("/agents/leaderboard", s.handleAdminAgentLeaderboard)
 
 	secured.GET("/users", s.handleAdminListUsers)
 	secured.DELETE("/users", s.handleAdminBatchDeleteUsers)
-	secured.DELETE("/agent-stats", s.handleAdminBatchDeleteAgents)
-
 	secured.GET("/invite-codes", s.handleAdminListInviteCodes)
 	secured.POST("/invite-codes", s.handleAdminCreateInviteCode)
 	secured.POST("/invite-codes/batch", s.handleAdminCreateInviteCodesBatch)
@@ -38,10 +41,15 @@ func (s *Server) registerAdminRoutes(g *echo.Group) {
 	secured.GET("/agent-accounts", s.handleAdminListAgentAccounts)
 	secured.POST("/agent-accounts/import", s.handleAdminImportAgentAccounts)
 	secured.DELETE("/agent-accounts", s.handleAdminBatchDeleteAgentPool)
+	secured.POST("/agent-accounts/:publicKey/revoke", s.handleAdminRevokeAgent)
+	secured.POST("/agent-accounts/:publicKey/reassign", s.handleAdminReassignAgent)
+	secured.POST("/users/:id/revoke-invite", s.handleAdminRevokeUserInvite)
+	secured.POST("/users/:id/revoke-agent", s.handleAdminRevokeUserAgent)
 
-	secured.GET("/agent-stats", s.handleAdminListAgentStats)
-	secured.POST("/agent-stats/:publicKey/sync", s.handleAdminSyncAgentData)
-	secured.PATCH("/agent-stats/:publicKey/profile", s.handleAdminUpdateAgentProfile)
+	secured.GET("/agent-vaults", s.handleAdminListAgentVaults)
+	secured.DELETE("/agent-vaults", s.handleAdminBatchDeleteAgentVaults)
+	secured.PATCH("/agent-accounts/:publicKey/profile", s.handleAdminUpdateAgentProfile)
+	secured.POST("/agent-accounts/:publicKey/privatekey", s.handleAdminGetAgentPrivateKey)
 
 	secured.GET("/settings/sync", s.handleAdminGetSyncSettings)
 	secured.PATCH("/settings/sync", s.handleAdminUpdateSyncSettings)
@@ -51,6 +59,12 @@ func (s *Server) registerAdminRoutes(g *echo.Group) {
 	secured.PATCH("/settings/contracts", s.handleAdminUpdateContractsSettings)
 	secured.GET("/settings/daily-slots", s.handleAdminGetDailySlotsSettings)
 	secured.PATCH("/settings/daily-slots", s.handleAdminUpdateDailySlotsSettings)
+	secured.GET("/settings/dispatch", s.handleAdminGetDispatchSettings)
+	secured.PATCH("/settings/dispatch", s.handleAdminUpdateDispatchSettings)
+	secured.POST("/agent-accounts/:publicKey/dispatch", s.handleAdminDispatchAgent)
+
+	secured.GET("/treasury", s.handleAdminTreasury)
+	secured.GET("/treasury/history", s.handleAdminTreasuryHistory)
 }
 
 func (s *Server) handleAdminLogin(c echo.Context) error {
@@ -68,7 +82,7 @@ func (s *Server) handleAdminLogin(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_login"})
 	}
-	if hashPassword(req.Password) != passwordHash {
+	if !verifyPassword(req.Password, passwordHash) {
 		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "invalid_credentials"})
 	}
 	token, err := issueToken(s.tokenSecret, admin.ID, "admin", 12*time.Hour)
@@ -167,11 +181,63 @@ func (s *Server) handleAdminDeleteAdmin(c echo.Context) error {
 }
 
 func (s *Server) handleAdminDashboard(c echo.Context) error {
-	stats, err := s.store.dashboardStats()
+	stats, err := s.store.dashboardStatsEnhanced()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_get_dashboard"})
 	}
 	return c.JSON(http.StatusOK, stats)
+}
+
+func (s *Server) handleAdminDashboardTrends(c echo.Context) error {
+	period := strings.TrimSpace(c.QueryParam("period"))
+	if period == "" {
+		period = "7d"
+	}
+	limit := 200
+	if raw := strings.TrimSpace(c.QueryParam("limit")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	snapshots, err := s.store.listPlatformSnapshots(limit, period)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_trends"})
+	}
+	growth := s.store.getPlatformGrowth(period)
+	return c.JSON(http.StatusOK, echo.Map{
+		"snapshots": snapshots,
+		"growth":    growth,
+	})
+}
+
+func (s *Server) handleAdminAgentPerformance(c echo.Context) error {
+	publicKey := strings.ToLower(strings.TrimSpace(c.Param("publicKey")))
+	if publicKey == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "public_key_required"})
+	}
+	perf, err := s.store.getAgentPerformance(publicKey)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_get_performance"})
+	}
+	return c.JSON(http.StatusOK, perf)
+}
+
+func (s *Server) handleAdminAgentLeaderboard(c echo.Context) error {
+	sortBy := strings.TrimSpace(c.QueryParam("sortBy"))
+	if sortBy == "" {
+		sortBy = "pnl"
+	}
+	limit := 10
+	if raw := strings.TrimSpace(c.QueryParam("limit")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	items, err := s.store.getAgentLeaderboard(sortBy, limit)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_get_leaderboard"})
+	}
+	return c.JSON(http.StatusOK, items)
 }
 
 func (s *Server) handleAdminListUsers(c echo.Context) error {
@@ -218,19 +284,14 @@ func (s *Server) handleAdminCreateInviteCode(c echo.Context) error {
 func (s *Server) handleAdminUpdateInviteCode(c echo.Context) error {
 	id := c.Param("id")
 	req := struct {
-		Description string `json:"description"`
-		MaxUses     int    `json:"maxUses"`
-		Status      string `json:"status"`
+		Description *string `json:"description"`
+		MaxUses     *int    `json:"maxUses"`
+		Status      *string `json:"status"`
 	}{}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
 	}
-	patch := InviteCode{
-		Description: req.Description,
-		MaxUses:     req.MaxUses,
-		Status:      req.Status,
-	}
-	item, err := s.store.updateInviteCode(id, patch)
+	item, err := s.store.updateInviteCode(id, req.Description, req.MaxUses, req.Status)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "invite_code_not_found"})
@@ -342,25 +403,43 @@ func (s *Server) handleAdminImportAgentAccounts(c echo.Context) error {
 	return c.JSON(http.StatusOK, result)
 }
 
-func (s *Server) handleAdminListAgentStats(c echo.Context) error {
-	search := c.QueryParam("search")
-	items, err := s.store.listAgentStats(search)
+func (s *Server) handleAdminListAgentVaults(c echo.Context) error {
+	items, err := s.store.listAgentVaults()
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_list_agent_stats"})
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_list_agent_vaults"})
 	}
 	return c.JSON(http.StatusOK, items)
 }
 
-func (s *Server) handleAdminSyncAgentData(c echo.Context) error {
-	publicKey := strings.ToLower(strings.TrimSpace(c.Param("publicKey")))
-	if publicKey == "" {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "public_key_required"})
+func (s *Server) handleAdminBatchDeleteAgentVaults(c echo.Context) error {
+	req := struct {
+		VaultAddresses []string `json:"vaultAddresses"`
+	}{}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
 	}
-	item, err := s.syncByPublicKey(publicKey)
+	if len(req.VaultAddresses) == 0 {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "vault_addresses_required"})
+	}
+
+	targetSet := make(map[string]struct{})
+	for _, addr := range req.VaultAddresses {
+		normalized := strings.ToLower(strings.TrimSpace(addr))
+		if normalized == "" {
+			continue
+		}
+		targetSet[normalized] = struct{}{}
+	}
+	targets := make([]string, 0, len(targetSet))
+	for addr := range targetSet {
+		targets = append(targets, addr)
+	}
+
+	deleted, err := s.store.deleteAgentVaults(targets)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_sync_agent_data"})
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_delete_agent_vaults"})
 	}
-	return c.JSON(http.StatusOK, item)
+	return c.JSON(http.StatusOK, echo.Map{"deleted": deleted})
 }
 
 func (s *Server) handleAdminUpdateAgentProfile(c echo.Context) error {
@@ -369,14 +448,29 @@ func (s *Server) handleAdminUpdateAgentProfile(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "public_key_required"})
 	}
 	req := struct {
-		Name           string  `json:"name"`
-		Description    string  `json:"description"`
-		PerformanceFee float64 `json:"performanceFee"`
+		Name           *string  `json:"name"`
+		Description    *string  `json:"description"`
+		Category       *string  `json:"category"`
+		PerformanceFee *float64 `json:"performanceFee"`
 	}{}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
 	}
-	if err := s.store.updateAgentProfile(publicKey, req.Name, req.Description, req.PerformanceFee); err != nil {
+	if req.Category != nil {
+		category := strings.ToLower(strings.TrimSpace(*req.Category))
+		switch category {
+		case "trend", "arbitrage", "grid", "martingale":
+			*req.Category = category
+		default:
+			return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_category"})
+		}
+	}
+	if req.PerformanceFee != nil {
+		if *req.PerformanceFee < 0 || *req.PerformanceFee > 1 {
+			return c.JSON(http.StatusBadRequest, echo.Map{"error": "performance_fee_out_of_range"})
+		}
+	}
+	if err := s.store.updateAgentProfile(publicKey, req.Name, req.Description, req.Category, req.PerformanceFee); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "agent_not_found"})
 		}
@@ -386,25 +480,51 @@ func (s *Server) handleAdminUpdateAgentProfile(c echo.Context) error {
 }
 
 func (s *Server) handleAdminGetSyncSettings(c echo.Context) error {
+	hlConcurrency := 5
+	if v := s.store.getSettingDefault("sync_hl_concurrency", "5"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			hlConcurrency = n
+		}
+	}
 	return c.JSON(http.StatusOK, echo.Map{
 		"intervalSeconds": s.syncIntervalSecs,
+		"hlConcurrency":   hlConcurrency,
 	})
 }
 
 func (s *Server) handleAdminUpdateSyncSettings(c echo.Context) error {
 	req := struct {
-		IntervalSeconds int `json:"intervalSeconds"`
+		IntervalSeconds *int `json:"intervalSeconds"`
+		HLConcurrency   *int `json:"hlConcurrency"`
 	}{}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
 	}
-	if req.IntervalSeconds < 0 {
-		req.IntervalSeconds = 0
+	if req.IntervalSeconds != nil {
+		v := *req.IntervalSeconds
+		if v < 0 {
+			v = 0
+		}
+		_ = s.store.setSetting("sync_interval_seconds", strconv.Itoa(v))
+		s.startAutoSync(v)
 	}
-	_ = s.store.setSetting("sync_interval_seconds", strconv.Itoa(req.IntervalSeconds))
-	s.startAutoSync(req.IntervalSeconds)
+	if req.HLConcurrency != nil {
+		v := *req.HLConcurrency
+		if v < 1 {
+			v = 1
+		}
+		_ = s.store.setSetting("sync_hl_concurrency", strconv.Itoa(v))
+	}
+
+	hlConcurrency := 5
+	if v := s.store.getSettingDefault("sync_hl_concurrency", "5"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			hlConcurrency = n
+		}
+	}
 	return c.JSON(http.StatusOK, echo.Map{
 		"intervalSeconds": s.syncIntervalSecs,
+		"hlConcurrency":   hlConcurrency,
 	})
 }
 
@@ -479,6 +599,7 @@ func (s *Server) handleAdminUpdateContractsSettings(c echo.Context) error {
 		}
 		s.setEVMClient(ec)
 		logInfo("evm", "EVM client ready")
+		go s.runSyncRound()
 	}()
 
 	logInfo("admin", "contracts settings updated (rpc: %s)", rpcURL)
@@ -552,7 +673,7 @@ func (s *Server) handleAdminBatchDeleteAgentPool(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_verify_password"})
 	}
-	if hashPassword(req.Password) != storedHash {
+	if !verifyPassword(req.Password, storedHash) {
 		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "invalid_password"})
 	}
 
@@ -586,7 +707,7 @@ func (s *Server) handleAdminBatchDeleteUsers(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_verify_password"})
 	}
-	if hashPassword(req.Password) != storedHash {
+	if !verifyPassword(req.Password, storedHash) {
 		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "invalid_password"})
 	}
 
@@ -597,16 +718,72 @@ func (s *Server) handleAdminBatchDeleteUsers(c echo.Context) error {
 	return c.JSON(http.StatusOK, echo.Map{"deleted": deleted})
 }
 
-func (s *Server) handleAdminBatchDeleteAgents(c echo.Context) error {
+func (s *Server) handleAdminGetDispatchSettings(c echo.Context) error {
+	cmd := s.store.getSettingDefault("dispatch_command", "")
+	return c.JSON(http.StatusOK, echo.Map{"command": cmd})
+}
+
+func (s *Server) handleAdminUpdateDispatchSettings(c echo.Context) error {
 	req := struct {
-		PublicKeys []string `json:"publicKeys"`
-		Password   string   `json:"password"`
+		Command string `json:"command"`
 	}{}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
 	}
-	if len(req.PublicKeys) == 0 {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "public_keys_required"})
+	if err := s.store.setSetting("dispatch_command", strings.TrimSpace(req.Command)); err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_save"})
+	}
+	logInfo("admin", "dispatch command template updated")
+	return c.JSON(http.StatusOK, echo.Map{"success": true})
+}
+
+func (s *Server) handleAdminDispatchAgent(c echo.Context) error {
+	publicKey := strings.ToLower(strings.TrimSpace(c.Param("publicKey")))
+	if publicKey == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "public_key_required"})
+	}
+
+	cmdTemplate := s.store.getSettingDefault("dispatch_command", "")
+	if cmdTemplate == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "dispatch_command_not_configured"})
+	}
+
+	encrypted, vaultAddress, err := s.store.getAgentDispatchInfo(publicKey)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "agent_not_found"})
+	}
+
+	privateKey, err := decryptSecret(encrypted, s.agentFixedKey)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_decrypt_key"})
+	}
+
+	cmd := buildDispatchCommand(cmdTemplate, privateKey, publicKey, vaultAddress)
+
+	logInfo("admin", "dispatching agent %s", publicKey)
+	go func() {
+		out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+		if err != nil {
+			logError("dispatch", "agent %s failed: %v — %s", publicKey, err, string(out))
+		} else {
+			logInfo("dispatch", "agent %s done: %s", publicKey, string(out))
+		}
+	}()
+
+	return c.JSON(http.StatusOK, echo.Map{"success": true, "message": "dispatch started"})
+}
+
+func (s *Server) handleAdminGetAgentPrivateKey(c echo.Context) error {
+	publicKey := strings.ToLower(strings.TrimSpace(c.Param("publicKey")))
+	if publicKey == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "public_key_required"})
+	}
+
+	req := struct {
+		Password string `json:"password"`
+	}{}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
 	}
 	if strings.TrimSpace(req.Password) == "" {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "password_required"})
@@ -615,18 +792,122 @@ func (s *Server) handleAdminBatchDeleteAgents(c echo.Context) error {
 	adminID := c.Get("subject").(string)
 	storedHash, err := s.store.getAdminPasswordHashByID(adminID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return c.JSON(http.StatusUnauthorized, echo.Map{"error": "admin_not_found"})
-		}
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_verify_password"})
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "admin_not_found"})
 	}
-	if hashPassword(req.Password) != storedHash {
+	if !verifyPassword(req.Password, storedHash) {
 		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "invalid_password"})
 	}
 
-	deleted, err := s.store.deleteAgentAccounts(req.PublicKeys)
+	encrypted, err := s.store.getAgentEncryptedPrivateKey(publicKey)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_delete_agents"})
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "agent_not_found"})
 	}
-	return c.JSON(http.StatusOK, echo.Map{"deleted": deleted})
+
+	privateKey, err := decryptSecret(encrypted, s.agentFixedKey)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_decrypt_key"})
+	}
+
+	logInfo("admin", "admin %s viewed private key for agent %s", adminID, publicKey)
+	return c.JSON(http.StatusOK, echo.Map{"privateKey": privateKey})
+}
+
+func (s *Server) handleAdminRevokeAgent(c echo.Context) error {
+	publicKey := strings.ToLower(strings.TrimSpace(c.Param("publicKey")))
+	if publicKey == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "public_key_required"})
+	}
+	if err := s.store.revokeUserAgent(publicKey); err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, echo.Map{"success": true})
+}
+
+func (s *Server) handleAdminReassignAgent(c echo.Context) error {
+	publicKey := strings.ToLower(strings.TrimSpace(c.Param("publicKey")))
+	if publicKey == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "public_key_required"})
+	}
+	req := struct {
+		UserID   string `json:"userId"`
+		UserName string `json:"userName"`
+	}{}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
+	}
+
+	userID := strings.TrimSpace(req.UserID)
+	// If userName is provided, look up the user by name
+	if userID == "" && strings.TrimSpace(req.UserName) != "" {
+		user, err := s.store.getUserByName(req.UserName)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, echo.Map{"error": "user_not_found"})
+		}
+		userID = user.ID
+	}
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id_or_user_name_required"})
+	}
+	if err := s.store.reassignAgent(publicKey, userID); err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, echo.Map{"success": true})
+}
+
+func (s *Server) handleAdminRevokeUserInvite(c echo.Context) error {
+	userID := strings.TrimSpace(c.Param("id"))
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id_required"})
+	}
+	if err := s.store.revokeUserInviteCode(userID); err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, echo.Map{"success": true})
+}
+
+func (s *Server) handleAdminRevokeUserAgent(c echo.Context) error {
+	userID := strings.TrimSpace(c.Param("id"))
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id_required"})
+	}
+	user, err := s.store.getUserByID(userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.JSON(http.StatusNotFound, echo.Map{"error": "user_not_found"})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	if user.AgentPublicKey == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_has_no_agent"})
+	}
+	if err := s.store.revokeUserAgent(user.AgentPublicKey); err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, echo.Map{"success": true})
+}
+
+func (s *Server) handleAdminTreasury(c echo.Context) error {
+	snap, err := s.store.getLatestTreasurySnapshot()
+	if err != nil {
+		return c.JSON(http.StatusOK, echo.Map{})
+	}
+	return c.JSON(http.StatusOK, snap)
+}
+
+func (s *Server) handleAdminTreasuryHistory(c echo.Context) error {
+	period := strings.TrimSpace(c.QueryParam("period"))
+	if period == "" {
+		period = "7d"
+	}
+	limit := 200
+	if raw := strings.TrimSpace(c.QueryParam("limit")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	items, err := s.store.listTreasurySnapshots(limit, period)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_treasury_history"})
+	}
+	return c.JSON(http.StatusOK, items)
 }

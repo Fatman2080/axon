@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useAppDispatch, useAppSelector } from '../hooks/redux';
-import { fetchAgents } from '../store/slices/agentSlice';
-import { fetchUser } from '../store/slices/userSlice';
 import { Info } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import { useLanguage } from '../context/LanguageContext';
-import { authApi, marketApi } from '../services/api';
-import { VaultOverview } from '../types';
+import { marketApi } from '../services/api';
+import { VaultOverview, TreasurySnapshot } from '../types';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -22,16 +19,12 @@ import {
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 const Agents = () => {
-  const dispatch = useAppDispatch();
-  const { currentUser: user } = useAppSelector((state) => state.user);
   const { t } = useLanguage();
   const [vaultOverview, setVaultOverview] = useState<VaultOverview | null>(null);
-  const [agentHistory, setAgentHistory] = useState<number[]>([]);
+  const [treasuryHistory, setTreasuryHistory] = useState<TreasurySnapshot[]>([]);
   const [chartPeriod, setChartPeriod] = useState('1M');
 
   useEffect(() => {
-    dispatch(fetchAgents());
-    dispatch(fetchUser());
     marketApi.getVaultOverview().then(setVaultOverview).catch(() => {
       marketApi.getVaultStats().then(stats => {
         setVaultOverview({
@@ -45,51 +38,62 @@ const Agents = () => {
         });
       }).catch(() => {});
     });
-  }, [dispatch]);
+  }, []);
+
+  const periodToApi = (period: string) => {
+    switch (period) {
+      case '1D': return '1d';
+      case '1W': return '7d';
+      case '1M': return '30d';
+      case 'ALL': return 'ALL';
+      default: return '30d';
+    }
+  };
 
   useEffect(() => {
-    if (!user) return;
-    const loadAgentData = async () => {
+    const loadTreasuryHistory = async () => {
       try {
-        const data = await authApi.getAgentHistory(chartPeriod);
-        setAgentHistory(Array.isArray(data.history) ? data.history : []);
+        const data = await marketApi.getTreasuryHistory(periodToApi(chartPeriod));
+        setTreasuryHistory(Array.isArray(data) ? data : []);
       } catch {
-        setAgentHistory([]);
+        setTreasuryHistory([]);
       }
     };
-    loadAgentData();
-  }, [user, chartPeriod]);
+    loadTreasuryHistory();
+  }, [chartPeriod]);
 
   const totalTvl = vaultOverview?.totalTvl ?? 0;
   const totalPnl = vaultOverview?.totalPnl ?? 0;
   const agentCount = vaultOverview?.agentCount ?? 0;
-
-  const sharePrice = agentHistory.length > 0
-    ? agentHistory[agentHistory.length - 1]
-    : totalTvl > 0 ? 1 + totalTvl / 1000000 * 0.2 : 1.0;
+  const totalInitialCapital = vaultOverview?.totalInitialCapital ?? 0;
+  const overallRoi = totalInitialCapital > 0 ? (totalPnl / totalInitialCapital) * 100 : 0;
+  const totalFundsHistory = treasuryHistory.map((s) => s.totalFunds || 0);
+  const currentTotalFunds = totalFundsHistory.length > 0 ? totalFundsHistory[totalFundsHistory.length - 1] : totalTvl;
 
   let maxDrawdown = 0;
   let sharpeRatio = 0;
-  if (agentHistory.length > 1) {
-    let peak = agentHistory[0];
-    for (const v of agentHistory) {
+  if (totalFundsHistory.length > 1) {
+    let peak = totalFundsHistory[0];
+    for (const v of totalFundsHistory) {
       if (v > peak) peak = v;
       const dd = peak > 0 ? ((peak - v) / peak) * 100 : 0;
       if (dd > maxDrawdown) maxDrawdown = dd;
     }
-    const returns = agentHistory.slice(1).map((v, i) => (v - agentHistory[i]) / agentHistory[i]);
+    const returns = totalFundsHistory.slice(1).map((v, i) =>
+      totalFundsHistory[i] > 0 ? (v - totalFundsHistory[i]) / totalFundsHistory[i] : 0
+    );
     const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
     const stdReturn = Math.sqrt(returns.reduce((a, b) => a + (b - avgReturn) ** 2, 0) / returns.length);
     sharpeRatio = stdReturn > 0 ? (avgReturn / stdReturn) * Math.sqrt(252) : 0;
   }
 
-  const apy = totalTvl > 0 && totalPnl !== 0 ? (totalPnl / (totalTvl - totalPnl)) * 100 : 0;
-  const chartSeries = agentHistory.length > 0 ? agentHistory : [];
+  const apy = totalInitialCapital > 0 ? overallRoi : (totalTvl > 0 && totalPnl !== 0 ? (totalPnl / (totalTvl - totalPnl)) * 100 : 0);
+  const chartSeries = totalFundsHistory;
 
   const chartData = {
     labels: Array.from({ length: chartSeries.length }, (_, i) => `Day ${i + 1}`),
     datasets: [{
-      label: t('vault.sharePrice'),
+      label: t('vault.totalFunds'),
       data: chartSeries,
       borderColor: '#00FF41',
       backgroundColor: 'rgba(0, 240, 255, 0.06)',
@@ -122,7 +126,7 @@ const Agents = () => {
         position: 'right' as const,
         grid: { color: 'rgba(255,255,255,0.04)' },
         ticks: {
-          callback: (value: number | string) => `$${Number(value).toFixed(2)}`,
+          callback: (value: number | string) => `$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
           font: { family: 'JetBrains Mono, monospace' },
           color: '#555B66',
         },
@@ -228,10 +232,10 @@ const Agents = () => {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <div className="text-xs font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>
-                  {t('vault.sharePrice')}
+                  {t('vault.totalFunds')}
                 </div>
                 <div className="text-xl font-bold font-mono" style={{ color: 'var(--text-primary)' }}>
-                  ${sharePrice.toFixed(4)}
+                  ${currentTotalFunds.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </div>
               </div>
               <div className="flex gap-1">

@@ -23,6 +23,13 @@ export const fetchUser = createAsyncThunk(
     }
     const response = await authApi.getMe();
     return response;
+  },
+  {
+    condition: (_, { getState }) => {
+      const { user } = getState() as { user: UserState };
+      // Skip if already loading
+      if (user.loading) return false;
+    },
   }
 );
 

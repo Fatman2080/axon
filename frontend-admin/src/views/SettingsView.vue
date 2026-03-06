@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { onMounted, ref, reactive } from "vue";
 import { adminApi } from "../api/client";
-import { useI18n } from "vue-i18n";
-
-const { t } = useI18n();
 
 const loading = ref(true);
 const loadError = ref("");
 
-const sync = reactive({ interval: 0, saving: false, msg: "", ok: true });
+const sync = reactive({ interval: 0, hlConcurrency: 5, saving: false, msg: "", ok: true });
 const contracts = reactive({
   rpcURL: "",
   allocatorAddress: "",
+  saving: false,
+  msg: "",
+  ok: true,
+});
+const dispatch = reactive({
+  command: "",
   saving: false,
   msg: "",
   ok: true,
@@ -52,24 +55,27 @@ const load = async () => {
   loading.value = true;
   loadError.value = "";
   try {
-    const [syncData, xoauthData, contractsData, slotsData] = await Promise.all([
+    const [syncData, xoauthData, contractsData, slotsData, dispatchData] = await Promise.all([
       adminApi.getSyncSettings(),
       adminApi.getXOAuthSettings(),
       adminApi.getContractsSettings(),
       adminApi.getDailySlotsSettings(),
+      adminApi.getDispatchSettings(),
     ]);
     sync.interval = syncData.intervalSeconds;
+    sync.hlConcurrency = syncData.hlConcurrency || 5;
     xoauth.clientId = xoauthData.clientId || "";
     xoauth.clientSecret = xoauthData.clientSecret || "";
     xoauth.scopes = xoauthData.scopes || "";
     contracts.rpcURL = contractsData.rpcURL || "";
     contracts.allocatorAddress = contractsData.allocatorAddress || "";
+    dispatch.command = dispatchData.command || "";
     slots.total = slotsData.total;
     slots.resetHour = slotsData.resetHour;
     slots.consumed = slotsData.consumed;
     slots.remaining = slotsData.remaining;
   } catch (err: any) {
-    loadError.value = err?.response?.data?.error || t("settings.loadError");
+    loadError.value = err?.response?.data?.error || "加载设置失败";
   } finally {
     loading.value = false;
   }
@@ -79,17 +85,21 @@ const saveSyncSettings = async () => {
   sync.saving = true;
   sync.msg = "";
   try {
-    const r = await adminApi.updateSyncSettings(sync.interval);
+    const r = await adminApi.updateSyncSettings({
+      intervalSeconds: sync.interval,
+      hlConcurrency: sync.hlConcurrency,
+    });
     sync.interval = r.intervalSeconds;
+    sync.hlConcurrency = r.hlConcurrency || 5;
     flash(
       sync,
       r.intervalSeconds > 0
-        ? t("settings.syncIntervalSuccess", { interval: r.intervalSeconds })
-        : t("settings.syncDisabled"),
+        ? `自动同步已更新（间隔：${r.intervalSeconds}s）`
+        : "自动同步已禁用",
       true,
     );
   } catch (err: any) {
-    flash(sync, err?.response?.data?.error || t("common.saveError"), false);
+    flash(sync, err?.response?.data?.error || "保存失败", false);
   } finally {
     sync.saving = false;
   }
@@ -103,15 +113,28 @@ const saveContractsSettings = async () => {
       rpcURL: contracts.rpcURL,
       allocatorAddress: contracts.allocatorAddress,
     });
-    flash(contracts, t("settings.contractsSuccess"), true);
+    flash(contracts, "合约配置已更新", true);
   } catch (err: any) {
     flash(
       contracts,
-      err?.response?.data?.error || t("common.saveError"),
+      err?.response?.data?.error || "保存失败",
       false,
     );
   } finally {
     contracts.saving = false;
+  }
+};
+
+const saveDispatchSettings = async () => {
+  dispatch.saving = true;
+  dispatch.msg = "";
+  try {
+    await adminApi.updateDispatchSettings(dispatch.command);
+    flash(dispatch, "配置已更新", true);
+  } catch (err: any) {
+    flash(dispatch, err?.response?.data?.error || "保存失败", false);
+  } finally {
+    dispatch.saving = false;
   }
 };
 
@@ -127,9 +150,9 @@ const saveDailySlotsSettings = async () => {
     slots.resetHour = r.resetHour;
     slots.consumed = r.consumed;
     slots.remaining = r.remaining;
-    flash(slots, t("settings.configUpdated"), true);
+    flash(slots, "配置已更新", true);
   } catch (err: any) {
-    flash(slots, err?.response?.data?.error || t("common.saveError"), false);
+    flash(slots, err?.response?.data?.error || "保存失败", false);
   } finally {
     slots.saving = false;
   }
@@ -142,11 +165,11 @@ const resetDailySlotsConsumed = async () => {
     const r = await adminApi.updateDailySlotsSettings({ resetConsumed: true });
     slots.consumed = r.consumed;
     slots.remaining = r.remaining;
-    flash(slots, t("settings.slotsResetSuccess"), true);
+    flash(slots, "今日消耗已重置", true);
   } catch (err: any) {
     flash(
       slots,
-      err?.response?.data?.error || t("settings.slotsResetError"),
+      err?.response?.data?.error || "重置失败",
       false,
     );
   } finally {
@@ -163,9 +186,9 @@ const saveXOAuthSettings = async () => {
       clientSecret: xoauth.clientSecret,
       scopes: xoauth.scopes,
     });
-    flash(xoauth, t("settings.configUpdated"), true);
+    flash(xoauth, "配置已更新", true);
   } catch (err: any) {
-    flash(xoauth, err?.response?.data?.error || t("common.saveError"), false);
+    flash(xoauth, err?.response?.data?.error || "保存失败", false);
   } finally {
     xoauth.saving = false;
   }
@@ -177,29 +200,41 @@ onMounted(load);
 <template>
   <section class="page-scroll">
     <div class="page-header">
-      <h1>{{ t("settings.title") }}</h1>
-      <p class="muted">{{ t("settings.desc") }}</p>
+      <h1>系统配置</h1>
+      <p class="muted">管理全局设置，如实习生名额或 Season 配置。</p>
     </div>
 
-    <div v-if="loading" class="table-empty">{{ t("common.loading") }}</div>
+    <div v-if="loading" class="table-empty">加载中...</div>
     <div v-else-if="loadError" class="panel error">{{ loadError }}</div>
     <div v-else class="settings-grid">
       <!-- 自动同步 -->
       <div class="setting-card">
         <div class="setting-card-head">
-          <h3>{{ t("settings.syncTitle") }}</h3>
-          <p class="muted">{{ t("settings.syncDesc") }}</p>
+          <h3>自动同步</h3>
+          <p class="muted">定时同步已分配 Agent 的链上数据。</p>
         </div>
         <div class="setting-card-body">
-          <label>
-            {{ t("settings.syncInterval") }}
-            <input
-              v-model.number="sync.interval"
-              type="number"
-              min="0"
-              placeholder="0 = 禁用"
-            />
-          </label>
+          <div class="grid-2">
+            <label>
+              同步间隔（秒）
+              <input
+                v-model.number="sync.interval"
+                type="number"
+                min="0"
+                placeholder="0 = 禁用"
+              />
+            </label>
+            <label>
+              HL 并发数
+              <input
+                v-model.number="sync.hlConcurrency"
+                type="number"
+                min="1"
+                max="50"
+                placeholder="5"
+              />
+            </label>
+          </div>
         </div>
         <div class="setting-card-foot">
           <span v-if="sync.msg" :class="sync.ok ? 'success' : 'error'">{{
@@ -211,7 +246,7 @@ onMounted(load);
             @click="saveSyncSettings"
             :disabled="sync.saving"
           >
-            {{ sync.saving ? t("common.saving") : t("common.save") }}
+            {{ sync.saving ? "保存中..." : "保存" }}
           </button>
         </div>
       </div>
@@ -219,19 +254,19 @@ onMounted(load);
       <!-- 合约配置 -->
       <div class="setting-card">
         <div class="setting-card-head">
-          <h3>{{ t("settings.contractsTitle") }}</h3>
-          <p class="muted">{{ t("settings.contractsDesc") }}</p>
+          <h3>合约配置</h3>
+          <p class="muted">配置 EVM RPC 和 Allocator 合约地址。</p>
         </div>
         <div class="setting-card-body">
           <label>
-            {{ t("settings.rpcURL") }}
+            RPC URL
             <input
               v-model="contracts.rpcURL"
               placeholder="https://rpc.hyperliquid.xyz/evm"
             />
           </label>
           <label>
-            {{ t("settings.allocatorAddress") }}
+            Allocator 地址
             <input v-model="contracts.allocatorAddress" placeholder="0x..." />
           </label>
         </div>
@@ -247,7 +282,44 @@ onMounted(load);
             @click="saveContractsSettings"
             :disabled="contracts.saving"
           >
-            {{ contracts.saving ? t("common.saving") : t("common.save") }}
+            {{ contracts.saving ? "保存中..." : "保存" }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 派遣命令 -->
+      <div class="setting-card">
+        <div class="setting-card-head">
+          <h3>派遣命令</h3>
+          <p class="muted">配置 Agent 派遣执行的命令模板。</p>
+        </div>
+        <div class="setting-card-body">
+          <label>
+            命令模板
+            <textarea
+              v-model="dispatch.command"
+              rows="3"
+              placeholder="python bot.py --key #prikey# --addr #pubkey# --vault #agentvaultaddr#"
+              style="width:100%;font-family:monospace;resize:vertical"
+            ></textarea>
+          </label>
+          <p class="muted" style="font-size:0.85em;margin-top:4px">
+            可用占位符：#prikey#（私钥）、#pubkey#（公钥）、#agentvaultaddr#（AgentVault 地址）
+          </p>
+        </div>
+        <div class="setting-card-foot">
+          <span
+            v-if="dispatch.msg"
+            :class="dispatch.ok ? 'success' : 'error'"
+            >{{ dispatch.msg }}</span
+          >
+          <span class="toolbar-spacer"></span>
+          <button
+            class="btn btn-primary btn-sm"
+            @click="saveDispatchSettings"
+            :disabled="dispatch.saving"
+          >
+            {{ dispatch.saving ? "保存中..." : "保存" }}
           </button>
         </div>
       </div>
@@ -255,25 +327,19 @@ onMounted(load);
       <!-- 每日名额 -->
       <div class="setting-card">
         <div class="setting-card-head">
-          <h3>{{ t("settings.slotsTitle") }}</h3>
+          <h3>每日名额</h3>
           <p class="muted">
-            {{
-              t("settings.slotsDesc", {
-                consumed: slots.consumed,
-                total: slots.total,
-                remaining: slots.remaining,
-              })
-            }}
+            已消耗 {{ slots.consumed }} / {{ slots.total }}，剩余 {{ slots.remaining }}
           </p>
         </div>
         <div class="setting-card-body">
           <div class="grid-2">
             <label>
-              {{ t("settings.slotsTotal") }}
+              每日总名额
               <input v-model.number="slots.total" type="number" min="1" />
             </label>
             <label>
-              {{ t("settings.slotsResetHour") }}
+              重置小时 (UTC)
               <input
                 v-model.number="slots.resetHour"
                 type="number"
@@ -293,14 +359,14 @@ onMounted(load);
             @click="resetDailySlotsConsumed"
             :disabled="slots.resetting"
           >
-            {{ slots.resetting ? "..." : t("settings.slotsResetBtn") }}
+            {{ slots.resetting ? "..." : "重置今日消耗" }}
           </button>
           <button
             class="btn btn-primary btn-sm"
             @click="saveDailySlotsSettings"
             :disabled="slots.saving"
           >
-            {{ slots.saving ? t("common.saving") : t("common.save") }}
+            {{ slots.saving ? "保存中..." : "保存" }}
           </button>
         </div>
       </div>
@@ -308,16 +374,16 @@ onMounted(load);
       <!-- X OAuth -->
       <div class="setting-card">
         <div class="setting-card-head">
-          <h3>{{ t("settings.xoauthTitle") }}</h3>
-          <p class="muted">{{ t("settings.xoauthDesc") }}</p>
+          <h3>X OAuth</h3>
+          <p class="muted">配置 Twitter/X OAuth 2.0 凭据。</p>
         </div>
         <div class="setting-card-body">
           <label>
-            {{ t("settings.clientId") }}
+            Client ID
             <input v-model="xoauth.clientId" placeholder="Client ID" />
           </label>
           <label>
-            {{ t("settings.clientSecret") }}
+            Client Secret
             <input
               v-model="xoauth.clientSecret"
               type="password"
@@ -325,7 +391,7 @@ onMounted(load);
             />
           </label>
           <label>
-            {{ t("settings.scopes") }}
+            Scopes
             <input
               v-model="xoauth.scopes"
               placeholder="users.read tweet.read offline.access"
@@ -342,7 +408,7 @@ onMounted(load);
             @click="saveXOAuthSettings"
             :disabled="xoauth.saving"
           >
-            {{ xoauth.saving ? t("common.saving") : t("common.save") }}
+            {{ xoauth.saving ? "保存中..." : "保存" }}
           </button>
         </div>
       </div>

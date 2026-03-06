@@ -20,6 +20,7 @@ const errorMessages: Record<string, string> = {
   invalid_or_expired_oauth_state: 'Your login session has expired. Please try again.',
   invalid_invite_code: 'The invite code is invalid or has been used.',
   agent_account_pool_empty: 'No agent accounts are available at this time. Please try again later.',
+  no_slots_remaining: 'Today\'s registration slots are full. Please try again after reset.',
 };
 
 const getErrorMessage = (code: string): string => {

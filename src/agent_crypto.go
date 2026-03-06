@@ -73,24 +73,16 @@ func decryptPrivateKeyPayload(input string, fixedKey string) ([]string, error) {
 		return nil, errors.New("empty encrypted data")
 	}
 
-	combined, err := hex.DecodeString(cleaned)
+	combined, err := decodeEncryptedBytes(cleaned)
 	if err != nil {
-		return nil, errors.New("unsupported encoding, expected hex")
-	}
-	if len(combined) <= 32 {
-		return nil, errors.New("invalid encrypted data")
+		return nil, err
 	}
 
 	key, err := deriveAES256Key(fixedKey)
 	if err != nil {
 		return nil, err
 	}
-	nonce := combined[:16]
-	tag := combined[16:32]
-	ciphertext := combined[32:]
-	ciphertextWithTag := append(append(make([]byte, 0, len(ciphertext)+len(tag)), ciphertext...), tag...)
-
-	plaintext, err := aesGCMDecrypt(key, nonce, ciphertextWithTag)
+	plaintext, err := decryptEncryptedKeyList(key, combined)
 	if err != nil {
 		return nil, err
 	}
@@ -200,4 +192,46 @@ func derivePublicKeyFromPrivateKey(privateKeyHex string) (string, error) {
 		return "", err
 	}
 	return strings.ToLower(crypto.PubkeyToAddress(key.PublicKey).Hex()), nil
+}
+
+func decodeEncryptedBytes(input string) ([]byte, error) {
+	if decoded, err := hex.DecodeString(input); err == nil && len(decoded) > 0 {
+		return decoded, nil
+	}
+	if decoded, err := base64.StdEncoding.DecodeString(input); err == nil && len(decoded) > 0 {
+		return decoded, nil
+	}
+	if decoded, err := base64.RawStdEncoding.DecodeString(input); err == nil && len(decoded) > 0 {
+		return decoded, nil
+	}
+	return nil, errors.New("unsupported encoding, expected hex/base64")
+}
+
+func decryptEncryptedKeyList(key []byte, combined []byte) ([]byte, error) {
+	if len(combined) <= 12 {
+		return nil, errors.New("invalid encrypted data")
+	}
+
+	// Preferred format for import payload:
+	// nonce(16) + tag(16) + ciphertext
+	if len(combined) > 32 {
+		nonce := combined[:16]
+		tag := combined[16:32]
+		ciphertext := combined[32:]
+		if len(ciphertext) > 0 {
+			ciphertextWithTag := make([]byte, 0, len(ciphertext)+len(tag))
+			ciphertextWithTag = append(ciphertextWithTag, ciphertext...)
+			ciphertextWithTag = append(ciphertextWithTag, tag...)
+			if pt, err := aesGCMDecrypt(key, nonce, ciphertextWithTag); err == nil {
+				return pt, nil
+			}
+		}
+	}
+
+	// Fallback format:
+	// nonce(12) + ciphertext + tag(16)
+	if pt, err := aesGCMDecrypt(key, combined[:12], combined[12:]); err == nil {
+		return pt, nil
+	}
+	return nil, errors.New("failed to decrypt encrypted data")
 }

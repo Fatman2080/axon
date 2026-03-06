@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-// Minimal ERC20 Interface
 interface IERC20 {
     function transfer(address recipient, uint256 amount) external returns (bool);
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
@@ -18,25 +17,29 @@ interface ICoreDepositWallet {
     function deposit(uint256 amount, uint32 destination) external;
 }
 
-// Simple Agent Vault that holds funds and delegates to an API wallet (the agent)
-contract AgentVault {
-    // Inactive: Initial state or after rotation/reset, waiting for funds/activation
-    // Active: Authorized and trading
-    // Revoked: Trading stopped by Risk Manager
-    enum Status { Inactive, Active, Revoked }
+/// @notice Fund transfer directions — full lifecycle: Owner ↔ EVM ↔ Perps ↔ Spot
+/// Note: EVM↔Spot and Perps→EVM are not supported by Hyperliquid in a single tx.
+///       Use multi-step paths instead (e.g. EVM→Perps→Spot).
+enum TransferDirection {
+    OwnerToEvm,        // 0 — Owner → AgentVault EVM (USDC transferFrom)
+    EvmToPerps,        // 1 — EVM → L1 Perps (CoreDeposit bridge)
+    PerpsToSpot,       // 2 — L1 Perps → Spot (usdClassTransfer)
+    SpotToPerps,       // 3 — L1 Spot → Perps (usdClassTransfer)
+    SpotToEvm,         // 4 — L1 Spot → EVM  (sendAsset to self)
+    EvmToOwner,        // 5 — AgentVault EVM → Owner (withdraw to destination)
+    SpotToOwnerSpot    // 6 — L1 Spot → Owner Spot directly (spotSend to destination)
+}
 
-    address public factory;
-    address public owner; // The Allocator
-    address public agent; // The trading agent (API Wallet)
+/// @title AgentVault — per-user fund vault deployed as beacon proxy
+/// @notice Status computed off-chain: NOT_EXISTS / UNASSIGNED / ACTIVED
+contract AgentVault {
+    address public owner;     // The Allocator contract
+    address public user;      // The trading API Wallet, address(0) = unassigned
     bool public initialized;
-    Status public status;
-    
-    // Hyperliquid Mainnet Constants
-    // USDC Token Address (EVM)
-    address public USDC;
-    // Core Deposit Bridge Address (EVM)
-    address public CORE_DEPOSIT;
-    // USDC System Address (L1) - Index 0
+
+    address public usdc;
+    address public coreDeposit;
+    uint256 public initialCapital; // Base capital for PnL / stop-loss calculation (6 decimals)
     address constant USDC_SYSTEM = 0x2000000000000000000000000000000000000000;
 
     modifier onlyOwner() {
@@ -44,326 +47,348 @@ contract AgentVault {
         _;
     }
 
-    function initialize(address _owner, address _agent, address _usdc, address _coreDeposit) external {
+    /// @notice Disable initialization on the implementation contract
+    constructor() {
+        initialized = true;
+    }
+
+    // --- Lifecycle ---
+
+    function initialize(address _owner, address _usdc, address _coreDeposit) external {
         require(!initialized, "Already initialized");
         initialized = true;
-        factory = msg.sender;
         owner = _owner;
-        agent = _agent;
-        USDC = _usdc;
-        CORE_DEPOSIT = _coreDeposit;
-        status = Status.Inactive;
-        
-        // Removed automatic delegation to prevent initialization deadlock
-        // Delegation will happen upon first bridge/deposit
+        usdc = _usdc;
+        coreDeposit = _coreDeposit;
     }
 
-    // Bridge funds from EVM to Exchange L1 (Perps Account)
-    function bridgeToL1(uint256 amount) external onlyOwner {
-        // 1. Approve CoreDepositWallet
-        IERC20(USDC).approve(CORE_DEPOSIT, amount);
-        
-        // 2. Deposit to Perps (destination = 0)
-        // This moves funds from this contract's EVM balance to its Exchange L1 balance
-        // Note: This action creates the L1 account if it doesn't exist.
-        ICoreDepositWallet(CORE_DEPOSIT).deposit(amount, 0);
-
-        // 3. Re-authorize Agent
-        // Since the L1 account might have just been created by the deposit, 
-        // we must ensure the agent is authorized NOW.
-        CoreWriterActions.addApiWallet(agent, "AgentVault");
-        status = Status.Active;
+    /// @notice Assign user (L1 authorization is a separate step via userAuthorize)
+    function userAssign(address _user) external onlyOwner {
+        user = _user;
     }
 
-    // Withdraw from Perps to Spot (L1 internal transfer)
-    // Only owner (Allocator) can call this
-    function withdrawFromPerp(uint64 amount) external onlyOwner {
-        // Move amount from Perps (false) -> Spot
-        // toPerp = false means Perp -> Spot
-        CoreWriterActions.usdClassTransfer(amount, false);
+    /// @notice Revoke L1 authorization and clear user
+    function userClear() external onlyOwner {
+        if (user != address(0)) {
+            CoreWriterActions.addApiWallet(address(this), "AgentVault");
+        }
+        user = address(0);
     }
 
-    // Manual Re-authorization helper
-    function authorize() external onlyOwner {
-        CoreWriterActions.addApiWallet(agent, "AgentVault");
-        status = Status.Active;
+    // --- L1 Authorization ---
+
+    /// @notice Re-authorize user on L1 (without changing assignment)
+    function userAuthorize() external onlyOwner {
+        require(user != address(0), "No user assigned");
+        CoreWriterActions.addApiWallet(user, "AgentVault");
     }
 
-    // Bridge funds from Exchange L1 (Spot) back to EVM
-    function bridgeToEVM(uint64 amount) external onlyOwner {
-        // Send USDC from L1 Spot (self) to USDC System Address
-        // This triggers the bridge to credit this contract on EVM
-        // Note: L1 USDC has 8 decimals, EVM USDC has 6.
-        // We receive `amount` in EVM units (6 dec). We must scale to L1 units (8 dec).
-        uint64 l1Amount = amount * 100;
-
-        CoreWriterActions.sendAsset(
-            USDC_SYSTEM, // destination (System Address)
-            address(0),  // subAccount (0 = default)
-            4294967295,  // sourceDex (Spot = max uint32)
-            4294967295,  // destDex (Spot = max uint32)
-            0,           // tokenIndex (USDC = 0)
-            l1Amount     // amount (L1 USDC units)
-        );
+    /// @notice Revoke L1 authorization (without clearing user)
+    function userRevoke() external onlyOwner {
+        CoreWriterActions.addApiWallet(address(this), "AgentVault");
     }
 
-    // Allow owner (Allocator) to withdraw funds
-    function withdraw(address token, uint256 amount) external onlyOwner {
-        // Transfer logic (standard ERC20 transfer)
-        IERC20(token).transfer(owner, amount);
+    // --- Fund Transfer ---
+
+    /// @notice Unified fund transfer. `destination` is used by directions that need an
+    ///         external target (EvmToOwner/SpotToOwnerSpot: recipient).
+    ///         Pass address(0) for directions that don't need it.
+    ///         OwnerToEvm is handled at the Allocator level (needs allowance on Allocator).
+    function transferAgentAsset(TransferDirection direction, uint256 amount, address destination) external onlyOwner {
+        if (direction == TransferDirection.EvmToPerps) {
+            require(user != address(0), "No user assigned");
+            require(IERC20(usdc).approve(coreDeposit, amount), "Approve failed");
+            ICoreDepositWallet(coreDeposit).deposit(amount, 0);
+            CoreWriterActions.addApiWallet(user, "AgentVault");
+        } else if (direction == TransferDirection.PerpsToSpot) {
+            require(amount <= type(uint64).max, "Amount overflow");
+            CoreWriterActions.usdClassTransfer(uint64(amount), false);
+        } else if (direction == TransferDirection.SpotToPerps) {
+            require(amount <= type(uint64).max, "Amount overflow");
+            CoreWriterActions.usdClassTransfer(uint64(amount), true);
+        } else if (direction == TransferDirection.SpotToEvm) {
+            require(amount <= type(uint64).max / 100, "Amount overflow");
+            // spotSend to USDC system address triggers EVM credit to this vault
+            CoreWriterActions.spotSend(USDC_SYSTEM, 0, uint64(amount) * 100);
+        } else if (direction == TransferDirection.EvmToOwner) {
+            require(destination != address(0), "Invalid destination");
+            require(IERC20(usdc).transfer(destination, amount), "Transfer failed");
+        } else if (direction == TransferDirection.SpotToOwnerSpot) {
+            require(destination != address(0), "Invalid destination");
+            require(amount <= type(uint64).max / 100, "Amount overflow");
+            CoreWriterActions.spotSend(destination, 0, uint64(amount) * 100);
+        }
     }
 
-    // Explicitly revoke agent permission
-    function revokeDelegate() external onlyOwner {
-        // Delegate to the Vault itself (this contract address) to freeze trading.
-        CoreWriterActions.addApiWallet(address(this), "Revoked");
-        status = Status.Revoked;
-    }
-
-    // Set new agent (rotate key)
-    function setAgent(address newAgent) external onlyOwner {
-        agent = newAgent;
-        // Authorize new agent
-        CoreWriterActions.addApiWallet(newAgent, "AgentVault");
-        // Reset to Inactive, waiting for funds or explicit activation if needed.
-        // Or keep Active if we assume rotation means immediate trading.
-        // Given user request "replenish then re-allocate", Inactive is safer.
-        status = Status.Inactive;
-    }
-
-    // Allow owner to execute arbitrary actions (like removing delegate)
-    function execute(address target, bytes calldata data) external onlyOwner {
-        (bool success, ) = target.call(data);
-        require(success, "Execution failed");
+    /// @notice Set initial capital baseline (6 decimals, same as USDC)
+    function setInitialCapital(uint256 _capital) external onlyOwner {
+        initialCapital = _capital;
     }
 }
 
+/// @title Allocator — factory and controller for AgentVaults
 contract Allocator is Ownable {
     UpgradeableBeacon public beacon;
-    
-    // Configurable addresses
-    address public immutable USDC;
-    address public immutable CORE_DEPOSIT;
-    
-    // Risk Managers whitelist
-    mapping(address => bool) public isRiskManager;
 
-    // Mapping from Agent EOA to their Vault contract
-    mapping(address => address) public agentVaults;
-    address[] public allAgents;
+    address public immutable usdc;
+    address public immutable coreDeposit;
 
-    event AgentAllocated(address indexed agent, address indexed vault, uint256 amount);
-    event AgentDeallocated(address indexed agent, address indexed vault, uint256 amount);
-    event AgentBridged(address indexed agent, address indexed vault, uint256 amount);
-    event AgentRevoked(address indexed agent, address indexed vault);
-    event Withdrawal(address indexed token, uint256 amount);
-    event RiskManagerUpdated(address indexed manager, bool status);
+    // Ops manager whitelist
+    mapping(address => bool) public isOpsManager;
+
+    // Vault registry
+    address[] public allVaults;
+    mapping(address => bool) public isVault;
+
+    // User → Vault reverse lookup
+    mapping(address => address) public userVault;
+
+    // --- Events: Vault Lifecycle ---
+    event VaultCreated(address indexed vault, uint256 index);
+
+    // --- Events: User Lifecycle ---
+    event UserAssigned(address indexed vault, address indexed user);
+    event UserCleared(address indexed vault, address indexed user);
+    event UserAuthorized(address indexed vault);
+    event UserRevoked(address indexed vault);
+
+    // --- Events: Fund Operations ---
+    event FundsTransferred(address indexed vault, TransferDirection direction, uint256 amount);
+    event EmergencyWithdraw(address indexed token, uint256 amount);
+
+    // --- Events: Administration ---
+    event OpsManagerUpdated(address indexed manager, bool status);
     event ImplementationUpdated(address indexed newImplementation);
 
-    modifier onlyRiskManagerOrOwner() {
-        require(msg.sender == owner() || isRiskManager[msg.sender], "Not authorized");
+    // --- Modifiers ---
+
+    modifier onlyOpsManagerOrOwner() {
+        require(msg.sender == owner() || isOpsManager[msg.sender], "Not authorized");
         _;
     }
 
-    constructor(address _implementation, address _usdc, address _coreDeposit) Ownable(msg.sender) {
-        // 1. Deploy Beacon, pointing to initial logic
-        beacon = new UpgradeableBeacon(_implementation, msg.sender);
-        USDC = _usdc;
-        CORE_DEPOSIT = _coreDeposit;
+    modifier validVault(address vault) {
+        require(isVault[vault], "Not a valid vault");
+        _;
     }
 
-    // --- Administration ---
-    
-    // Upgrade all Vaults to new implementation
+    // --- Constructor ---
+
+    constructor(address _implementation, address _usdc, address _coreDeposit) Ownable(msg.sender) {
+        beacon = new UpgradeableBeacon(_implementation, address(this));
+        usdc = _usdc;
+        coreDeposit = _coreDeposit;
+    }
+
+    // =========================================================================
+    // Administration
+    // =========================================================================
+
     function upgradeTo(address newImplementation) external onlyOwner {
         beacon.upgradeTo(newImplementation);
         emit ImplementationUpdated(newImplementation);
     }
 
-    // --- Risk Management ---
-    function setRiskManager(address manager, bool status) external onlyOwner {
-        isRiskManager[manager] = status;
-        emit RiskManagerUpdated(manager, status);
+    function setOpsManager(address manager, bool status) external onlyOwner {
+        isOpsManager[manager] = status;
+        emit OpsManagerUpdated(manager, status);
     }
 
-    // Create a new sub-vault for an agent if it doesn't exist
-    function getOrCreateAgentVault(address agent) public returns (address) {
-        if (agentVaults[agent] == address(0)) {
-            // Deploy BeaconProxy instead of Clones.clone
-            // BeaconProxy will ask beacon "where is the implementation?"
-            BeaconProxy proxy = new BeaconProxy(
-                address(beacon),
-                "" // Don't initialize in constructor, call manually later
-            );
-            
+    // =========================================================================
+    // Vault Creation
+    // =========================================================================
+
+    function batchCreate(uint256 count) external onlyOpsManagerOrOwner returns (address[] memory vaults) {
+        vaults = new address[](count);
+        for (uint256 i = 0; i < count; i++) {
+            BeaconProxy proxy = new BeaconProxy(address(beacon), "");
             address vault = address(proxy);
-            
-            // Initialize Proxy with configured addresses
-            AgentVault(vault).initialize(address(this), agent, USDC, CORE_DEPOSIT);
-            
-            agentVaults[agent] = vault;
-            allAgents.push(agent);
-        }
-        return agentVaults[agent];
-    }
-
-    // Batch create vaults
-
-    // Batch create vaults
-    function batchCreate(address[] calldata agents) external returns (address[] memory vaults) {
-        vaults = new address[](agents.length);
-        for (uint256 i = 0; i < agents.length; i++) {
-            vaults[i] = getOrCreateAgentVault(agents[i]);
+            AgentVault(vault).initialize(address(this), usdc, coreDeposit);
+            isVault[vault] = true;
+            allVaults.push(vault);
+            vaults[i] = vault;
+            emit VaultCreated(vault, allVaults.length - 1);
         }
     }
 
-    // Allocate funds to an agent (pull from user -> Allocator -> AgentVault)
-    // User must approve Allocator first!
-    function allocate(address agent, address token, uint256 amount) external {
-        address vault = getOrCreateAgentVault(agent);
-        IERC20(token).transferFrom(msg.sender, vault, amount);
-        emit AgentAllocated(agent, vault, amount);
+    // =========================================================================
+    // User Management
+    // =========================================================================
+
+    function userAssign(address vault, address _user) external onlyOpsManagerOrOwner validVault(vault) {
+        _userAssign(vault, _user);
     }
 
-    // Batch allocate funds (User -> Allocator -> Vaults)
-    // User must approve Allocator for total amount first
-    function batchAllocate(address[] calldata agents, address token, uint256[] calldata amounts) external {
-        require(agents.length == amounts.length, "Length mismatch");
-        for (uint256 i = 0; i < agents.length; i++) {
-            // Re-use logic inline to save gas on external calls? Or just call getOrCreate
-            address vault = getOrCreateAgentVault(agents[i]);
-            IERC20(token).transferFrom(msg.sender, vault, amounts[i]);
-            emit AgentAllocated(agents[i], vault, amounts[i]);
+    function userClear(address vault) external onlyOpsManagerOrOwner validVault(vault) {
+        _userClear(vault);
+    }
+
+    function userAuthorize(address vault) external onlyOpsManagerOrOwner validVault(vault) {
+        AgentVault(vault).userAuthorize();
+        emit UserAuthorized(vault);
+    }
+
+    function userRevoke(address vault) external onlyOpsManagerOrOwner validVault(vault) {
+        AgentVault(vault).userRevoke();
+        emit UserRevoked(vault);
+    }
+
+    function batchUserAssign(address[] calldata vaults, address[] calldata users) external onlyOpsManagerOrOwner {
+        require(vaults.length == users.length, "Length mismatch");
+        for (uint256 i = 0; i < vaults.length; i++) {
+            require(isVault[vaults[i]], "Not a valid vault");
+            _userAssign(vaults[i], users[i]);
         }
     }
 
-    // Bridge funds from AgentVault EVM to Exchange L1
-    function bridge(address agent, uint256 amount) external onlyRiskManagerOrOwner {
-        address vault = agentVaults[agent];
-        require(vault != address(0), "Agent vault not found");
-        
-        AgentVault(vault).bridgeToL1(amount);
-        emit AgentBridged(agent, vault, amount);
-    }
-
-    // Batch bridge to L1
-    function batchBridge(address[] calldata agents, uint256[] calldata amounts) external onlyRiskManagerOrOwner {
-        require(agents.length == amounts.length, "Length mismatch");
-        for (uint256 i = 0; i < agents.length; i++) {
-            address vault = agentVaults[agents[i]];
-            require(vault != address(0), "Agent vault not found");
-            AgentVault(vault).bridgeToL1(amounts[i]);
-            emit AgentBridged(agents[i], vault, amounts[i]);
+    function batchUserClear(address[] calldata vaults) external onlyOpsManagerOrOwner {
+        for (uint256 i = 0; i < vaults.length; i++) {
+            require(isVault[vaults[i]], "Not a valid vault");
+            _userClear(vaults[i]);
         }
     }
 
-    // Manually authorize agent (Fix for "User not found" issue)
-    function authorizeAgent(address agent) external onlyRiskManagerOrOwner {
-        address vault = agentVaults[agent];
-        require(vault != address(0), "Agent vault not found");
-        
-        AgentVault(vault).authorize();
-        // Emit an event? reusing AgentAllocated implies success, maybe just silent or new event.
-    }
-
-    // Withdraw from Perp to Spot (Fix for stuck funds)
-    function withdrawFromPerp(address agent, uint64 amount) external onlyRiskManagerOrOwner {
-        address vault = agentVaults[agent];
-        require(vault != address(0), "Agent vault not found");
-        
-        // Call AgentVault.withdrawFromPerp
-        AgentVault(vault).withdrawFromPerp(amount);
-    }
-
-    // Rotate agent key for a vault
-    function rotateAgent(address oldAgent, address newAgent) external onlyRiskManagerOrOwner {
-        address vault = agentVaults[oldAgent];
-        require(vault != address(0), "Agent vault not found");
-        require(agentVaults[newAgent] == address(0), "New agent already has a vault");
-
-        // 1. Update Vault contract state and authorize new agent on L1
-        AgentVault(vault).setAgent(newAgent);
-
-        // 2. Update Allocator mapping
-        agentVaults[newAgent] = vault;
-        agentVaults[oldAgent] = address(0); 
-
-        // 3. Update allAgents list
-        allAgents.push(newAgent);
-        
-        // 4. Emit event
-        emit AgentAllocated(newAgent, vault, 0); 
-    }
-
-    // Bridge funds from Exchange L1 back to AgentVault EVM
-    function bridgeBack(address agent, uint64 amount) external onlyRiskManagerOrOwner {
-        address vault = agentVaults[agent];
-        require(vault != address(0), "Agent vault not found");
-        
-        AgentVault(vault).bridgeToEVM(amount);
-        emit AgentBridged(agent, vault, amount); 
-    }
-
-    // Deallocate funds (pull back from agent vault to Allocator, then to Owner)
-    // Authorized: Owner OR Risk Manager
-    function deallocate(address agent, address token, uint256 amount) external onlyRiskManagerOrOwner {
-        address vault = agentVaults[agent];
-        require(vault != address(0), "Agent vault not found");
-
-        // 1. Pull from Vault to Allocator
-        AgentVault(vault).withdraw(token, amount);
-        
-        // 2. Send from Allocator to Owner (NOT to msg.sender)
-        // This ensures Risk Manager can only save funds to cold wallet, not steal them.
-        IERC20(token).transfer(owner(), amount);
-        
-        emit AgentDeallocated(agent, vault, amount);
-    }
-
-    // Force revoke agent permission without moving funds
-    // Authorized: Owner OR Risk Manager
-    function revokeAgent(address agent) external onlyRiskManagerOrOwner {
-        address vault = agentVaults[agent];
-        require(vault != address(0), "Agent vault not found");
-        
-        AgentVault(vault).revokeDelegate();
-        emit AgentRevoked(agent, vault);
-    }
-
-    // Emergency Withdraw from Allocator itself
-    // Authorized: Only Owner (Risk Manager cannot touch Allocator's own balance)
-    function withdraw(address token, uint256 amount) external onlyOwner {
-        IERC20(token).transfer(owner(), amount);
-        emit Withdrawal(token, amount);
-    }
-
-    // View helper
-    function getAgentVault(address agent) external view returns (address) {
-        return agentVaults[agent];
-    }
-
-    function getAgentStatus(address agent) external view returns (AgentVault.Status) {
-        address vault = agentVaults[agent];
-        if (vault == address(0)) {
-            return AgentVault.Status.Inactive; // Default
+    function batchUserAuthorize(address[] calldata vaults) external onlyOpsManagerOrOwner {
+        for (uint256 i = 0; i < vaults.length; i++) {
+            require(isVault[vaults[i]], "Not a valid vault");
+            AgentVault(vaults[i]).userAuthorize();
+            emit UserAuthorized(vaults[i]);
         }
-        return AgentVault(vault).status();
     }
 
-    // Batch view helper
-    function getAgentsInfo(address[] calldata agents) external view returns (AgentVault.Status[] memory statuses, uint256[] memory balances) {
-        statuses = new AgentVault.Status[](agents.length);
-        balances = new uint256[](agents.length);
-        
-        for (uint256 i = 0; i < agents.length; i++) {
-            address vault = agentVaults[agents[i]];
-            if (vault != address(0)) {
-                statuses[i] = AgentVault(vault).status();
-                // Get EVM balance of the vault
-                balances[i] = IERC20(USDC).balanceOf(vault);
-            } else {
-                statuses[i] = AgentVault.Status.Inactive;
-                balances[i] = 0;
+    function batchUserRevoke(address[] calldata vaults) external onlyOpsManagerOrOwner {
+        for (uint256 i = 0; i < vaults.length; i++) {
+            require(isVault[vaults[i]], "Not a valid vault");
+            AgentVault(vaults[i]).userRevoke();
+            emit UserRevoked(vaults[i]);
+        }
+    }
+
+    function _userAssign(address vault, address _user) internal {
+        require(_user != address(0), "Invalid user");
+        require(AgentVault(vault).user() == address(0), "Vault already has a user");
+        require(userVault[_user] == address(0), "User already has a vault");
+        AgentVault(vault).userAssign(_user);
+        userVault[_user] = vault;
+        emit UserAssigned(vault, _user);
+    }
+
+    function _userClear(address vault) internal {
+        address oldUser = AgentVault(vault).user();
+        if (oldUser == address(0)) return; // no user — skip silently
+        userVault[oldUser] = address(0);
+        AgentVault(vault).userClear();
+        emit UserCleared(vault, oldUser);
+    }
+
+    // =========================================================================
+    // Fund Transfer (Owner ↔ EVM ↔ Perps ↔ Spot)
+    // =========================================================================
+
+    function transferAgentAsset(address vault, TransferDirection direction, uint256 amount) external onlyOpsManagerOrOwner validVault(vault) {
+        _transferOne(vault, direction, amount);
+    }
+
+    function batchTransferAgentAsset(address[] calldata vaults, TransferDirection direction, uint256[] calldata amounts) external onlyOpsManagerOrOwner {
+        require(vaults.length == amounts.length, "Length mismatch");
+        if (direction == TransferDirection.EvmToOwner) {
+            // Optimized: collect all to Allocator first, then single transfer to Owner
+            uint256 total = 0;
+            for (uint256 i = 0; i < vaults.length; i++) {
+                require(isVault[vaults[i]], "Not a valid vault");
+                AgentVault(vaults[i]).transferAgentAsset(direction, amounts[i], address(this));
+                total += amounts[i];
+                emit FundsTransferred(vaults[i], direction, amounts[i]);
+            }
+            require(IERC20(usdc).transfer(owner(), total), "Transfer failed");
+        } else {
+            for (uint256 i = 0; i < vaults.length; i++) {
+                require(isVault[vaults[i]], "Not a valid vault");
+                _transferOne(vaults[i], direction, amounts[i]);
+            }
+        }
+    }
+
+    function _transferOne(address vault, TransferDirection direction, uint256 amount) internal {
+        if (direction == TransferDirection.OwnerToEvm) {
+            // OwnerToEvm: Allocator pulls from caller then sends to vault (allowance is on Allocator)
+            require(IERC20(usdc).transferFrom(msg.sender, vault, amount), "TransferFrom failed");
+        } else if (direction == TransferDirection.EvmToOwner || direction == TransferDirection.SpotToOwnerSpot) {
+            // Needs destination = owner()
+            AgentVault(vault).transferAgentAsset(direction, amount, owner());
+        } else {
+            // L1 operations — no destination needed
+            AgentVault(vault).transferAgentAsset(direction, amount, address(0));
+        }
+        emit FundsTransferred(vault, direction, amount);
+    }
+
+    // =========================================================================
+    // Initial Capital
+    // =========================================================================
+
+    function setInitialCapital(address vault, uint256 capital) external onlyOpsManagerOrOwner validVault(vault) {
+        AgentVault(vault).setInitialCapital(capital);
+    }
+
+    function batchSetInitialCapital(address[] calldata vaults, uint256[] calldata capitals) external onlyOpsManagerOrOwner {
+        require(vaults.length == capitals.length, "Length mismatch");
+        for (uint256 i = 0; i < vaults.length; i++) {
+            require(isVault[vaults[i]], "Not a valid vault");
+            AgentVault(vaults[i]).setInitialCapital(capitals[i]);
+        }
+    }
+
+    // =========================================================================
+    // Emergency
+    // =========================================================================
+
+    function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
+        require(IERC20(token).transfer(owner(), amount), "Transfer failed");
+        emit EmergencyWithdraw(token, amount);
+    }
+
+    // =========================================================================
+    // View Helpers
+    // =========================================================================
+
+    function vaultCount() external view returns (uint256) {
+        return allVaults.length;
+    }
+
+    function getVaultsByRange(uint256 start, uint256 count) external view returns (address[] memory) {
+        if (start >= allVaults.length) {
+            return new address[](0);
+        }
+        uint256 end = start + count > allVaults.length ? allVaults.length : start + count;
+        address[] memory result = new address[](end - start);
+        for (uint256 i = start; i < end; i++) {
+            result[i - start] = allVaults[i];
+        }
+        return result;
+    }
+
+    function getUserVault(address _user) external view returns (address) {
+        return userVault[_user];
+    }
+
+    function getVaultsInfo(address[] calldata vaults) external view returns (
+        address[] memory users,
+        uint256[] memory balances,
+        bool[] memory valids,
+        uint256[] memory capitals
+    ) {
+        uint256 len = vaults.length;
+        users = new address[](len);
+        balances = new uint256[](len);
+        valids = new bool[](len);
+        capitals = new uint256[](len);
+        for (uint256 i = 0; i < len; i++) {
+            if (isVault[vaults[i]]) {
+                valids[i] = true;
+                users[i] = AgentVault(vaults[i]).user();
+                balances[i] = IERC20(usdc).balanceOf(vaults[i]);
+                capitals[i] = AgentVault(vaults[i]).initialCapital();
             }
         }
     }

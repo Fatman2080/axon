@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -14,18 +15,19 @@ import (
 )
 
 type Server struct {
-	store            *Store
-	tokenSecret      string
-	agentFixedKey    string
-	appBaseURL       string
-	hyperliquid      *HyperliquidClient
-	evmMu            sync.RWMutex
-	evmClient        *EVMClient
-	xOAuth           XOAuthConfig
-	contractRPCURL   string
+	store             *Store
+	tokenSecret       string
+	agentFixedKey     string
+	appBaseURL        string
+	hyperliquid       *HyperliquidClient
+	evmMu             sync.RWMutex
+	evmClient         *EVMClient
+	xOAuth            XOAuthConfig
+	contractRPCURL    string
 	contractAllocator string
-	syncIntervalSecs int
-	syncStop         chan struct{}
+	syncIntervalSecs  int
+	syncStop          chan struct{}
+	syncRoundRunning  int32
 }
 
 func (s *Server) getEVMClient() *EVMClient {
@@ -42,7 +44,6 @@ func (s *Server) setEVMClient(c *EVMClient) {
 
 func (s *Server) registerPublicRoutes(g *echo.Group) {
 	g.GET("/health", s.handleHealth)
-	g.POST("/auth/x-login", s.handleXLogin)
 	g.GET("/auth/x/start", s.handleXOAuthStart)
 	g.GET("/auth/x/callback", s.handleXOAuthCallback)
 	g.GET("/auth/twitter", s.handleTwitterAuth)
@@ -53,12 +54,18 @@ func (s *Server) registerPublicRoutes(g *echo.Group) {
 	g.GET("/vault/stats", s.handleVaultStats)
 	g.GET("/daily-slots", s.handleDailySlots)
 	g.GET("/vault/overview", s.handleVaultOverview)
+	g.GET("/treasury", s.handlePublicTreasury)
+	g.GET("/treasury/history", s.handlePublicTreasuryHistory)
+
+	g.GET("/platform/stats", s.handlePlatformStats)
+	g.GET("/platform/history", s.handlePlatformHistory)
 
 	g.GET("/invite-codes/verify", s.handleVerifyInviteCode)
 	g.POST("/invite-codes/consume", s.handleConsumeInviteCode, s.requireRole("user"))
 	g.GET("/user/me", s.handleGetMe, s.requireRole("user"))
 	g.GET("/user/agent/history", s.handleUserAgentHistory, s.requireRole("user"))
 	g.GET("/user/agent/stats", s.handleUserAgentStats, s.requireRole("user"))
+	g.GET("/user/agent/deploy-command", s.handleUserDeployCommand, s.requireRole("user"))
 }
 
 func (s *Server) handleHealth(c echo.Context) error {
@@ -83,6 +90,7 @@ func (s *Server) loginWithXIdentity(xID string, xUsername string, avatar string,
 		return "", User{}, &xLoginError{Status: http.StatusBadRequest, Code: "x_id_required"}
 	}
 
+	needSaveUser := true
 	user, err := s.store.getOrCreateUserByXID(xID)
 	if err != nil {
 		return "", User{}, &xLoginError{Status: http.StatusInternalServerError, Code: "failed_to_load_user"}
@@ -109,17 +117,33 @@ func (s *Server) loginWithXIdentity(xID string, xUsername string, avatar string,
 	if user.InviteCodeUsed == "" && strings.TrimSpace(inviteCode) != "" {
 		invite, acct, err := s.store.consumeInviteAndAssignAccount(inviteCode, user.ID)
 		if err != nil {
-			if errors.Is(err, errInviteCodeNotFound) {
+			resolved := false
+			if strings.Contains(err.Error(), "user already used invite code") || strings.Contains(err.Error(), "user already has agent") {
+				if latest, getErr := s.store.getUserByID(user.ID); getErr == nil {
+					user = latest
+				}
+				if user.InviteCodeUsed != "" {
+					needSaveUser = false
+					resolved = true
+				}
+			}
+			if !resolved {
+				if errors.Is(err, errNoSlotsRemaining) {
+					return "", User{}, &xLoginError{Status: http.StatusTooManyRequests, Code: "no_slots_remaining"}
+				}
+				if errors.Is(err, errInviteCodeNotFound) {
+					return "", User{}, &xLoginError{Status: http.StatusForbidden, Code: "invalid_invite_code"}
+				}
+				if errors.Is(err, sql.ErrNoRows) {
+					return "", User{}, &xLoginError{Status: http.StatusConflict, Code: "agent_account_pool_empty"}
+				}
 				return "", User{}, &xLoginError{Status: http.StatusForbidden, Code: "invalid_invite_code"}
 			}
-			if errors.Is(err, sql.ErrNoRows) {
-				return "", User{}, &xLoginError{Status: http.StatusConflict, Code: "agent_account_pool_empty"}
-			}
-			return "", User{}, &xLoginError{Status: http.StatusForbidden, Code: "invalid_invite_code"}
+		} else {
+			user.InviteCodeUsed = invite.Code
+			user.AgentPublicKey = acct.PublicKey
+			user.AgentAssignedAt = acct.AssignedAt
 		}
-		user.InviteCodeUsed = invite.Code
-		user.AgentPublicKey = acct.PublicKey
-		user.AgentAssignedAt = acct.AssignedAt
 	} else if user.InviteCodeUsed != "" && user.AgentPublicKey == "" {
 		acct, err := s.store.assignUnusedAgentAccount(user.ID)
 		if err == nil {
@@ -128,8 +152,10 @@ func (s *Server) loginWithXIdentity(xID string, xUsername string, avatar string,
 		}
 	}
 
-	if err := s.store.saveUser(user); err != nil {
-		return "", User{}, &xLoginError{Status: http.StatusInternalServerError, Code: "failed_to_save_user"}
+	if needSaveUser {
+		if err := s.store.saveUser(user); err != nil {
+			return "", User{}, &xLoginError{Status: http.StatusInternalServerError, Code: "failed_to_save_user"}
+		}
 	}
 
 	token, err := issueToken(s.tokenSecret, user.ID, "user", 72*time.Hour)
@@ -307,8 +333,22 @@ func (s *Server) handleConsumeInviteCode(c echo.Context) error {
 
 	invite, account, err := s.store.consumeInviteAndAssignAccount(req.Code, userID)
 	if err != nil {
+		if strings.Contains(err.Error(), "user already used invite code") || strings.Contains(err.Error(), "user already has agent") {
+			latest, getErr := s.store.getUserByID(userID)
+			if getErr == nil && latest.InviteCodeUsed != "" {
+				return c.JSON(http.StatusOK, echo.Map{
+					"success":    true,
+					"inviteCode": latest.InviteCodeUsed,
+					"publicKey":  latest.AgentPublicKey,
+					"user":       latest,
+				})
+			}
+		}
 		if errors.Is(err, errInviteCodeNotFound) {
 			return c.JSON(http.StatusForbidden, echo.Map{"error": "invalid_invite_code"})
+		}
+		if errors.Is(err, errNoSlotsRemaining) {
+			return c.JSON(http.StatusTooManyRequests, echo.Map{"error": "no_slots_remaining"})
 		}
 		if errors.Is(err, sql.ErrNoRows) {
 			return c.JSON(http.StatusConflict, echo.Map{"error": "agent_account_pool_empty"})
@@ -366,23 +406,16 @@ func (s *Server) handleAgentMarketDetail(c echo.Context) error {
 		history = append(history, snap.AccountValue)
 	}
 
-	// Fetch live positions and fills from Hyperliquid
 	positions := make([]VaultPosition, 0)
-	recentFills := make([]VaultFill, 0)
-	if s.hyperliquid != nil {
-		if pos, err := s.hyperliquid.FetchPositions(publicKey); err == nil {
-			positions = pos
-		}
-		if fills, err := s.hyperliquid.FetchUserFills(publicKey); err == nil {
-			limit := 50
-			if len(fills) < limit {
-				limit = len(fills)
-			}
-			recentFills = fills[:limit]
-		}
+	recentFills, err := s.store.listAgentFills(publicKey, 50)
+	if err != nil {
+		recentFills = make([]VaultFill, 0)
 	}
 
 	createdAt := s.store.getAgentCreatedAt(publicKey)
+
+	// Agent performance analysis
+	perf, _ := s.store.getAgentPerformance(publicKey)
 
 	return c.JSON(http.StatusOK, echo.Map{
 		"agent":       agent,
@@ -390,6 +423,7 @@ func (s *Server) handleAgentMarketDetail(c echo.Context) error {
 		"positions":   positions,
 		"recentFills": recentFills,
 		"createdAt":   createdAt,
+		"performance": perf,
 	})
 }
 
@@ -400,7 +434,7 @@ func (s *Server) handleUserAgentHistory(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, echo.Map{"error": "user_not_found"})
 	}
 	if strings.TrimSpace(user.AgentPublicKey) == "" {
-		return c.JSON(http.StatusOK, echo.Map{"history": []float64{}, "trades": []interface{}{}})
+		return c.JSON(http.StatusOK, echo.Map{"history": []float64{}, "trades": []VaultFill{}})
 	}
 	period := strings.TrimSpace(c.QueryParam("period"))
 	snapshots, err := s.store.listAgentSnapshots(user.AgentPublicKey, 120, period)
@@ -414,10 +448,14 @@ func (s *Server) handleUserAgentHistory(c echo.Context) error {
 	for _, item := range snapshots {
 		history = append(history, item.AccountValue)
 	}
+	trades, err := s.store.listAgentFills(user.AgentPublicKey, 50)
+	if err != nil {
+		trades = []VaultFill{}
+	}
 	return c.JSON(http.StatusOK, echo.Map{
 		"publicKey": user.AgentPublicKey,
 		"history":   history,
-		"trades":    []interface{}{},
+		"trades":    trades,
 	})
 }
 
@@ -427,7 +465,7 @@ func (s *Server) handleVaultStats(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_stats"})
 	}
 
-	var totalTvl, totalL1Value, totalEvmBalance float64
+	var totalTvl, totalL1Value, totalEvmBalance, totalInitialCapital float64
 	var activeCount int
 	for _, item := range items {
 		if item.AgentStatus != AgentStatusActive {
@@ -436,14 +474,17 @@ func (s *Server) handleVaultStats(c echo.Context) error {
 		totalTvl += item.TVL
 		totalL1Value += item.AccountValue
 		totalEvmBalance += item.EVMBalance
+		totalInitialCapital += item.InitialCapital
 		activeCount++
 	}
 
 	return c.JSON(http.StatusOK, echo.Map{
-		"totalTvl":        totalTvl,
-		"totalEvmBalance": totalEvmBalance,
-		"totalL1Value":    totalL1Value,
-		"agentCount":      activeCount,
+		"totalTvl":            totalTvl,
+		"totalEvmBalance":     totalEvmBalance,
+		"totalL1Value":        totalL1Value,
+		"agentCount":          activeCount,
+		"totalInitialCapital": totalInitialCapital,
+		"treasuryTotal":       s.getTreasuryTotal(),
 	})
 }
 
@@ -465,39 +506,15 @@ func (s *Server) handleVaultOverview(c echo.Context) error {
 		overview.TotalL1Value += item.AccountValue
 		overview.TotalEvmBalance += item.EVMBalance
 		overview.TotalPnl += item.TotalPnL
+		overview.TotalInitialCapital += item.InitialCapital
 		overview.AgentCount++
 	}
 
-	if s.hyperliquid != nil {
-		keys, err := s.store.listAssignedPublicKeys()
-		if err == nil {
-			for _, key := range keys {
-				positions, err := s.hyperliquid.FetchPositions(key)
-				if err != nil {
-					continue
-				}
-				overview.Positions = append(overview.Positions, positions...)
-			}
-			// Fetch fills from first few agents (limit to avoid timeout)
-			limit := 5
-			if len(keys) < limit {
-				limit = len(keys)
-			}
-			for _, key := range keys[:limit] {
-				fills, err := s.hyperliquid.FetchUserFills(key)
-				if err != nil {
-					continue
-				}
-				overview.RecentFills = append(overview.RecentFills, fills...)
-			}
-			// Sort fills by time descending, limit to 50
-			sort.Slice(overview.RecentFills, func(i, j int) bool {
-				return overview.RecentFills[i].Time > overview.RecentFills[j].Time
-			})
-			if len(overview.RecentFills) > 50 {
-				overview.RecentFills = overview.RecentFills[:50]
-			}
-		}
+	// Positions are not persisted yet; keep empty in synced-data-only mode.
+	// Use persisted fills from sync rounds to avoid heavy online fan-out calls.
+	fills, fillErr := s.store.listRecentFillsForActiveAgents(50)
+	if fillErr == nil {
+		overview.RecentFills = fills
 	}
 
 	return c.JSON(http.StatusOK, overview)
@@ -511,17 +528,21 @@ func (s *Server) handleUserAgentStats(c echo.Context) error {
 	}
 
 	result := echo.Map{
-		"publicKey":    user.AgentPublicKey,
-		"accountValue": 0.0,
-		"totalPnl":     0.0,
-		"positions":    []VaultPosition{},
-		"recentFills":  []VaultFill{},
+		"publicKey":      user.AgentPublicKey,
+		"accountValue":   0.0,
+		"totalPnl":       0.0,
+		"initialCapital": 0.0,
+		"positions":      []VaultPosition{},
+		"recentFills":    []VaultFill{},
 	}
 
 	pk := strings.TrimSpace(user.AgentPublicKey)
 	if pk == "" {
 		return c.JSON(http.StatusOK, result)
 	}
+
+	// Get agent stats (includes initialCapital from DB)
+	agentStats, statsErr := s.store.getAgentStats(pk)
 
 	// Get latest snapshot data
 	snapshots, err := s.store.listAgentSnapshots(pk, 120, "ALL")
@@ -535,18 +556,17 @@ func (s *Server) handleUserAgentStats(c echo.Context) error {
 		result["totalPnl"] = latest.AccountValue - first.AccountValue
 	}
 
-	// Fetch live positions and fills from Hyperliquid
-	if s.hyperliquid != nil {
-		if positions, err := s.hyperliquid.FetchPositions(pk); err == nil {
-			result["positions"] = positions
+	// Use initialCapital for more accurate PnL when available
+	if statsErr == nil && agentStats.InitialCapital > 0 {
+		result["initialCapital"] = agentStats.InitialCapital
+		if av, ok := result["accountValue"].(float64); ok && av > 0 {
+			result["totalPnl"] = av - agentStats.InitialCapital
 		}
-		if fills, err := s.hyperliquid.FetchUserFills(pk); err == nil {
-			limit := 30
-			if len(fills) < limit {
-				limit = len(fills)
-			}
-			result["recentFills"] = fills[:limit]
-		}
+	}
+
+	fills, err := s.store.listAgentFills(pk, 30)
+	if err == nil {
+		result["recentFills"] = fills
 	}
 
 	return c.JSON(http.StatusOK, result)
@@ -579,4 +599,131 @@ func (s *Server) requireRole(requiredRole string) echo.MiddlewareFunc {
 			return next(c)
 		}
 	}
+}
+
+func (s *Server) handleUserDeployCommand(c echo.Context) error {
+	userID := c.Get("subject").(string)
+	user, err := s.store.getUserByID(userID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "user_not_found"})
+	}
+
+	publicKey := strings.TrimSpace(user.AgentPublicKey)
+	if publicKey == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "no_agent_assigned"})
+	}
+
+	cmdTemplate := s.store.getSettingDefault("dispatch_command", "")
+	if cmdTemplate == "" {
+		return c.JSON(http.StatusOK, echo.Map{"command": ""})
+	}
+
+	encrypted, vaultAddress, err := s.store.getAgentDispatchInfo(publicKey)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "agent_not_found"})
+	}
+
+	privateKey, err := decryptSecret(encrypted, s.agentFixedKey)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_decrypt_key"})
+	}
+
+	cmd := buildDispatchCommand(cmdTemplate, privateKey, publicKey, vaultAddress)
+
+	return c.JSON(http.StatusOK, echo.Map{"command": cmd})
+}
+
+func (s *Server) getTreasuryTotal() float64 {
+	snap, err := s.store.getLatestTreasurySnapshot()
+	if err != nil {
+		return 0
+	}
+	return snap.TotalFunds
+}
+
+func (s *Server) handlePublicTreasury(c echo.Context) error {
+	snap, err := s.store.getLatestTreasurySnapshot()
+	if err != nil {
+		return c.JSON(http.StatusOK, echo.Map{})
+	}
+	return c.JSON(http.StatusOK, snap)
+}
+
+func (s *Server) handlePublicTreasuryHistory(c echo.Context) error {
+	period := strings.TrimSpace(c.QueryParam("period"))
+	if period == "" {
+		period = "30d"
+	}
+	items, err := s.store.listTreasurySnapshots(200, period)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_treasury_history"})
+	}
+	return c.JSON(http.StatusOK, items)
+}
+
+func (s *Server) handlePlatformStats(c echo.Context) error {
+	latest, err := s.store.getLatestPlatformSnapshot()
+	if err != nil || latest == nil {
+		items, listErr := s.store.listAgentStats("")
+		if listErr != nil {
+			return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_platform_stats"})
+		}
+		var totalTvl, totalPnl, totalCapital float64
+		activeCount := 0
+		for _, item := range items {
+			if item.AgentStatus != AgentStatusActive {
+				continue
+			}
+			totalTvl += item.TVL
+			totalPnl += item.TotalPnL
+			totalCapital += item.InitialCapital
+			activeCount++
+		}
+		var userCount, totalAgentCount, totalTrades int
+		_ = s.store.db.QueryRow(`SELECT COUNT(1) FROM users`).Scan(&userCount)
+		_ = s.store.db.QueryRow(`SELECT COUNT(1) FROM agent_accounts`).Scan(&totalAgentCount)
+		_ = s.store.db.QueryRow(`SELECT COUNT(1) FROM agent_fills`).Scan(&totalTrades)
+
+		return c.JSON(http.StatusOK, echo.Map{
+			"totalTvl":        totalTvl,
+			"totalPnl":        totalPnl,
+			"totalCapital":    totalCapital,
+			"agentCount":      activeCount,
+			"totalAgentCount": totalAgentCount,
+			"userCount":       userCount,
+			"totalTrades":     totalTrades,
+			"growthRate7d":    map[string]float64{},
+			"lastUpdated":     nowISO(),
+		})
+	}
+	growth := s.store.getPlatformGrowth("7d")
+	return c.JSON(http.StatusOK, echo.Map{
+		"totalTvl":        latest.TotalTVL,
+		"totalPnl":        latest.TotalPnL,
+		"totalCapital":    latest.TotalCapital,
+		"agentCount":      latest.ActiveAgentCount,
+		"totalAgentCount": latest.TotalAgentCount,
+		"userCount":       latest.UserCount,
+		"totalTrades":     latest.TotalTrades,
+		"growthRate7d":    growth,
+		"lastUpdated":     latest.CreatedAt,
+	})
+}
+
+func (s *Server) handlePlatformHistory(c echo.Context) error {
+	period := strings.TrimSpace(c.QueryParam("period"))
+	if period == "" {
+		period = "30d"
+	}
+	limit := 200
+	if raw := strings.TrimSpace(c.QueryParam("limit")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	items, err := s.store.listPlatformSnapshots(limit, period)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_platform_history"})
+	}
+	return c.JSON(http.StatusOK, items)
 }

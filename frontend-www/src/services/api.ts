@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { AgentMarketItem, AgentMarketDetail, VaultStats, DailySlotsResponse, VaultOverview, UserAgentStats } from '../types';
+import type { AgentMarketItem, AgentMarketDetail, VaultStats, DailySlotsResponse, VaultOverview, UserAgentStats, TreasurySnapshot, PlatformStats, PlatformSnapshot } from '../types';
 
 const API_URL = '';
 
@@ -51,8 +51,23 @@ export const authApi = {
   getAgentStats: async (): Promise<UserAgentStats> => {
     const response = await api.get('/user/agent/stats');
     return response.data;
+  },
+
+  getDeployCommand: async (): Promise<{ command: string }> => {
+    const response = await api.get('/user/agent/deploy-command');
+    return response.data;
   }
 };
+
+// Dedup in-flight requests for the same endpoint
+const inflight = new Map<string, Promise<any>>();
+function dedup<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const existing = inflight.get(key);
+  if (existing) return existing;
+  const p = fn().finally(() => inflight.delete(key));
+  inflight.set(key, p);
+  return p;
+}
 
 export const marketApi = {
   getAgentMarket: async (search?: string): Promise<AgentMarketItem[]> => {
@@ -66,18 +81,52 @@ export const marketApi = {
   },
 
   getVaultStats: async (): Promise<VaultStats> => {
-    const response = await api.get('/vault/stats');
-    return response.data;
+    return dedup('vault/stats', async () => {
+      const response = await api.get('/vault/stats');
+      return response.data;
+    });
   },
 
   getDailySlots: async (): Promise<DailySlotsResponse> => {
-    const response = await api.get('/daily-slots');
-    return response.data;
+    return dedup('daily-slots', async () => {
+      const response = await api.get('/daily-slots');
+      return response.data;
+    });
   },
 
   getVaultOverview: async (): Promise<VaultOverview> => {
-    const response = await api.get('/vault/overview');
-    return response.data;
+    return dedup('vault/overview', async () => {
+      const response = await api.get('/vault/overview');
+      return response.data;
+    });
+  },
+
+  getTreasury: async (): Promise<TreasurySnapshot> => {
+    return dedup('treasury', async () => {
+      const response = await api.get('/treasury');
+      return response.data;
+    });
+  },
+
+  getTreasuryHistory: async (period = '30d'): Promise<TreasurySnapshot[]> => {
+    return dedup(`treasury/history/${period}`, async () => {
+      const response = await api.get('/treasury/history', { params: { period } });
+      return response.data;
+    });
+  },
+
+  getPlatformStats: async (): Promise<PlatformStats> => {
+    return dedup('platform/stats', async () => {
+      const response = await api.get('/platform/stats');
+      return response.data;
+    });
+  },
+
+  getPlatformHistory: async (period = '30d'): Promise<PlatformSnapshot[]> => {
+    return dedup(`platform/history/${period}`, async () => {
+      const response = await api.get('/platform/history', { params: { period } });
+      return response.data;
+    });
   },
 };
 

@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { fetchStrategies } from '../store/slices/strategySlice';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Shield, Lock, BarChart3, Database, Eye, Award } from 'lucide-react';
-import { VaultOverview, DailySlotsResponse } from "../types";
+import { VaultOverview, DailySlotsResponse, TreasurySnapshot } from "../types";
 import { useLanguage } from '../context/LanguageContext';
 import { marketApi } from '../services/api';
 
@@ -13,6 +13,7 @@ const defaultStats: VaultOverview = {
   totalL1Value: 0,
   agentCount: 0,
   totalPnl: 0,
+  totalInitialCapital: 0,
   positions: [],
   recentFills: [],
 };
@@ -46,6 +47,8 @@ const Home = () => {
   const { items: strategies } = useAppSelector((state) => state.strategies);
   const [dailySlots, setDailySlots] = useState<DailySlotsResponse | null>(null);
   const [vaultStats, setVaultStats] = useState<VaultOverview | null>(null);
+  const [treasury, setTreasury] = useState<TreasurySnapshot | null>(null);
+  const [treasuryHistory, setTreasuryHistory] = useState<TreasurySnapshot[]>([]);
   const { t } = useLanguage();
 
   const fetchSlots = () => {
@@ -55,28 +58,26 @@ const Home = () => {
   useEffect(() => {
     dispatch(fetchStrategies());
     marketApi.getVaultOverview().then(setVaultStats).catch(() => {});
+    marketApi.getTreasury().then(setTreasury).catch(() => {});
+    marketApi.getTreasuryHistory('30d').then(setTreasuryHistory).catch(() => {});
     fetchSlots();
-    const refreshInterval = setInterval(fetchSlots, 30000);
+    const refreshInterval = setInterval(fetchSlots, 60000);
     return () => clearInterval(refreshInterval);
   }, [dispatch]);
 
   useEffect(() => {
     if (!dailySlots) return;
-    const tick = () => {
-      const now = Date.now();
-      const resetTime = new Date(dailySlots.resetsAt).getTime();
-      const diff = resetTime - now;
-      if (diff <= 0) { fetchSlots(); return; }
-    };
-    tick();
-    const timer = setInterval(tick, 1000);
-    return () => clearInterval(timer);
+    const resetTime = new Date(dailySlots.resetsAt).getTime();
+    const diff = resetTime - Date.now();
+    if (diff <= 0) { fetchSlots(); return; }
+    const timer = setTimeout(fetchSlots, diff);
+    return () => clearTimeout(timer);
   }, [dailySlots]);
 
   const stats = vaultStats ?? defaultStats;
   const agentCount = stats?.agentCount || strategies?.length || 0;
-  const tvlValue = stats?.totalTvl ?? 0;
-  const totalPnl = stats?.totalPnl ?? 0;
+  const tvlValue = treasury?.totalFunds ?? 0;
+  const totalPnl = treasury?.vaultPnl ?? stats?.totalPnl ?? 0;
 
   const fmtUsd = (v: number) =>
     v >= 1000000
@@ -219,18 +220,52 @@ const Home = () => {
 
         {/* Stats Grid */}
         <div
-          className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-16 pt-12"
+          className="grid grid-cols-3 gap-3 mt-16 pt-12"
           style={{ borderTop: '1px solid var(--border)' }}
         >
           <StatCard label={t('home.stats.tvl')} value={fmtUsd(tvlValue)} accent="var(--neon-green)" />
           <StatCard label={t('home.stats.agents')} value={`${agentCount}+`} accent="var(--green)" />
-          <StatCard label={t('home.stats.apy')} value="--" accent="var(--tier-partner)" />
           <StatCard
             label={t('home.stats.yield')}
             value={`${totalPnl >= 0 ? '+' : ''}${fmtUsd(Math.abs(totalPnl))}`}
             accent={totalPnl >= 0 ? 'var(--green)' : 'var(--red)'}
           />
         </div>
+
+        {/* Total Assets Chart */}
+        {treasuryHistory.length > 1 && (
+          <div className="mt-8 p-5 rounded cyber-card" style={{ background: 'var(--bg-card)' }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-mono uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
+                Total Assets (30d)
+              </div>
+              <div className="text-sm font-bold" style={{ color: 'var(--neon-green)' }}>
+                {fmtUsd(treasuryHistory[treasuryHistory.length - 1]?.totalFunds ?? 0)}
+              </div>
+            </div>
+            <svg viewBox={`0 0 ${Math.max(treasuryHistory.length - 1, 1)} 100`} className="w-full" style={{ height: '120px' }} preserveAspectRatio="none">
+              {(() => {
+                const values = treasuryHistory.map(s => s.totalFunds);
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                const range = max - min || 1;
+                const points = values.map((v, i) => `${i},${100 - ((v - min) / range) * 90 - 5}`).join(' ');
+                return (
+                  <>
+                    <polyline fill="none" stroke="var(--neon-green)" strokeWidth="0.8" points={points} />
+                    <polyline fill="url(#treasuryGrad)" stroke="none" points={`0,100 ${points} ${values.length - 1},100`} />
+                    <defs>
+                      <linearGradient id="treasuryGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--neon-green)" stopOpacity="0.15" />
+                        <stop offset="100%" stopColor="var(--neon-green)" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                  </>
+                );
+              })()}
+            </svg>
+          </div>
+        )}
       </section>
 
       {/* ── Visual Architecture Diagram (Hidden) ── */}

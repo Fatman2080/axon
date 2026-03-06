@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
-import { fetchUser } from '../store/slices/userSlice';
 import { fetchStrategies } from '../store/slices/strategySlice';
 import {
   User, Wallet, Calendar,
@@ -31,12 +30,23 @@ const Profile = () => {
   const { items: strategies, loading: strategiesLoading } = useAppSelector((state) => state.strategies);
   const [agentHistory, setAgentHistory] = useState<number[]>([]);
   const [chartPeriod, setChartPeriod] = useState('1W');
+  const [agentStats, setAgentStats] = useState<{ accountValue: number; totalPnl: number; initialCapital: number } | null>(null);
   const { t } = useLanguage();
 
   useEffect(() => {
-    dispatch(fetchUser());
     dispatch(fetchStrategies());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (!user) return;
+    authApi.getAgentStats().then((stats) => {
+      setAgentStats({
+        accountValue: stats.accountValue ?? 0,
+        totalPnl: stats.totalPnl ?? 0,
+        initialCapital: (stats as any).initialCapital ?? 0,
+      });
+    }).catch(() => {});
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -93,10 +103,12 @@ const Profile = () => {
   }
 
   const mySubmissions = strategies.filter(s => user.agentPublicKey ? s.id === user.agentPublicKey : false);
-  const accountValue = user.totalInvestment ?? 0;
-  const totalPnl = user.totalProfit ?? 0;
-  const totalInvestment = accountValue;
+  const initialCapital = agentStats?.initialCapital ?? 0;
+  const accountValue = agentStats?.accountValue ?? (user.totalInvestment ?? 0);
+  const totalPnl = agentStats?.totalPnl ?? (user.totalProfit ?? 0);
+  const totalInvestment = initialCapital > 0 ? initialCapital : accountValue;
   const totalProfit = totalPnl;
+  const roi = initialCapital > 0 ? (totalPnl / initialCapital) * 100 : 0;
   const agentCount = user.agentPublicKey ? 1 : (user.agentCount ?? 0);
   const lpShares = user.lpShares ?? 0;
 
@@ -139,10 +151,10 @@ const Profile = () => {
   };
 
   const summaryCards = [
-    { label: t('profile.totalEquity'), value: `$${totalInvestment.toLocaleString()}`, icon: Wallet, color: 'var(--neon-green)' },
+    { label: initialCapital > 0 ? t('profile.initialCapital') || 'Initial Capital' : t('profile.totalEquity'), value: `$${totalInvestment.toLocaleString()}`, icon: Wallet, color: 'var(--neon-green)' },
     { label: t('profile.unrealizedPnL'), value: `${totalProfit > 0 ? '+' : ''}$${totalProfit.toLocaleString()}`, icon: Award, color: totalProfit >= 0 ? 'var(--green)' : 'var(--red)' },
+    { label: 'ROI', value: initialCapital > 0 ? `${roi >= 0 ? '+' : ''}${roi.toFixed(2)}%` : '--', icon: DollarSign, color: roi >= 0 ? 'var(--green)' : 'var(--red)' },
     { label: t('profile.activeAgents'), value: `${agentCount}`, icon: Briefcase, color: 'var(--tier-manager)' },
-    { label: t('profile.vaultShares'), value: lpShares.toLocaleString(), icon: DollarSign, color: 'var(--tier-partner)' },
   ];
 
   return (
@@ -243,12 +255,12 @@ const Profile = () => {
               {t('profile.portfolio')}
             </div>
             <div className="text-3xl font-bold font-mono tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              ${(totalInvestment + totalProfit).toLocaleString()}
+              ${accountValue.toLocaleString()}
             </div>
             <div className="mt-1 flex items-center gap-2 text-sm">
               <span className="font-mono" style={{ color: totalPnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
                 {totalPnl > 0 ? '+' : ''}${totalPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                {totalInvestment > 0 && totalPnl !== 0 && ` (${((totalPnl / (totalInvestment - totalPnl)) * 100).toFixed(1)}%)`}
+                {initialCapital > 0 && ` (${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%)`}
               </span>
             </div>
           </div>

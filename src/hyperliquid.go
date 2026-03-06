@@ -108,6 +108,30 @@ func (c *HyperliquidClient) FetchPositions(publicKey string) ([]VaultPosition, e
 	return positions, nil
 }
 
+func (c *HyperliquidClient) FetchSpotBalance(address string) (float64, error) {
+	address = strings.ToLower(strings.TrimSpace(address))
+	payload := map[string]any{
+		"type": "spotClearinghouseState",
+		"user": address,
+	}
+	var resp map[string]any
+	if err := c.postInfo(payload, &resp); err != nil {
+		return 0, err
+	}
+	balances, _ := resp["balances"].([]any)
+	for _, b := range balances {
+		entry, ok := b.(map[string]any)
+		if !ok {
+			continue
+		}
+		coin, _ := entry["coin"].(string)
+		if strings.EqualFold(coin, "USDC") {
+			return readAnyFloat(entry["total"]), nil
+		}
+	}
+	return 0, nil
+}
+
 func (c *HyperliquidClient) FetchUserFills(publicKey string) ([]VaultFill, error) {
 	publicKey = strings.ToLower(strings.TrimSpace(publicKey))
 	payload := map[string]any{

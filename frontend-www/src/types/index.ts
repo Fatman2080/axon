@@ -138,6 +138,7 @@ export interface AgentMarketItem {
   publicKey: string;
   name?: string;
   description?: string;
+  category?: Strategy['category'];
   userId?: string;
   userName?: string;
   accountValue?: number;
@@ -148,6 +149,7 @@ export interface AgentMarketItem {
   tvl?: number;
   lastSyncedAt?: string;
   performanceFee?: number;
+  initialCapital?: number;
 }
 
 export interface VaultStats {
@@ -155,6 +157,7 @@ export interface VaultStats {
   totalEvmBalance: number;
   totalL1Value: number;
   agentCount: number;
+  totalInitialCapital?: number;
 }
 
 export interface AgentMarketDetail {
@@ -204,6 +207,7 @@ export interface VaultOverview {
   totalL1Value: number;
   agentCount: number;
   totalPnl: number;
+  totalInitialCapital?: number;
   positions: VaultPosition[];
   recentFills: VaultFill[];
 }
@@ -212,7 +216,67 @@ export interface UserAgentStats {
   publicKey: string;
   accountValue: number;
   totalPnl: number;
+  initialCapital?: number;
   positions: VaultPosition[];
   recentFills: VaultFill[];
 }
 
+export interface TreasurySnapshot {
+  id: string;
+  vaultEvm: number;
+  vaultPerps: number;
+  vaultSpot: number;
+  vaultPnl: number;
+  vaultCapital: number;
+  allocatorEvm: number;
+  allocatorPerps: number;
+  allocatorSpot: number;
+  ownerEvm: number;
+  ownerPerps: number;
+  ownerSpot: number;
+  totalFunds: number;
+  vaultCount: number;
+  activeVaultCount: number;
+  allocatorAddress: string;
+  ownerAddress: string;
+  createdAt: string;
+}
+
+export interface AgentPerformance {
+  publicKey: string;
+  roi: number;
+  winRate: number;
+  totalFills: number;
+  profitableFills: number;
+  maxDrawdown: number;
+  sharpeRatio: number;
+  tradingFrequency: number;
+  totalClosedPnl: number;
+  avgWinSize: number;
+  avgLossSize: number;
+  daysSinceCreation: number;
+}
+
+export interface PlatformSnapshot {
+  id: string;
+  totalTvl: number;
+  totalPnl: number;
+  totalCapital: number;
+  userCount: number;
+  activeAgentCount: number;
+  totalAgentCount: number;
+  totalTrades: number;
+  createdAt: string;
+}
+
+export interface PlatformStats {
+  totalTvl: number;
+  totalPnl: number;
+  totalCapital: number;
+  agentCount: number;
+  totalAgentCount: number;
+  userCount: number;
+  totalTrades: number;
+  growthRate7d: Record<string, number>;
+  lastUpdated: string;
+}

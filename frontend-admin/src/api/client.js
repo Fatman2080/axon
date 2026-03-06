@@ -51,19 +51,24 @@ export const adminApi = {
         const { data } = await http.post('/admin/api/agent-accounts/import', { encryptedPayload });
         return data;
     },
-    async listAgentStats(search) {
-        const { data } = await http.get('/admin/api/agent-stats', { params: { search } });
+    async listAgentVaults() {
+        const { data } = await http.get('/admin/api/agent-vaults');
         return data;
     },
-    async syncAgentData(publicKey) {
-        await http.post(`/admin/api/agent-stats/${publicKey}/sync`);
+    async deleteAgentVaults(payload) {
+        const { data } = await http.delete('/admin/api/agent-vaults', { data: payload });
+        return data;
     },
     async updateAgentProfile(publicKey, payload) {
-        const { data } = await http.patch(`/admin/api/agent-stats/${publicKey}/profile`, payload);
+        const { data } = await http.patch(`/admin/api/agent-accounts/${publicKey}/profile`, payload);
         return data;
     },
-    async listInviteCodes() {
-        const { data } = await http.get('/admin/api/invite-codes');
+    async listInviteCodes(status) {
+        const { data } = await http.get('/admin/api/invite-codes', { params: status ? { status } : {} });
+        return data;
+    },
+    async generateInviteCodes(count) {
+        const { data } = await http.post('/admin/api/invite-codes/batch', { count });
         return data;
     },
     async createInviteCode(payload) {
@@ -86,10 +91,6 @@ export const adminApi = {
         const { data } = await http.delete('/admin/api/users', { data: { ids, password } });
         return data;
     },
-    async deleteAgents(publicKeys, password) {
-        const { data } = await http.delete('/admin/api/agent-stats', { data: { publicKeys, password } });
-        return data;
-    },
     async deleteAgentPool(publicKeys, password) {
         const { data } = await http.delete('/admin/api/agent-accounts', { data: { publicKeys, password } });
         return data;
@@ -109,8 +110,8 @@ export const adminApi = {
         const { data } = await http.get('/admin/api/settings/sync');
         return data;
     },
-    async updateSyncSettings(intervalSeconds) {
-        const { data } = await http.patch('/admin/api/settings/sync', { intervalSeconds });
+    async updateSyncSettings(payload) {
+        const { data } = await http.patch('/admin/api/settings/sync', payload);
         return data;
     },
     async getXOAuthSettings() {
@@ -135,6 +136,58 @@ export const adminApi = {
     },
     async updateContractsSettings(payload) {
         const { data } = await http.patch('/admin/api/settings/contracts', payload);
+        return data;
+    },
+    async getDispatchSettings() {
+        const { data } = await http.get('/admin/api/settings/dispatch');
+        return data;
+    },
+    async updateDispatchSettings(command) {
+        const { data } = await http.patch('/admin/api/settings/dispatch', { command });
+        return data;
+    },
+    async dispatchAgent(publicKey) {
+        const { data } = await http.post(`/admin/api/agent-accounts/${publicKey}/dispatch`);
+        return data;
+    },
+    async getAgentPrivateKey(publicKey, password) {
+        const { data } = await http.post(`/admin/api/agent-accounts/${publicKey}/privatekey`, { password });
+        return data;
+    },
+    async revokeAgent(publicKey) {
+        const { data } = await http.post(`/admin/api/agent-accounts/${publicKey}/revoke`);
+        return data;
+    },
+    async reassignAgent(publicKey, userName) {
+        const { data } = await http.post(`/admin/api/agent-accounts/${publicKey}/reassign`, { userName });
+        return data;
+    },
+    async revokeUserInvite(userId) {
+        const { data } = await http.post(`/admin/api/users/${userId}/revoke-invite`);
+        return data;
+    },
+    async revokeUserAgent(userId) {
+        const { data } = await http.post(`/admin/api/users/${userId}/revoke-agent`);
+        return data;
+    },
+    async treasury() {
+        const { data } = await http.get('/admin/api/treasury');
+        return data;
+    },
+    async treasuryHistory(period = '7d', limit = 200) {
+        const { data } = await http.get('/admin/api/treasury/history', { params: { period, limit } });
+        return data;
+    },
+    async dashboardTrends(period = '7d') {
+        const { data } = await http.get('/admin/api/dashboard/trends', { params: { period } });
+        return data;
+    },
+    async agentPerformance(publicKey) {
+        const { data } = await http.get(`/admin/api/agents/${publicKey}/performance`);
+        return data;
+    },
+    async agentLeaderboard(sortBy = 'pnl', limit = 10) {
+        const { data } = await http.get('/admin/api/agents/leaderboard', { params: { sortBy, limit } });
         return data;
     },
 };
