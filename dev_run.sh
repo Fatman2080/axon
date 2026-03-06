@@ -4,6 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL_RUN_DIR="${ROOT_DIR}/local_run"
 
+# Load environment variables from .env if it exists
+if [ -f "${ROOT_DIR}/.env" ]; then
+  echo "[dev-run] loading environment variables from .env..."
+  export $(grep -v '^#' "${ROOT_DIR}/.env" | xargs)
+fi
+
 # Store PIDs for cleanup
 PIDS=()
 

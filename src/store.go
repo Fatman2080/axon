@@ -225,6 +225,7 @@ func (s *Store) initSchema() error {
 			active_vault_count INTEGER NOT NULL DEFAULT 0,
 			allocator_address TEXT NOT NULL DEFAULT '',
 			owner_address TEXT NOT NULL DEFAULT '',
+			extra_usdc REAL NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_treasury_snapshots_created ON treasury_snapshots(created_at)`,
@@ -242,6 +243,7 @@ func (s *Store) initSchema() error {
 			created_at TEXT NOT NULL
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_platform_snapshots_created ON platform_snapshots(created_at)`,
+		`ALTER TABLE treasury_snapshots ADD COLUMN extra_usdc REAL NOT NULL DEFAULT 0`,
 	}
 
 	for _, stmt := range schema {

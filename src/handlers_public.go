@@ -28,6 +28,7 @@ type Server struct {
 	syncIntervalSecs  int
 	syncStop          chan struct{}
 	syncRoundRunning  int32
+	extraUsdcAddress  string
 }
 
 func (s *Server) getEVMClient() *EVMClient {

@@ -76,6 +76,7 @@ func main() {
 			FrontendFailureURL: cfg.AppBaseURL + "/auth/x/callback",
 			Scopes:             xoauthScopes,
 		},
+		extraUsdcAddress: cfg.Treasury.ExtraUsdcAddress,
 	}
 
 	// EVM client init is async — it can be slow to dial the RPC endpoint.

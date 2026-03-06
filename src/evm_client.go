@@ -208,7 +208,7 @@ func (ec *EVMClient) GetAgentsInfo(agents []common.Address) (map[common.Address]
 
 	data := make([]byte, 0, 4+32+32+len(vaultAddrs)*32)
 	data = append(data, selectorGetVaultsInfo...)
-	data = append(data, common.LeftPadBytes(big.NewInt(32).Bytes(), 32)...)              // offset
+	data = append(data, common.LeftPadBytes(big.NewInt(32).Bytes(), 32)...)                     // offset
 	data = append(data, common.LeftPadBytes(big.NewInt(int64(len(vaultAddrs))).Bytes(), 32)...) // length
 	for _, addr := range vaultAddrs {
 		data = append(data, common.LeftPadBytes(addr.Bytes(), 32)...)
@@ -348,6 +348,43 @@ func (ec *EVMClient) GetUSDCBalance(addr common.Address) (float64, error) {
 	}
 	bal := new(big.Int).SetBytes(out[:32])
 	return usdcToFloat(bal), nil
+}
+
+// GetERC20Balance calls token.balanceOf(userAddr) and returns the balance as float64 (assuming 6 decimals).
+func (ec *EVMClient) GetERC20Balance(tokenAddr, userAddr common.Address) (float64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	data := make([]byte, 0, 4+32)
+	data = append(data, selectorBalanceOf...)
+	data = append(data, common.LeftPadBytes(userAddr.Bytes(), 32)...)
+
+	out, err := ec.client.CallContract(ctx, ethereum.CallMsg{
+		To:   &tokenAddr,
+		Data: data,
+	}, nil)
+	if err != nil {
+		return 0, fmt.Errorf("balanceOf call: %w", err)
+	}
+	if len(out) < 32 {
+		return 0, fmt.Errorf("balanceOf response too short: %d", len(out))
+	}
+	bal := new(big.Int).SetBytes(out[:32])
+	return usdcToFloat(bal), nil
+}
+
+// GetNativeBalance calls eth_getBalance(addr, "latest") and returns the balance as float64 (assuming 18 decimals for Hyperliquid EVM native USDC).
+func (ec *EVMClient) GetNativeBalance(addr common.Address) (float64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	bal, err := ec.client.BalanceAt(ctx, addr, nil)
+	if err != nil {
+		return 0, fmt.Errorf("eth_getBalance call: %w", err)
+	}
+
+	f, _ := new(big.Float).SetInt(bal).Float64()
+	return math.Round(f/1e16) / 100, nil // 1e18 -> 100
 }
 
 // callAddress performs an eth_call that returns a single address value.

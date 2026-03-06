@@ -36,6 +36,9 @@ type RuntimeConfig struct {
 			AdminDevServer string `json:"adminDevServer"`
 		} `json:"dev"`
 	} `json:"frontend"`
+	Treasury struct {
+		ExtraUsdcAddress string `json:"extraUsdcAddress"`
+	} `json:"treasury"`
 }
 
 func defaultRuntimeConfig() RuntimeConfig {
@@ -63,6 +66,10 @@ func loadRuntimeConfig(path string) (RuntimeConfig, error) {
 	}
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return RuntimeConfig{}, fmt.Errorf("invalid config json: %w", err)
+	}
+
+	if envAddr := os.Getenv("TREASURY_EXTRA_USDC_ADDRESS"); envAddr != "" {
+		cfg.Treasury.ExtraUsdcAddress = envAddr
 	}
 
 	configDir := filepath.Dir(path)

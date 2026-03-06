@@ -1174,3 +1174,154 @@
 [ INFO 2026-03-07 01:05:02] [   41072] [           sync] platform: tvl=$3843.09 users=1 agents=8/7 trades=19
 [ INFO 2026-03-07 01:05:02] [   41072] [           sync] consistency: 1 assigned accounts checked, 0 lost vault access
 [ INFO 2026-03-07 01:05:02] [   41072] [           sync] === round #77 completed in 1.5s === next in 60s
+[ INFO 2026-03-07 01:05:49] [   41072] [           http] GET /api/agent-market 200 4.559458ms
+[ INFO 2026-03-07 01:05:49] [   41072] [           http] GET /api/vault/overview 200 2.799209ms
+[ INFO 2026-03-07 01:05:49] [   41072] [           http] GET /api/treasury/history?period=1d 200 4.195875ms
+[ INFO 2026-03-07 01:05:50] [   41072] [           http] GET /api/vault/overview 200 599.625µs
+[ INFO 2026-03-07 01:05:50] [   41072] [           http] GET /api/agent-market 200 1.696375ms
+[ INFO 2026-03-07 01:05:50] [   41072] [           http] GET /api/treasury/history?period=30d 200 1.107ms
+[ INFO 2026-03-07 01:05:50] [   41072] [           http] GET /api/treasury 200 3.038083ms
+[ INFO 2026-03-07 01:05:50] [   41072] [           http] GET /api/daily-slots 200 2.755333ms
+[ INFO 2026-03-07 01:06:01] [   41072] [           sync] === round #78 started === agents_assigned: 1, allocator: 0xa3fE0611B289AbBb24B33F3152051A49Ce8514F5
+[ INFO 2026-03-07 01:06:01] [   41072] [           sync] evm: discovering vaults... total: 8
+[ INFO 2026-03-07 01:06:01] [   41072] [           sync] evm: fetched info for 8 vaults (batch 1/1)
+[ INFO 2026-03-07 01:06:01] [   41072] [           sync] evm: 8 vaults upserted, 8 with active users
+[ INFO 2026-03-07 01:06:01] [   41072] [           sync] hl: syncing 8 vaults (concurrency: 5)...
+[ INFO 2026-03-07 01:06:02] [   41072] [           sync] hl: done — 8 ok, 0 failed
+[ INFO 2026-03-07 01:06:03] [   41072] [           sync] treasury: total=$3840.97 (vault=$801.06 alloc=$0.00 owner=$3039.91)
+[ INFO 2026-03-07 01:06:03] [   41072] [           sync] platform: tvl=$3840.97 users=1 agents=8/7 trades=19
+[ INFO 2026-03-07 01:06:03] [   41072] [           sync] consistency: 1 assigned accounts checked, 0 lost vault access
+[ INFO 2026-03-07 01:06:03] [   41072] [           sync] === round #78 completed in 2.0s === next in 60s
+[ INFO 2026-03-07 01:06:08] [   41072] [           http] GET /api/user/agent/deploy-command 200 570.541µs
+[ INFO 2026-03-07 01:06:08] [   41072] [           http] GET /api/user/agent/deploy-command 200 1.919292ms
+[ INFO 2026-03-07 01:06:43] [   41072] [           http] GET /api/agent-market 200 1.400541ms
+[ INFO 2026-03-07 01:06:43] [   41072] [           http] GET /api/treasury 200 316.333µs
+[ INFO 2026-03-07 01:06:43] [   41072] [           http] GET /api/vault/overview 200 2.854834ms
+[ INFO 2026-03-07 01:06:43] [   41072] [           http] GET /api/daily-slots 200 4.100584ms
+[ INFO 2026-03-07 01:06:43] [   41072] [           http] GET /api/treasury/history?period=30d 200 6.717167ms
+[ INFO 2026-03-07 01:07:01] [   41072] [           sync] === round #79 started === agents_assigned: 1, allocator: 0xa3fE0611B289AbBb24B33F3152051A49Ce8514F5
+[ INFO 2026-03-07 01:07:01] [   41072] [           sync] evm: discovering vaults... total: 8
+[ INFO 2026-03-07 01:07:01] [   41072] [           sync] evm: fetched info for 8 vaults (batch 1/1)
+[ INFO 2026-03-07 01:07:01] [   41072] [           sync] evm: 8 vaults upserted, 8 with active users
+[ INFO 2026-03-07 01:07:01] [   41072] [           sync] hl: syncing 8 vaults (concurrency: 5)...
+[ INFO 2026-03-07 01:07:02] [   41072] [           sync] hl: done — 8 ok, 0 failed
+[ INFO 2026-03-07 01:07:03] [   41072] [           sync] treasury: total=$3839.21 (vault=$801.15 alloc=$0.00 owner=$3038.06)
+[ INFO 2026-03-07 01:07:03] [   41072] [           sync] platform: tvl=$3839.21 users=1 agents=8/7 trades=19
+[ INFO 2026-03-07 01:07:03] [   41072] [           sync] consistency: 1 assigned accounts checked, 0 lost vault access
+[ INFO 2026-03-07 01:07:03] [   41072] [           sync] === round #79 completed in 1.8s === next in 60s
+[ INFO 2026-03-07 01:07:05] [   41072] [           http] GET /api/vault/overview 200 819.083µs
+[ INFO 2026-03-07 01:07:05] [   41072] [           http] GET /api/treasury/history?period=1d 200 2.045ms
+[ INFO 2026-03-07 01:07:11] [   41072] [           http] GET /api/agent-market 200 546.625µs
+[ INFO 2026-03-07 01:07:15] [   41072] [           http] GET /api/user/agent/deploy-command 200 493.25µs
+[ INFO 2026-03-07 01:07:15] [   41072] [           http] GET /api/user/agent/deploy-command 200 332.583µs
+[ INFO 2026-03-07 01:07:18] [   41072] [           http] GET /api/user/agent/deploy-command 200 744.333µs
+[ INFO 2026-03-07 01:07:18] [   41072] [           http] GET /api/user/agent/deploy-command 200 308.791µs
+[ INFO 2026-03-07 01:07:18] [   41072] [           http] GET /api/agent-market 200 3.304208ms
+[ INFO 2026-03-07 01:07:21] [   41072] [           http] GET /api/vault/overview 200 955.166µs
+[ INFO 2026-03-07 01:07:21] [   41072] [           http] GET /api/treasury/history?period=1d 200 1.939208ms
+[ INFO 2026-03-07 01:08:01] [   41072] [           sync] === round #80 started === agents_assigned: 1, allocator: 0xa3fE0611B289AbBb24B33F3152051A49Ce8514F5
+[ INFO 2026-03-07 01:08:01] [   41072] [           sync] evm: discovering vaults... total: 8
+[ INFO 2026-03-07 01:08:01] [   41072] [           sync] evm: fetched info for 8 vaults (batch 1/1)
+[ INFO 2026-03-07 01:08:01] [   41072] [           sync] evm: 8 vaults upserted, 8 with active users
+[ INFO 2026-03-07 01:08:01] [   41072] [           sync] hl: syncing 8 vaults (concurrency: 5)...
+[ INFO 2026-03-07 01:08:02] [   41072] [           sync] hl: done — 8 ok, 0 failed
+[ INFO 2026-03-07 01:08:02] [   41072] [           sync] treasury: total=$3837.88 (vault=$801.23 alloc=$0.00 owner=$3036.65)
+[ INFO 2026-03-07 01:08:02] [   41072] [           sync] platform: tvl=$3837.88 users=1 agents=8/7 trades=19
+[ INFO 2026-03-07 01:08:02] [   41072] [           sync] consistency: 1 assigned accounts checked, 0 lost vault access
+[ INFO 2026-03-07 01:08:02] [   41072] [           sync] === round #80 completed in 1.6s === next in 60s
+[ INFO 2026-03-07 01:09:01] [   41072] [           sync] === round #81 started === agents_assigned: 1, allocator: 0xa3fE0611B289AbBb24B33F3152051A49Ce8514F5
+[ INFO 2026-03-07 01:09:01] [   41072] [           sync] evm: discovering vaults... total: 8
+[ INFO 2026-03-07 01:09:01] [   41072] [           sync] evm: fetched info for 8 vaults (batch 1/1)
+[ INFO 2026-03-07 01:09:01] [   41072] [           sync] evm: 8 vaults upserted, 8 with active users
+[ INFO 2026-03-07 01:09:01] [   41072] [           sync] hl: syncing 8 vaults (concurrency: 5)...
+[ INFO 2026-03-07 01:09:02] [   41072] [           sync] hl: done — 8 ok, 0 failed
+[ INFO 2026-03-07 01:09:02] [   41072] [           sync] treasury: total=$3838.36 (vault=$801.20 alloc=$0.00 owner=$3037.16)
+[ INFO 2026-03-07 01:09:02] [   41072] [           sync] platform: tvl=$3838.36 users=1 agents=8/7 trades=19
+[ INFO 2026-03-07 01:09:02] [   41072] [           sync] consistency: 1 assigned accounts checked, 0 lost vault access
+[ INFO 2026-03-07 01:09:02] [   41072] [           sync] === round #81 completed in 1.3s === next in 60s
+[ INFO 2026-03-07 01:09:24] [   41072] [           http] GET /api/user/me 200 1.650958ms
+[ INFO 2026-03-07 01:09:24] [   41072] [           http] GET /api/treasury/history?period=1d 200 2.716667ms
+[ INFO 2026-03-07 01:09:24] [   41072] [           http] GET /api/vault/overview 200 4.402959ms
+[ INFO 2026-03-07 01:10:01] [   41072] [           sync] === round #82 started === agents_assigned: 1, allocator: 0xa3fE0611B289AbBb24B33F3152051A49Ce8514F5
+[ INFO 2026-03-07 01:10:01] [   41072] [           sync] evm: discovering vaults... total: 8
+[ INFO 2026-03-07 01:10:01] [   41072] [           sync] evm: fetched info for 8 vaults (batch 1/1)
+[ INFO 2026-03-07 01:10:01] [   41072] [           sync] evm: 8 vaults upserted, 8 with active users
+[ INFO 2026-03-07 01:10:01] [   41072] [           sync] hl: syncing 8 vaults (concurrency: 5)...
+[ INFO 2026-03-07 01:10:02] [   41072] [           sync] hl: done — 8 ok, 0 failed
+[ INFO 2026-03-07 01:10:02] [   41072] [           sync] treasury: total=$3841.92 (vault=$801.00 alloc=$0.00 owner=$3040.92)
+[ INFO 2026-03-07 01:10:02] [   41072] [           sync] platform: tvl=$3841.92 users=1 agents=8/7 trades=19
+[ INFO 2026-03-07 01:10:02] [   41072] [           sync] consistency: 1 assigned accounts checked, 0 lost vault access
+[ INFO 2026-03-07 01:10:02] [   41072] [           sync] === round #82 completed in 1.6s === next in 60s
+[ INFO 2026-03-07 01:11:01] [   41072] [           sync] === round #83 started === agents_assigned: 1, allocator: 0xa3fE0611B289AbBb24B33F3152051A49Ce8514F5
+[ INFO 2026-03-07 01:11:01] [   41072] [           sync] evm: discovering vaults... total: 8
+[ INFO 2026-03-07 01:11:01] [   41072] [           sync] evm: fetched info for 8 vaults (batch 1/1)
+[ INFO 2026-03-07 01:11:01] [   41072] [           sync] evm: 8 vaults upserted, 8 with active users
+[ INFO 2026-03-07 01:11:01] [   41072] [           sync] hl: syncing 8 vaults (concurrency: 5)...
+[ INFO 2026-03-07 01:11:02] [   41072] [           sync] hl: done — 8 ok, 0 failed
+[ INFO 2026-03-07 01:11:02] [   41072] [           sync] treasury: total=$3840.07 (vault=$801.11 alloc=$0.00 owner=$3038.96)
+[ INFO 2026-03-07 01:11:02] [   41072] [           sync] platform: tvl=$3840.07 users=1 agents=8/7 trades=19
+[ INFO 2026-03-07 01:11:02] [   41072] [           sync] consistency: 1 assigned accounts checked, 0 lost vault access
+[ INFO 2026-03-07 01:11:02] [   41072] [           sync] === round #83 completed in 1.6s === next in 60s
+[ INFO 2026-03-07 01:12:01] [   41072] [           sync] === round #84 started === agents_assigned: 1, allocator: 0xa3fE0611B289AbBb24B33F3152051A49Ce8514F5
+[ INFO 2026-03-07 01:12:01] [   41072] [           sync] evm: discovering vaults... total: 8
+[ INFO 2026-03-07 01:12:01] [   41072] [           sync] evm: fetched info for 8 vaults (batch 1/1)
+[ INFO 2026-03-07 01:12:01] [   41072] [           sync] evm: 8 vaults upserted, 8 with active users
+[ INFO 2026-03-07 01:12:01] [   41072] [           sync] hl: syncing 8 vaults (concurrency: 5)...
+[ INFO 2026-03-07 01:12:02] [   41072] [           sync] hl: done — 8 ok, 0 failed
+[ INFO 2026-03-07 01:12:02] [   41072] [           sync] treasury: total=$3840.11 (vault=$801.10 alloc=$0.00 owner=$3039.01)
+[ INFO 2026-03-07 01:12:02] [   41072] [           sync] platform: tvl=$3840.11 users=1 agents=8/7 trades=19
+[ INFO 2026-03-07 01:12:02] [   41072] [           sync] consistency: 1 assigned accounts checked, 0 lost vault access
+[ INFO 2026-03-07 01:12:02] [   41072] [           sync] === round #84 completed in 1.5s === next in 60s
+[ INFO 2026-03-07 01:12:19] [   41072] [           http] GET /api/user/me 200 389.208µs
+[ INFO 2026-03-07 01:12:19] [   41072] [           http] GET /api/vault/overview 200 1.072125ms
+[ INFO 2026-03-07 01:12:19] [   41072] [           http] GET /api/treasury/history?period=1d 200 2.422125ms
+[ INFO 2026-03-07 01:12:57] [   41072] [           http] GET /api/user/me 200 2.53ms
+[ INFO 2026-03-07 01:12:57] [   41072] [           http] GET /api/treasury/history?period=1d 200 2.536541ms
+[ INFO 2026-03-07 01:12:57] [   41072] [           http] GET /api/vault/overview 200 5.237458ms
+[ INFO 2026-03-07 01:13:01] [   41072] [           sync] === round #85 started === agents_assigned: 1, allocator: 0xa3fE0611B289AbBb24B33F3152051A49Ce8514F5
+[ INFO 2026-03-07 01:13:01] [   41072] [           sync] evm: discovering vaults... total: 8
+[ INFO 2026-03-07 01:13:01] [   41072] [           sync] evm: fetched info for 8 vaults (batch 1/1)
+[ INFO 2026-03-07 01:13:01] [   41072] [           sync] evm: 8 vaults upserted, 8 with active users
+[ INFO 2026-03-07 01:13:01] [   41072] [           sync] hl: syncing 8 vaults (concurrency: 5)...
+[ INFO 2026-03-07 01:13:02] [   41072] [           sync] hl: done — 8 ok, 0 failed
+[ INFO 2026-03-07 01:13:02] [   41072] [           sync] treasury: total=$3836.55 (vault=$801.30 alloc=$0.00 owner=$3035.25)
+[ INFO 2026-03-07 01:13:02] [   41072] [           sync] platform: tvl=$3836.55 users=1 agents=8/7 trades=19
+[ INFO 2026-03-07 01:13:02] [   41072] [           sync] consistency: 1 assigned accounts checked, 0 lost vault access
+[ INFO 2026-03-07 01:13:02] [   41072] [           sync] === round #85 completed in 1.5s === next in 60s
+[ INFO 2026-03-07 01:13:18] [   41072] [           http] GET /api/user/me 200 1.408125ms
+[ INFO 2026-03-07 01:13:18] [   41072] [           http] GET /api/treasury/history?period=1d 200 1.87325ms
+[ INFO 2026-03-07 01:13:18] [   41072] [           http] GET /api/vault/overview 200 3.751292ms
+[ INFO 2026-03-07 01:14:01] [   41072] [           sync] === round #86 started === agents_assigned: 1, allocator: 0xa3fE0611B289AbBb24B33F3152051A49Ce8514F5
+[ INFO 2026-03-07 01:14:01] [   41072] [           sync] evm: discovering vaults... total: 8
+[ INFO 2026-03-07 01:14:01] [   41072] [           sync] evm: fetched info for 8 vaults (batch 1/1)
+[ INFO 2026-03-07 01:14:01] [   41072] [           sync] evm: 8 vaults upserted, 8 with active users
+[ INFO 2026-03-07 01:14:01] [   41072] [           sync] hl: syncing 8 vaults (concurrency: 5)...
+[ INFO 2026-03-07 01:14:02] [   41072] [           sync] hl: done — 8 ok, 0 failed
+[ INFO 2026-03-07 01:14:02] [   41072] [           sync] treasury: total=$3837.16 (vault=$801.23 alloc=$0.00 owner=$3035.93)
+[ INFO 2026-03-07 01:14:02] [   41072] [           sync] platform: tvl=$3837.16 users=1 agents=8/7 trades=19
+[ INFO 2026-03-07 01:14:02] [   41072] [           sync] consistency: 1 assigned accounts checked, 0 lost vault access
+[ INFO 2026-03-07 01:14:02] [   41072] [           sync] === round #86 completed in 1.3s === next in 60s
+[ INFO 2026-03-07 01:14:06] [   41072] [           http] GET /api/user/me 200 4.79675ms
+[ INFO 2026-03-07 01:14:06] [   41072] [           http] GET /api/treasury/history?period=1d 200 4.909833ms
+[ INFO 2026-03-07 01:14:06] [   41072] [           http] GET /api/vault/overview 200 7.756792ms
+[ INFO 2026-03-07 01:15:01] [   41072] [           sync] === round #87 started === agents_assigned: 1, allocator: 0xa3fE0611B289AbBb24B33F3152051A49Ce8514F5
+[ INFO 2026-03-07 01:15:01] [   41072] [           sync] evm: discovering vaults... total: 8
+[ INFO 2026-03-07 01:15:01] [   41072] [           sync] evm: fetched info for 8 vaults (batch 1/1)
+[ INFO 2026-03-07 01:15:01] [   41072] [           sync] evm: 8 vaults upserted, 8 with active users
+[ INFO 2026-03-07 01:15:01] [   41072] [           sync] hl: syncing 8 vaults (concurrency: 5)...
+[ INFO 2026-03-07 01:15:02] [   41072] [           sync] hl: done — 8 ok, 0 failed
+[ INFO 2026-03-07 01:15:03] [   41072] [           sync] treasury: total=$3832.78 (vault=$801.51 alloc=$0.00 owner=$3031.27)
+[ INFO 2026-03-07 01:15:03] [   41072] [           sync] platform: tvl=$3832.78 users=1 agents=8/7 trades=19
+[ INFO 2026-03-07 01:15:03] [   41072] [           sync] consistency: 1 assigned accounts checked, 0 lost vault access
+[ INFO 2026-03-07 01:15:03] [   41072] [           sync] === round #87 completed in 2.1s === next in 60s
+2026/03/07 01:15:31 Unsolicited response received on idle HTTP channel starting with "HTTP/1.1 400 Bad Request\r\n\r\n"; err=<nil>
+[ INFO 2026-03-07 01:16:01] [   41072] [           sync] === round #88 started === agents_assigned: 1, allocator: 0xa3fE0611B289AbBb24B33F3152051A49Ce8514F5
+[ INFO 2026-03-07 01:16:01] [   41072] [           sync] evm: discovering vaults... total: 8
+[ INFO 2026-03-07 01:16:01] [   41072] [           sync] evm: fetched info for 8 vaults (batch 1/1)
+[ INFO 2026-03-07 01:16:01] [   41072] [           sync] evm: 8 vaults upserted, 8 with active users
+[ INFO 2026-03-07 01:16:01] [   41072] [           sync] hl: syncing 8 vaults (concurrency: 5)...
+[ INFO 2026-03-07 01:16:02] [   41072] [           sync] hl: done — 8 ok, 0 failed
+[ INFO 2026-03-07 01:16:02] [   41072] [           sync] treasury: total=$3831.03 (vault=$801.61 alloc=$0.00 owner=$3029.42)
+[ INFO 2026-03-07 01:16:02] [   41072] [           sync] platform: tvl=$3831.03 users=1 agents=8/7 trades=19
+[ INFO 2026-03-07 01:16:02] [   41072] [           sync] consistency: 1 assigned accounts checked, 0 lost vault access
+[ INFO 2026-03-07 01:16:02] [   41072] [           sync] === round #88 completed in 1.6s === next in 60s
