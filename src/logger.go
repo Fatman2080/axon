@@ -41,7 +41,7 @@ func initLogger(logCfg struct {
 	MaxSize  int    `json:"maxSize"`
 	MaxFiles int    `json:"maxFiles"`
 	Console  bool   `json:"console"`
-}, configDir string) {
+}) {
 	logState.pid = os.Getpid()
 	logState.console = logCfg.Console
 

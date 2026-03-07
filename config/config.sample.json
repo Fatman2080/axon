@@ -5,7 +5,7 @@
     "tokenSecret": "openfi-dev-secret"
   },
   "storage": {
-    "dbPath": "../data/openfi.db"
+    "dbPath": "./data/openfi.db"
   },
   "agentPool": {
     "fixedKey": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -13,19 +13,8 @@
   "hyperliquid": {
     "baseURL": "https://api.hyperliquid.xyz"
   },
-  "frontend": {
-    "mode": "dev",
-    "release": {
-      "wwwDistDir": "../../frontend-www/dist",
-      "adminDistDir": "../../frontend-admin/dist"
-    },
-    "dev": {
-      "wwwDevServer": "http://127.0.0.1:9334",
-      "adminDevServer": "http://127.0.0.1:9335"
-    }
-  },
   "log": {
-    "dir": "../logs",
+    "dir": "./logs",
     "level": "info",
     "maxSize": 100,
     "maxFiles": 10,

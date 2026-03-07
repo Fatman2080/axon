@@ -20,19 +20,22 @@ type staticHost struct {
 	adminProxy *httputil.ReverseProxy
 }
 
-func newStaticHost(cfg RuntimeConfig) (*staticHost, error) {
+func newStaticHost() (*staticHost, error) {
 	host := &staticHost{
-		mode:      cfg.Frontend.Mode,
-		wwwDist:   cfg.Frontend.Release.WWWDistDir,
-		adminDist: cfg.Frontend.Release.AdminDistDir,
+		mode:      "release",
+		wwwDist:   "./assets/www",
+		adminDist: "./assets/admin",
 	}
 
-	if host.mode == "dev" {
-		wwwProxy, err := buildReverseProxy(cfg.Frontend.Dev.WWWDevServer, "")
+	wwwDev := os.Getenv("OPENFI_WWW_DEV_SERVER")
+	adminDev := os.Getenv("OPENFI_ADMIN_DEV_SERVER")
+	if wwwDev != "" && adminDev != "" {
+		host.mode = "dev"
+		wwwProxy, err := buildReverseProxy(wwwDev, "")
 		if err != nil {
 			return nil, err
 		}
-		adminProxy, err := buildReverseProxy(cfg.Frontend.Dev.AdminDevServer, "")
+		adminProxy, err := buildReverseProxy(adminDev, "")
 		if err != nil {
 			return nil, err
 		}

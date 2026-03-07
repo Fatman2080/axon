@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -25,17 +24,6 @@ type RuntimeConfig struct {
 	Hyperliquid struct {
 		BaseURL string `json:"baseURL"`
 	} `json:"hyperliquid"`
-	Frontend struct {
-		Mode    string `json:"mode"`
-		Release struct {
-			WWWDistDir   string `json:"wwwDistDir"`
-			AdminDistDir string `json:"adminDistDir"`
-		} `json:"release"`
-		Dev struct {
-			WWWDevServer   string `json:"wwwDevServer"`
-			AdminDevServer string `json:"adminDevServer"`
-		} `json:"dev"`
-	} `json:"frontend"`
 	Log struct {
 		Dir      string `json:"dir"`      // directory for log files; empty = file logging disabled
 		Level    string `json:"level"`    // "debug"|"info"|"warn"|"error", default "info"
@@ -50,14 +38,9 @@ func defaultRuntimeConfig() RuntimeConfig {
 	cfg.AppBaseURL = "http://localhost:9333"
 	cfg.Server.Port = 9333
 	cfg.Server.TokenSecret = "openfi-dev-secret"
-	cfg.Storage.DBPath = "../data/openfi.db"
+	cfg.Storage.DBPath = "./data/openfi.db"
 	cfg.AgentPool.FixedKey = "01234567890123456789012345678901"
 	cfg.Hyperliquid.BaseURL = "https://api.hyperliquid.xyz"
-	cfg.Frontend.Mode = "release"
-	cfg.Frontend.Release.WWWDistDir = "../../frontend-www/dist"
-	cfg.Frontend.Release.AdminDistDir = "../../frontend-admin/dist"
-	cfg.Frontend.Dev.WWWDevServer = "http://127.0.0.1:9334"
-	cfg.Frontend.Dev.AdminDevServer = "http://127.0.0.1:9335"
 	cfg.Log.Level = "info"
 	cfg.Log.MaxSize = 100
 	cfg.Log.MaxFiles = 10
@@ -76,11 +59,6 @@ func loadRuntimeConfig(path string) (RuntimeConfig, error) {
 		return RuntimeConfig{}, fmt.Errorf("invalid config json: %w", err)
 	}
 
-	configDir := filepath.Dir(path)
-	cfg.Storage.DBPath = resolveConfigPath(configDir, cfg.Storage.DBPath)
-	cfg.Frontend.Release.WWWDistDir = resolveConfigPath(configDir, cfg.Frontend.Release.WWWDistDir)
-	cfg.Frontend.Release.AdminDistDir = resolveConfigPath(configDir, cfg.Frontend.Release.AdminDistDir)
-
 	if cfg.Server.Port <= 0 {
 		return RuntimeConfig{}, errors.New("server.port must be greater than 0")
 	}
@@ -90,15 +68,6 @@ func loadRuntimeConfig(path string) (RuntimeConfig, error) {
 	if _, err := deriveAES256Key(cfg.AgentPool.FixedKey); err != nil {
 		return RuntimeConfig{}, fmt.Errorf("agentPool.fixedKey invalid: %w", err)
 	}
-
-	mode := strings.ToLower(strings.TrimSpace(cfg.Frontend.Mode))
-	if mode == "" {
-		mode = "release"
-	}
-	if mode != "release" && mode != "dev" {
-		return RuntimeConfig{}, errors.New("frontend.mode must be release or dev")
-	}
-	cfg.Frontend.Mode = mode
 
 	cfg.AppBaseURL = strings.TrimRight(strings.TrimSpace(cfg.AppBaseURL), "/")
 	if cfg.AppBaseURL == "" {
@@ -112,13 +81,3 @@ func loadRuntimeConfig(path string) (RuntimeConfig, error) {
 	return cfg, nil
 }
 
-func resolveConfigPath(configDir string, value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return ""
-	}
-	if filepath.IsAbs(trimmed) {
-		return trimmed
-	}
-	return filepath.Clean(filepath.Join(configDir, trimmed))
-}

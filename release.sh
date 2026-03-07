@@ -53,7 +53,7 @@ else
     "tokenSecret": "CHANGE-ME-TO-A-RANDOM-SECRET"
   },
   "storage": {
-    "dbPath": "../data/openfi.db"
+    "dbPath": "./data/openfi.db"
   },
   "agentPool": {
     "fixedKey": "CHANGE-ME-TO-A-64-CHAR-HEX-KEY-0123456789abcdef0123456789abcdef"
@@ -61,15 +61,8 @@ else
   "hyperliquid": {
     "baseURL": "https://api.hyperliquid.xyz"
   },
-  "frontend": {
-    "mode": "release",
-    "release": {
-      "wwwDistDir": "../assets/www",
-      "adminDistDir": "../assets/admin"
-    }
-  },
   "log": {
-    "dir": "../logs",
+    "dir": "./logs",
     "level": "info",
     "maxSize": 100,
     "maxFiles": 10,

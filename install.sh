@@ -15,6 +15,8 @@ set -euo pipefail
 SERVICE_NAME="openfi"
 SERVICE_USER="openfi"
 INSTALL_DIR="/opt/openfi"
+BACKUP_DIR="/opt/openfi-backups"
+BACKUP_KEEP=10
 UNIT_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 # ---------------------------------------------------------------------------
@@ -67,6 +69,21 @@ if systemctl is-active --quiet "${SERVICE_NAME}" 2>/dev/null; then
         [yY]*) info "stopping ${SERVICE_NAME}..."; systemctl stop "${SERVICE_NAME}" ;;
         *)     error "install cancelled — service is still running" ;;
     esac
+fi
+
+# Backup existing installation (exclude logs/)
+if [[ -d "${INSTALL_DIR}" ]]; then
+  mkdir -p "${BACKUP_DIR}"
+  backup_file="${BACKUP_DIR}/openfi-$(date +%Y%m%d-%H%M%S).tar.gz"
+  info "backing up ${INSTALL_DIR} → ${backup_file} ..."
+  tar -czf "${backup_file}" -C /opt --exclude='openfi/logs' openfi
+
+  # Rotate: keep only the newest BACKUP_KEEP backups
+  backup_count=$(ls -1t "${BACKUP_DIR}"/openfi-*.tar.gz 2>/dev/null | wc -l)
+  if (( backup_count > BACKUP_KEEP )); then
+    ls -1t "${BACKUP_DIR}"/openfi-*.tar.gz | tail -n +"$(( BACKUP_KEEP + 1 ))" | xargs rm -f
+  fi
+  info "backup complete (keeping latest ${BACKUP_KEEP})"
 fi
 
 # Verify we are inside a release package

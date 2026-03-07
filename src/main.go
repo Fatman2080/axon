@@ -27,7 +27,7 @@ func main() {
 		logFatal("main", "failed to load config: %v", err)
 	}
 
-	initLogger(cfg.Log, filepath.Dir(*configPath))
+	initLogger(cfg.Log)
 
 	if err := os.MkdirAll(filepath.Dir(cfg.Storage.DBPath), 0o755); err != nil {
 		logFatal("main", "failed to create data directory: %v", err)
@@ -96,7 +96,7 @@ func main() {
 		}()
 	}
 
-	staticHost, err := newStaticHost(cfg)
+	staticHost, err := newStaticHost()
 	if err != nil {
 		logFatal("main", "failed to setup static host: %v", err)
 	}
@@ -117,7 +117,7 @@ func main() {
 	server.startAutoBackup()
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
-	logInfo("main", "OpenFi server listening on %s (db: %s, frontend: %s)", addr, cfg.Storage.DBPath, cfg.Frontend.Mode)
+	logInfo("main", "OpenFi server listening on %s (db: %s, frontend: %s)", addr, cfg.Storage.DBPath, staticHost.mode)
 	if server.xOAuth.RedirectURL != "" {
 		logInfo("main", "X OAuth redirect_uri: %s", server.xOAuth.RedirectURL)
 	}
