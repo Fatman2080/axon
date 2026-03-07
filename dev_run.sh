@@ -72,7 +72,7 @@ sleep 2
 # Start server
 echo "[dev-run] starting server..."
 cd "${LOCAL_RUN_DIR}"
-OPENFI_WWW_DEV_SERVER="http://127.0.0.1:9334" \
+OPENFI_WWW_DEV_SERVER="http://127.0.0.1:4455" \
 OPENFI_ADMIN_DEV_SERVER="http://127.0.0.1:9335" \
 ./openfi-server -config ./config/config.json &
 PIDS+=($!)

@@ -1,24 +1,256 @@
-import React, { useEffect, useState } from 'react';
-import { useAppDispatch, useAppSelector } from '../hooks/redux';
-import { fetchStrategies } from '../store/slices/strategySlice';
-import { Link } from 'react-router-dom';
-import { Search, TrendingUp, ArrowRight } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import React, { useEffect, useState } from "react";
+import { useAppDispatch, useAppSelector } from "../hooks/redux";
+import { fetchStrategies } from "../store/slices/strategySlice";
+import { Link } from "react-router-dom";
+import { Search, TrendingUp, ArrowRight, Trophy, Grid } from "lucide-react";
+import { useLanguage } from "../context/LanguageContext";
 
 const tierColor = (category: string) => {
   switch (category?.toLowerCase()) {
-    case 'partner': return { bg: 'rgba(255,184,0,0.08)', text: 'var(--tier-partner)', border: 'rgba(255,184,0,0.2)' };
-    case 'manager': return { bg: 'rgba(138,43,226,0.08)', text: 'var(--tier-manager)', border: 'rgba(138,43,226,0.2)' };
-    case 'analyst': return { bg: 'rgba(42,127,255,0.1)', text: 'var(--tier-analyst)', border: 'rgba(42,127,255,0.2)' };
-    default: return { bg: 'rgba(142,146,155,0.1)', text: 'var(--tier-intern)', border: 'rgba(142,146,155,0.2)' };
+    case "partner":
+      return {
+        bg: "rgba(255,184,0,0.08)",
+        text: "var(--tier-partner)",
+        border: "rgba(255,184,0,0.2)",
+      };
+    case "manager":
+      return {
+        bg: "rgba(138,43,226,0.08)",
+        text: "var(--tier-manager)",
+        border: "rgba(138,43,226,0.2)",
+      };
+    case "analyst":
+      return {
+        bg: "rgba(42,127,255,0.1)",
+        text: "var(--tier-analyst)",
+        border: "rgba(42,127,255,0.2)",
+      };
+    default:
+      return {
+        bg: "rgba(142,146,155,0.1)",
+        text: "var(--tier-intern)",
+        border: "rgba(142,146,155,0.2)",
+      };
   }
+};
+
+// Mock data for leaderboard
+const mockLeaderboardData = [
+  {
+    id: "1",
+    agentName: "Alphatron-X",
+    ownerTwitter: "@defi_god",
+    rank: 1,
+    roi: 142.5,
+    equity: 1542000,
+    category: "partner",
+  },
+  {
+    id: "2",
+    agentName: "YieldSniper_v4",
+    ownerTwitter: "@quant_ninja",
+    rank: 2,
+    roi: 87.2,
+    equity: 890500,
+    category: "manager",
+  },
+  {
+    id: "3",
+    agentName: "ArbBot_ETH",
+    ownerTwitter: "@arb_king",
+    rank: 3,
+    roi: 64.8,
+    equity: 620000,
+    category: "manager",
+  },
+  {
+    id: "4",
+    agentName: "TrendFollower_Z",
+    ownerTwitter: "@trader_z",
+    rank: 4,
+    roi: 45.1,
+    equity: 450000,
+    category: "analyst",
+  },
+  {
+    id: "5",
+    agentName: "MeanRev_Pro",
+    ownerTwitter: "@stat_arb",
+    rank: 5,
+    roi: 32.4,
+    equity: 310000,
+    category: "analyst",
+  },
+  {
+    id: "6",
+    agentName: "Grid_Master",
+    ownerTwitter: "@grid_bot",
+    rank: 6,
+    roi: 21.9,
+    equity: 180000,
+    category: "intern",
+  },
+  {
+    id: "7",
+    agentName: "DeltaNeutral_x",
+    ownerTwitter: "@delta_neutral",
+    rank: 7,
+    roi: 18.5,
+    equity: 150000,
+    category: "intern",
+  },
+  {
+    id: "8",
+    agentName: "Scalp_Algo",
+    ownerTwitter: "@algo_scalper",
+    rank: 8,
+    roi: 15.2,
+    equity: 120000,
+    category: "intern",
+  },
+  {
+    id: "9",
+    agentName: "Momentum_Catch",
+    ownerTwitter: "@momentum_guy",
+    rank: 9,
+    roi: 12.8,
+    equity: 95000,
+    category: "intern",
+  },
+  {
+    id: "10",
+    agentName: "Steady_Yield",
+    ownerTwitter: "@steady_hands",
+    rank: 10,
+    roi: 8.5,
+    equity: 50000,
+    category: "intern",
+  },
+];
+
+const LeaderboardRow = ({
+  item,
+}: {
+  item: (typeof mockLeaderboardData)[0];
+}) => {
+  let rankStyle: React.CSSProperties = { color: "var(--text-secondary)" };
+  let rowStyle: React.CSSProperties = {
+    borderBottom: "1px solid var(--border)",
+  };
+
+  if (item.rank === 1) {
+    rankStyle = {
+      color: "#FFD700",
+      textShadow: "0 0 10px rgba(255,215,0,0.5)",
+    }; // Gold
+    rowStyle = {
+      ...rowStyle,
+      background:
+        "linear-gradient(90deg, rgba(255,215,0,0.05) 0%, transparent 100%)",
+      borderLeft: "2px solid #FFD700",
+    };
+  } else if (item.rank === 2) {
+    rankStyle = {
+      color: "#C0C0C0",
+      textShadow: "0 0 10px rgba(192,192,192,0.5)",
+    }; // Silver
+    rowStyle = {
+      ...rowStyle,
+      background:
+        "linear-gradient(90deg, rgba(192,192,192,0.05) 0%, transparent 100%)",
+      borderLeft: "2px solid #C0C0C0",
+    };
+  } else if (item.rank === 3) {
+    rankStyle = {
+      color: "#CD7F32",
+      textShadow: "0 0 10px rgba(205,127,50,0.5)",
+    }; // Bronze
+    rowStyle = {
+      ...rowStyle,
+      background:
+        "linear-gradient(90deg, rgba(205,127,50,0.05) 0%, transparent 100%)",
+      borderLeft: "2px solid #CD7F32",
+    };
+  }
+
+  const tier = tierColor(item.category);
+
+  return (
+    <div
+      className="grid grid-cols-12 gap-4 py-3 px-4 hover:bg-[var(--bg-card-hover)] transition-colors items-center text-sm font-mono"
+      style={rowStyle}
+    >
+      <div
+        className="col-span-1 text-center font-bold text-lg"
+        style={rankStyle}
+      >
+        #{item.rank}
+      </div>
+      <div className="col-span-4 flex items-center gap-3">
+        <div className="w-8 h-8 rounded shrink-0 bg-[#0a0a0c] border border-[var(--border)] flex items-center justify-center relative overflow-hidden">
+          {/* Simple identicon placeholder */}
+          <div
+            className="absolute inset-0 opacity-30"
+            style={{
+              background: `linear-gradient(135deg, ${tier.text} 0%, transparent 100%)`,
+            }}
+          ></div>
+          <span className="text-xs font-bold" style={{ color: tier.text }}>
+            {item.agentName.substring(0, 2).toUpperCase()}
+          </span>
+        </div>
+        <div>
+          <div className="font-bold text-[var(--text-primary)]">
+            {item.agentName}
+          </div>
+          <div className="text-xs text-[var(--text-tertiary)]">
+            {item.ownerTwitter}
+          </div>
+        </div>
+      </div>
+      <div className="col-span-2 flex items-center">
+        <span
+          className="inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded"
+          style={{
+            background: tier.bg,
+            color: tier.text,
+            border: `1px solid ${tier.border}`,
+          }}
+        >
+          {item.category}
+        </span>
+      </div>
+      <div
+        className="col-span-2 text-right font-bold"
+        style={{ color: "var(--green)" }}
+      >
+        +{item.roi.toFixed(1)}%
+      </div>
+      <div className="col-span-2 text-right text-[var(--text-primary)]">
+        ${item.equity.toLocaleString()}
+      </div>
+      <div className="col-span-1 text-right flex justify-end">
+        <Link
+          to={`/strategies/${item.id}`}
+          className="text-[var(--text-tertiary)] hover:text-[var(--neon-green)] transition-colors"
+        >
+          <ArrowRight size={16} />
+        </Link>
+      </div>
+    </div>
+  );
 };
 
 const Strategies = () => {
   const dispatch = useAppDispatch();
-  const { items: strategies, loading } = useAppSelector((state) => state.strategies);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filter] = useState('all');
+  const { items: strategies, loading } = useAppSelector(
+    (state) => state.strategies,
+  );
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filter] = useState("all");
+  const [viewMode, setViewMode] = useState<"grid" | "leaderboard">(
+    "leaderboard",
+  );
   const { t } = useLanguage();
 
   useEffect(() => {
@@ -26,25 +258,39 @@ const Strategies = () => {
   }, [dispatch]);
 
   const filteredStrategies = strategies.filter((strategy) => {
-    const isActive = strategy.status === 'active';
-    const matchesFilter = filter === 'all' || strategy.category === filter;
-    const matchesSearch = strategy.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const isActive = strategy.status === "active";
+    const matchesFilter = filter === "all" || strategy.category === filter;
+    const matchesSearch = strategy.name
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
     return isActive && matchesFilter && matchesSearch;
   });
 
-  const isMarketEnabled = import.meta.env.VITE_ENABLE_STRATEGIES === 'true';
+  const isMarketEnabled = true; // import.meta.env.VITE_ENABLE_STRATEGIES === 'true';
 
   if (!isMarketEnabled) {
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center animate-fade-in-up">
-        <div className="h-16 w-16 mb-6 rounded-full flex items-center justify-center" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          <TrendingUp size={24} style={{ color: 'var(--text-tertiary)' }} />
+        <div
+          className="h-16 w-16 mb-6 rounded-full flex items-center justify-center"
+          style={{
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <TrendingUp size={24} style={{ color: "var(--text-tertiary)" }} />
         </div>
-        <h2 className="text-xl font-bold tracking-tight mb-3" style={{ color: 'var(--text-primary)' }}>
-          {t('strategies.underConstructionTitle')}
+        <h2
+          className="text-xl font-bold tracking-tight mb-3"
+          style={{ color: "var(--text-primary)" }}
+        >
+          {t("strategies.underConstructionTitle")}
         </h2>
-        <p className="text-sm font-mono max-w-md" style={{ color: 'var(--text-secondary)' }}>
-          {t('strategies.underConstruction')}
+        <p
+          className="text-sm font-mono max-w-md"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          {t("strategies.underConstruction")}
         </p>
       </div>
     );
@@ -55,56 +301,116 @@ const Strategies = () => {
       {/* Header */}
       <div
         className="flex flex-col justify-between gap-4 md:flex-row md:items-center pb-6"
-        style={{ borderBottom: '1px solid var(--border)' }}
+        style={{ borderBottom: "1px solid var(--border)" }}
       >
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-            {t('strategies.title')}
+          <h1
+            className="text-2xl font-bold tracking-tight"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {t("strategies.title")}
           </h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-            {t('strategies.subtitle')}
+          <p
+            className="mt-1 text-sm"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            {t("strategies.subtitle")}
           </p>
         </div>
 
         <div className="flex flex-wrap gap-3 items-center">
+          {/* View Toggle */}
+          <div className="flex bg-[var(--bg-input)] rounded border border-[var(--border)] p-0.5">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded transition-all ${viewMode === "grid" ? "bg-[rgba(0,255,65,0.12)] text-[var(--neon-green)]" : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"}`}
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
+              <Grid size={14} />
+              GRID
+            </button>
+            <button
+              onClick={() => setViewMode("leaderboard")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded transition-all ${viewMode === "leaderboard" ? "bg-[rgba(0,255,65,0.12)] text-[var(--neon-green)]" : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"}`}
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
+              <Trophy size={14} />
+              LEADERBOARD
+            </button>
+          </div>
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--text-tertiary)' }} />
+            <Search
+              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+              style={{ color: "var(--text-tertiary)" }}
+            />
             <input
               type="text"
-              placeholder={t('strategies.searchPlaceholder')}
+              placeholder={t("strategies.searchPlaceholder")}
               className="h-9 pl-9 pr-4 text-sm font-mono"
               style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                color: 'var(--text-primary)',
-                width: '200px',
+                background: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                borderRadius: "4px",
+                color: "var(--text-primary)",
+                width: "200px",
               }}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onFocus={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--neon-green)'}
-              onBlur={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
+              onFocus={(e) =>
+                ((e.currentTarget as HTMLElement).style.borderColor =
+                  "var(--neon-green)")
+              }
+              onBlur={(e) =>
+                ((e.currentTarget as HTMLElement).style.borderColor =
+                  "var(--border)")
+              }
             />
           </div>
         </div>
       </div>
 
-      {/* Cards */}
-      {loading ? (
+      {viewMode === "leaderboard" ? (
+        <div className="rounded border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+          {/* Table Header */}
+          <div className="grid grid-cols-12 gap-4 py-3 px-4 border-b border-[var(--border)] bg-[rgba(0,0,0,0.2)] text-xs font-mono font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
+            <div className="col-span-1 text-center">Rank</div>
+            <div className="col-span-4">Agent / Owner</div>
+            <div className="col-span-2">Tier</div>
+            <div className="col-span-2 text-right">ROI (30d)</div>
+            <div className="col-span-2 text-right">Equity</div>
+            <div className="col-span-1 text-right">Action</div>
+          </div>
+
+          {/* Table Body */}
+          <div className="flex flex-col">
+            {mockLeaderboardData.map((item) => (
+              <LeaderboardRow key={item.id} item={item} />
+            ))}
+          </div>
+        </div>
+      ) : /* Cards */
+      loading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map(i => (
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <div
               key={i}
               className="h-60 rounded animate-pulse"
-              style={{ background: 'var(--bg-card)' }}
+              style={{ background: "var(--bg-card)" }}
             />
           ))}
         </div>
       ) : filteredStrategies.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <TrendingUp size={40} className="mb-4" style={{ color: 'var(--text-tertiary)' }} />
-          <p className="font-mono text-sm" style={{ color: 'var(--text-secondary)' }}>
+          <TrendingUp
+            size={40}
+            className="mb-4"
+            style={{ color: "var(--text-tertiary)" }}
+          />
+          <p
+            className="font-mono text-sm"
+            style={{ color: "var(--text-secondary)" }}
+          >
             // NO_AGENTS_FOUND
           </p>
         </div>
@@ -119,16 +425,20 @@ const Strategies = () => {
                 key={strategy.id}
                 className="group flex flex-col justify-between rounded p-5 transition-all duration-200"
                 style={{
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border)',
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border)",
                 }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-hover)';
-                  (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-hover)';
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor =
+                    "var(--border-hover)";
+                  (e.currentTarget as HTMLElement).style.background =
+                    "var(--bg-card-hover)";
                 }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
-                  (e.currentTarget as HTMLElement).style.background = 'var(--bg-card)';
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor =
+                    "var(--border)";
+                  (e.currentTarget as HTMLElement).style.background =
+                    "var(--bg-card)";
                 }}
               >
                 <div>
@@ -136,11 +446,18 @@ const Strategies = () => {
                     <div>
                       <span
                         className="inline-block text-[10px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded mb-2"
-                        style={{ background: tier.bg, color: tier.text, border: `1px solid ${tier.border}` }}
+                        style={{
+                          background: tier.bg,
+                          color: tier.text,
+                          border: `1px solid ${tier.border}`,
+                        }}
                       >
                         {strategy.category}
                       </span>
-                      <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                      <h3
+                        className="text-base font-bold"
+                        style={{ color: "var(--text-primary)" }}
+                      >
                         {strategy.name}
                       </h3>
                     </div>
@@ -149,24 +466,36 @@ const Strategies = () => {
                   <div className="space-y-3 mb-5">
                     {/* PnL */}
                     <div className="flex justify-between text-sm items-center">
-                      <span className="font-mono text-xs uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
-                        {t('strategies.card.apr')}
+                      <span
+                        className="font-mono text-xs uppercase tracking-widest"
+                        style={{ color: "var(--text-tertiary)" }}
+                      >
+                        {t("strategies.card.apr")}
                       </span>
                       <span
                         className="font-mono font-bold"
-                        style={{ color: pnlPositive ? 'var(--green)' : 'var(--red)' }}
+                        style={{
+                          color: pnlPositive ? "var(--green)" : "var(--red)",
+                        }}
                       >
-                        {pnlPositive ? '+' : ''}{strategy.pnlContribution.toFixed(2)}
+                        {pnlPositive ? "+" : ""}
+                        {strategy.pnlContribution.toFixed(2)}
                       </span>
                     </div>
 
                     {/* TVL */}
                     <div>
                       <div className="flex justify-between text-sm items-center mb-1.5">
-                        <span className="font-mono text-xs uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
-                          {t('strategies.card.tvl')}
+                        <span
+                          className="font-mono text-xs uppercase tracking-widest"
+                          style={{ color: "var(--text-tertiary)" }}
+                        >
+                          {t("strategies.card.tvl")}
                         </span>
-                        <span className="font-mono text-sm" style={{ color: 'var(--text-primary)' }}>
+                        <span
+                          className="font-mono text-sm"
+                          style={{ color: "var(--text-primary)" }}
+                        >
                           ${strategy.currentTvl.toLocaleString()}
                         </span>
                       </div>
@@ -178,13 +507,19 @@ const Strategies = () => {
                   to={`/strategies/${strategy.id}`}
                   className="flex items-center justify-between text-sm font-mono font-bold transition-all group-hover:gap-3 pt-4"
                   style={{
-                    color: 'var(--text-secondary)',
-                    borderTop: '1px solid var(--border)',
+                    color: "var(--text-secondary)",
+                    borderTop: "1px solid var(--border)",
                   }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--neon-green)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'}
+                  onMouseEnter={(e) =>
+                    ((e.currentTarget as HTMLElement).style.color =
+                      "var(--neon-green)")
+                  }
+                  onMouseLeave={(e) =>
+                    ((e.currentTarget as HTMLElement).style.color =
+                      "var(--text-secondary)")
+                  }
                 >
-                  {t('strategies.card.hire')}
+                  {t("strategies.card.hire")}
                   <ArrowRight size={14} />
                 </Link>
               </div>

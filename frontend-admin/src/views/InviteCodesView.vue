@@ -23,8 +23,10 @@ const pageSize = ref(20);
 const isUsed = (c: InviteCode) => c.usedCount > 0;
 const filteredItems = computed(() => {
   if (!statusFilter.value) return codes.value;
-  if (statusFilter.value === 'unused') return codes.value.filter((c) => !isUsed(c));
-  if (statusFilter.value === 'used') return codes.value.filter((c) => isUsed(c));
+  if (statusFilter.value === "unused")
+    return codes.value.filter((c) => !isUsed(c));
+  if (statusFilter.value === "used")
+    return codes.value.filter((c) => isUsed(c));
   return codes.value;
 });
 const total = computed(() => filteredItems.value.length);
@@ -91,30 +93,60 @@ onMounted(load);
       <p class="muted">生成与管理一次性邀请码。</p>
     </div>
 
-    <div v-if="success" class="alert alert-success" @click="success = ''">{{ success }}</div>
+    <div v-if="success" class="alert alert-success" @click="success = ''">
+      {{ success }}
+    </div>
 
     <div class="table-card">
       <div class="table-toolbar">
         <button
           class="toolbar-btn primary"
-          @click="showGenModal = true; genPrefix = ''; genLength = 8; genCount = 10; genDescription = '';"
+          @click="
+            showGenModal = true;
+            genPrefix = '';
+            genLength = 8;
+            genCount = 10;
+            genDescription = '';
+          "
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M5 12h14" /><path d="M12 5v14" />
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M5 12h14" />
+            <path d="M12 5v14" />
           </svg>
           生成邀请码
         </button>
         <span class="toolbar-spacer"></span>
-        <select class="toolbar-select" v-model="statusFilter" @change="page = 1; load();">
+        <select
+          class="toolbar-select"
+          v-model="statusFilter"
+          @change="
+            page = 1;
+            load();
+          "
+        >
           <option value="">全部状态</option>
           <option value="unused">未使用</option>
           <option value="used">已使用</option>
         </select>
         <span class="toolbar-info">共 {{ total }} 条</span>
         <button class="toolbar-icon" @click="load" title="刷新">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" />
-            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" />
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+            <path d="M8 16H3v5" />
           </svg>
         </button>
       </div>
@@ -137,15 +169,25 @@ onMounted(load);
               <tr v-for="item in pagedItems" :key="item.code">
                 <td class="monospace font-bold">{{ item.code }}</td>
                 <td>
-                  <span class="badge" :class="{ 'badge-success': item.usedCount === 0, 'badge-disabled': item.usedCount > 0 }">
+                  <span
+                    class="badge"
+                    :class="{
+                      'badge-success': item.usedCount === 0,
+                      'badge-disabled': item.usedCount > 0,
+                    }"
+                  >
                     {{ item.usedCount === 0 ? "未使用" : "已使用" }}
                   </span>
                 </td>
                 <td class="small">
                   <template v-if="item.usedByUsers && item.usedByUsers.length">
                     <span v-for="(u, i) in item.usedByUsers" :key="u.userId">
-                      <span class="user-tag">{{ u.userName || u.userId.slice(0, 10) }}</span>
-                      <template v-if="i < item.usedByUsers.length - 1">, </template>
+                      <span class="user-tag">{{
+                        u.userName || u.userId.slice(0, 10)
+                      }}</span>
+                      <template v-if="i < item.usedByUsers.length - 1"
+                        >,
+                      </template>
                     </span>
                   </template>
                   <span v-else class="muted">-</span>
@@ -155,7 +197,9 @@ onMounted(load);
               </tr>
             </tbody>
           </table>
-          <div v-if="filteredItems.length === 0" class="table-empty">暂无数据</div>
+          <div v-if="filteredItems.length === 0" class="table-empty">
+            暂无数据
+          </div>
         </template>
       </div>
 
@@ -164,11 +208,26 @@ onMounted(load);
         <div class="page-nav">
           <button :disabled="page <= 1" @click="page = 1">&laquo;</button>
           <button :disabled="page <= 1" @click="page--">&lsaquo;</button>
-          <span style="font-size:0.78rem;padding:0 0.3rem">{{ page }} / {{ totalPages }}</span>
-          <button :disabled="page >= totalPages" @click="page++">&rsaquo;</button>
-          <button :disabled="page >= totalPages" @click="page = totalPages">&raquo;</button>
+          <span style="font-size: 0.78rem; padding: 0 0.3rem"
+            >{{ page }} / {{ totalPages }}</span
+          >
+          <button :disabled="page >= totalPages" @click="page++">
+            &rsaquo;
+          </button>
+          <button :disabled="page >= totalPages" @click="page = totalPages">
+            &raquo;
+          </button>
         </div>
-        <select v-model="pageSize" @change="page = 1" style="width:auto;padding:0.2rem 0.3rem;font-size:0.75rem;border-radius:6px">
+        <select
+          v-model="pageSize"
+          @change="page = 1"
+          style="
+            width: auto;
+            padding: 0.2rem 0.3rem;
+            font-size: 0.75rem;
+            border-radius: 6px;
+          "
+        >
           <option :value="20">20 / 页</option>
           <option :value="50">50 / 页</option>
           <option :value="100">100 / 页</option>
@@ -177,7 +236,11 @@ onMounted(load);
     </div>
 
     <!-- 生成邀请码弹窗 -->
-    <div v-if="showGenModal" class="modal-overlay" @click.self="showGenModal = false">
+    <div
+      v-if="showGenModal"
+      class="modal-overlay"
+      @click.self="showGenModal = false"
+    >
       <div class="modal modal-sm">
         <h3>生成邀请码</h3>
         <p class="muted small">生成一次性邀请码。</p>
@@ -200,7 +263,11 @@ onMounted(load);
         <div v-if="error" class="field-error">{{ error }}</div>
         <div class="form-actions">
           <button class="btn" @click="showGenModal = false">取消</button>
-          <button class="btn btn-primary" @click="generate" :disabled="generating">
+          <button
+            class="btn btn-primary"
+            @click="generate"
+            :disabled="generating"
+          >
             {{ generating ? "生成中..." : "生成" }}
           </button>
         </div>
