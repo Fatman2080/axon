@@ -85,22 +85,6 @@ const Agents = () => {
   const totalFundsHistory = treasuryHistory.map((s) => s.totalFunds || 0);
   const currentTotalFunds = totalFundsHistory.length > 0 ? totalFundsHistory[totalFundsHistory.length - 1] : totalTvl;
 
-  let maxDrawdown = 0;
-  let sharpeRatio = 0;
-  if (totalFundsHistory.length > 1) {
-    let peak = totalFundsHistory[0];
-    for (const v of totalFundsHistory) {
-      if (v > peak) peak = v;
-      const dd = peak > 0 ? ((peak - v) / peak) * 100 : 0;
-      if (dd > maxDrawdown) maxDrawdown = dd;
-    }
-    const returns = totalFundsHistory.slice(1).map((v, i) =>
-      totalFundsHistory[i] > 0 ? (v - totalFundsHistory[i]) / totalFundsHistory[i] : 0
-    );
-    const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
-    const stdReturn = Math.sqrt(returns.reduce((a, b) => a + (b - avgReturn) ** 2, 0) / returns.length);
-    sharpeRatio = stdReturn > 0 ? (avgReturn / stdReturn) * Math.sqrt(252) : 0;
-  }
 
   const apy = totalInitialCapital > 0 ? overallRoi : (totalTvl > 0 && totalPnl !== 0 ? (totalPnl / (totalTvl - totalPnl)) * 100 : 0);
   const chartSeries = totalFundsHistory;
@@ -176,11 +160,6 @@ const Agents = () => {
     interaction: { mode: 'nearest' as const, axis: 'x' as const, intersect: false },
   };
 
-  const metricCards = [
-    { label: t('vault.maxDrawdown'), value: `-${maxDrawdown.toFixed(2)}%`, color: 'var(--red)' },
-    { label: t('vault.sharpeRatio'), value: sharpeRatio.toFixed(2), color: 'var(--text-primary)' },
-    { label: t('vault.apy'), value: `${apy > 0 ? '+' : ''}${apy.toFixed(1)}%`, color: apy >= 0 ? 'var(--green)' : 'var(--red)' },
-  ];
 
   return (
     <div className="pb-20 animate-fade-in-up">
@@ -225,12 +204,22 @@ const Agents = () => {
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
           >
             <div className="mb-4 flex items-center justify-between">
-              <div>
-                <div className="text-xs font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>
-                  {t('vault.totalFunds')}
+              <div className="flex items-center gap-8">
+                <div>
+                  <div className="text-xs font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>
+                    {t('vault.totalFunds')}
+                  </div>
+                  <div className="text-xl font-bold font-mono" style={{ color: 'var(--text-primary)' }}>
+                    ${currentTotalFunds.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </div>
                 </div>
-                <div className="text-xl font-bold font-mono" style={{ color: 'var(--text-primary)' }}>
-                  ${currentTotalFunds.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                <div>
+                  <div className="text-xs font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>
+                    {t('vault.apy')}
+                  </div>
+                  <div className="text-xl font-bold font-mono" style={{ color: apy >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                    {apy > 0 ? '+' : ''}{apy.toFixed(1)}%
+                  </div>
                 </div>
               </div>
               <div className="flex gap-1">
@@ -261,28 +250,44 @@ const Agents = () => {
             </div>
           </div>
 
-          {/* Metrics */}
-          <div className="grid grid-cols-3 gap-3">
-            {metricCards.map(m => (
-              <div key={m.label} className="rounded p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                <div className="text-xs font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>
-                  {m.label}
-                </div>
-                <div className="text-lg font-bold font-mono" style={{ color: m.color }}>
-                  {m.value}
-                </div>
-              </div>
-            ))}
-          </div>
+
 
           {/* Description */}
-          <div className="rounded p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            <h3 className="font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-              {t('vault.description.title')}
-            </h3>
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              {t('vault.description.content')}
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="rounded p-6 md:col-span-3 flex flex-col justify-center" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <h3 className="font-bold mb-2 text-lg tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                {t('vault.description.title')}
+              </h3>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                {t('vault.description.content')}
+              </p>
+            </div>
+            
+            <div className="rounded p-6 md:col-span-1 flex flex-col justify-between relative overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid rgba(0,240,255,0.2)' }}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[rgba(0,240,255,0.05)] rounded-full blur-2xl -mr-16 -mt-16 pointer-events-none"></div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)] animate-pulse"></div>
+                  <h3 className="font-bold text-sm tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                    {t('vault.description.lpTitle')}
+                  </h3>
+                </div>
+                <p className="text-xs leading-relaxed mb-4" style={{ color: 'var(--text-secondary)' }}>
+                  {t('vault.description.lpContent')}
+                </p>
+              </div>
+              <button 
+                disabled
+                className="relative z-10 w-full py-2.5 text-xs font-bold tracking-widest rounded cursor-not-allowed transition-colors"
+                style={{ 
+                  background: 'rgba(255,255,255,0.03)', 
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: 'var(--text-tertiary)'
+                }}
+              >
+                {t('vault.description.lpButton')}
+              </button>
+            </div>
           </div>
         </div>
       </div>

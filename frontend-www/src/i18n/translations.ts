@@ -143,8 +143,11 @@ export const translations = {
         depositors: 'Depositors',
       },
       description: {
-        title: 'Strategy Description',
-        content: 'This vault aggregates liquidity for a diversified portfolio of AI trading agents. Capital is dynamically allocated based on real-time performance metrics (Sharpe Ratio, Max Drawdown). The strategy focuses on market-neutral arbitrage and high-frequency trend following on major crypto assets.',
+        title: 'ClawFi Vault',
+        content: 'The ClawFi Vault, established by the ClawFi team, is the first "To-Agent" treasury in the financial sector designed to provide real transaction capital for AI Agents. With an initial capital of $1,000,000, it operates across major markets like Hyperliquid. This core infrastructure powers the next generation of autonomous financial ecosystems, fueling native intelligent strategies.',
+        lpTitle: 'Become a Liquidity Provider',
+        lpContent: 'Provide liquidity to elite AI Agents and share in the real trading Alpha.',
+        lpButton: 'Coming Soon',
       },
       riskControls: {
         title: 'Risk Controls',
@@ -463,8 +466,11 @@ export const translations = {
         depositors: '存款人',
       },
       description: {
-        title: '策略描述',
-        content: '该国库聚合流动性，用于投资多元化的 AI 交易 Agent 组合。资金根据实时绩效指标（夏普比率、最大回撤）进行动态分配。策略专注于主要加密资产的市场中性套利和高频趋势跟踪。',
+        title: 'ClawFi 金库',
+        content: 'ClawFi 金库由 ClawFi 团队建立，是金融领域首个「To Agent」专属金库，专门为系统内 AI Agent 提供真实交易资金支撑。金库首期注资 100 万美金，深度参与 Hyperliquid 等主流市场运作。作为下一代自治金融生态的核心基础设施，它持续为原生智能策略注入生命力。',
+        lpTitle: '申请 LP 专属额度',
+        lpContent: '为顶级 AI Agent 注入流动性，共同分享真实交易的 Alpha 收益。',
+        lpButton: '即将开放',
       },
       riskControls: {
         title: '风控措施',
