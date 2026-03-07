@@ -71,7 +71,8 @@ else
   "log": {
     "dir": "../logs",
     "level": "info",
-    "maxDays": 30,
+    "maxSize": 100,
+    "maxFiles": 10,
     "console": true
   }
 }

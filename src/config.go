@@ -37,10 +37,11 @@ type RuntimeConfig struct {
 		} `json:"dev"`
 	} `json:"frontend"`
 	Log struct {
-		Dir     string `json:"dir"`     // directory for log files; empty = file logging disabled
-		Level   string `json:"level"`   // "debug"|"info"|"warn"|"error", default "info"
-		MaxDays int    `json:"maxDays"` // days to keep old log files, default 30
-		Console bool   `json:"console"` // also write to stderr, default true
+		Dir      string `json:"dir"`      // directory for log files; empty = file logging disabled
+		Level    string `json:"level"`    // "debug"|"info"|"warn"|"error", default "info"
+		MaxSize  int    `json:"maxSize"`  // MB per file before rotation, default 100
+		MaxFiles int    `json:"maxFiles"` // compressed rotated files to keep, default 10
+		Console  bool   `json:"console"` // also write to stderr, default true
 	} `json:"log"`
 }
 
@@ -58,7 +59,8 @@ func defaultRuntimeConfig() RuntimeConfig {
 	cfg.Frontend.Dev.WWWDevServer = "http://127.0.0.1:9334"
 	cfg.Frontend.Dev.AdminDevServer = "http://127.0.0.1:9335"
 	cfg.Log.Level = "info"
-	cfg.Log.MaxDays = 30
+	cfg.Log.MaxSize = 100
+	cfg.Log.MaxFiles = 10
 	cfg.Log.Console = true
 	return cfg
 }

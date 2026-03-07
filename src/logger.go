@@ -1,7 +1,9 @@
 package main
 
 import (
+	"compress/gzip"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,27 +23,37 @@ const (
 )
 
 var logState struct {
-	mu      sync.Mutex
-	file    *os.File
-	dir     string
-	today   string // "2006-01-02"
-	level   int
-	console bool
-	maxDays int
-	pid     int
+	mu       sync.Mutex
+	file     *os.File
+	dir      string
+	curPath  string // path to active log file
+	curSize  int64
+	maxSize  int64
+	maxFiles int
+	level    int
+	console  bool
+	pid      int
 }
 
 func initLogger(logCfg struct {
-	Dir     string `json:"dir"`
-	Level   string `json:"level"`
-	MaxDays int    `json:"maxDays"`
-	Console bool   `json:"console"`
+	Dir      string `json:"dir"`
+	Level    string `json:"level"`
+	MaxSize  int    `json:"maxSize"`
+	MaxFiles int    `json:"maxFiles"`
+	Console  bool   `json:"console"`
 }, configDir string) {
 	logState.pid = os.Getpid()
 	logState.console = logCfg.Console
-	logState.maxDays = logCfg.MaxDays
-	if logState.maxDays <= 0 {
-		logState.maxDays = 30
+
+	maxSize := logCfg.MaxSize
+	if maxSize <= 0 {
+		maxSize = 100
+	}
+	logState.maxSize = int64(maxSize) * 1024 * 1024
+
+	logState.maxFiles = logCfg.MaxFiles
+	if logState.maxFiles <= 0 {
+		logState.maxFiles = 10
 	}
 
 	switch strings.ToLower(strings.TrimSpace(logCfg.Level)) {
@@ -61,48 +73,70 @@ func initLogger(logCfg struct {
 			fmt.Fprintf(os.Stderr, "[FATAL] failed to create log dir %s: %v\n", logState.dir, err)
 			os.Exit(1)
 		}
-		openLogFile()
-		go cleanupOldLogs()
+		logState.curPath = filepath.Join(logState.dir, "openfi.log")
+		if info, err := os.Stat(logState.curPath); err == nil {
+			logState.curSize = info.Size()
+		}
+		f, err := os.OpenFile(logState.curPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR] failed to open log file %s: %v\n", logState.curPath, err)
+			return
+		}
+		logState.file = f
 	}
 }
 
-func openLogFile() {
-	today := time.Now().Format("2006-01-02")
-	logState.today = today
-	name := filepath.Join(logState.dir, fmt.Sprintf("openfi-%s.log", today))
-	f, err := os.OpenFile(name, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[ERROR] failed to open log file %s: %v\n", name, err)
-		return
-	}
+func rotateFile() {
 	if logState.file != nil {
 		logState.file.Close()
+		logState.file = nil
 	}
-	logState.file = f
-}
 
-func cleanupOldLogs() {
-	entries, err := os.ReadDir(logState.dir)
+	// Delete oldest if it exists
+	oldest := fmt.Sprintf("%s.%d.gz", logState.curPath, logState.maxFiles)
+	os.Remove(oldest)
+
+	// Shift .N.gz → .N+1.gz (from maxFiles-1 down to 1)
+	for i := logState.maxFiles - 1; i >= 1; i-- {
+		src := fmt.Sprintf("%s.%d.gz", logState.curPath, i)
+		dst := fmt.Sprintf("%s.%d.gz", logState.curPath, i+1)
+		os.Rename(src, dst)
+	}
+
+	// Compress current log → .1.gz
+	if err := compressFile(logState.curPath, logState.curPath+".1.gz"); err != nil {
+		fmt.Fprintf(os.Stderr, "[ERROR] failed to compress log file: %v\n", err)
+	}
+	os.Remove(logState.curPath)
+
+	// Open fresh log file
+	f, err := os.OpenFile(logState.curPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "[ERROR] failed to open new log file %s: %v\n", logState.curPath, err)
 		return
 	}
-	cutoff := time.Now().AddDate(0, 0, -logState.maxDays)
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		if !strings.HasPrefix(name, "openfi-") || !strings.HasSuffix(name, ".log") {
-			continue
-		}
-		info, err := e.Info()
-		if err != nil {
-			continue
-		}
-		if info.ModTime().Before(cutoff) {
-			os.Remove(filepath.Join(logState.dir, name))
-		}
+	logState.file = f
+	logState.curSize = 0
+}
+
+func compressFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
 	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	gz := gzip.NewWriter(out)
+	if _, err := io.Copy(gz, in); err != nil {
+		return err
+	}
+	return gz.Close()
 }
 
 func logf(level int, levelStr string, module string, format string, args ...any) {
@@ -119,12 +153,12 @@ func logf(level int, levelStr string, module string, format string, args ...any)
 
 	if logState.dir != "" {
 		logState.mu.Lock()
-		today := time.Now().Format("2006-01-02")
-		if today != logState.today {
-			openLogFile()
-		}
 		if logState.file != nil {
 			logState.file.WriteString(line)
+			logState.curSize += int64(len(line))
+			if logState.curSize >= logState.maxSize {
+				rotateFile()
+			}
 		}
 		logState.mu.Unlock()
 	}

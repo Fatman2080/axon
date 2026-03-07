@@ -31,6 +31,10 @@ func newID(prefix string) string {
 }
 
 func (s *Store) initSchema() error {
+	if _, err := s.db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		return fmt.Errorf("failed to enable WAL mode: %w", err)
+	}
+
 	schema := []string{
 		`CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY,

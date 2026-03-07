@@ -60,6 +60,15 @@ need_root
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Stop running service before install
+if systemctl is-active --quiet "${SERVICE_NAME}" 2>/dev/null; then
+    read -rp "[install] ${SERVICE_NAME} is running. Stop it to proceed? [y/N] " ans
+    case "${ans}" in
+        [yY]*) info "stopping ${SERVICE_NAME}..."; systemctl stop "${SERVICE_NAME}" ;;
+        *)     error "install cancelled — service is still running" ;;
+    esac
+fi
+
 # Verify we are inside a release package
 [[ -f "${SCRIPT_DIR}/openfi-server" ]] || error "openfi-server binary not found in ${SCRIPT_DIR}"
 [[ -d "${SCRIPT_DIR}/config" ]]        || error "config/ directory not found in ${SCRIPT_DIR}"
@@ -83,8 +92,6 @@ cp -r "${SCRIPT_DIR}/assets"        "${INSTALL_DIR}/assets"
 # Config — don't overwrite if already exists (preserve user edits)
 if [[ ! -d "${INSTALL_DIR}/config" ]]; then
   cp -r "${SCRIPT_DIR}/config" "${INSTALL_DIR}/config"
-else
-  warn "config/ already exists, skipping (won't overwrite your settings)"
 fi
 
 # Data dir
