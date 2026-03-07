@@ -9,6 +9,7 @@ import Profile from './pages/Profile';
 import SubmitAgent from './pages/SubmitAgent';
 import XAuthCallback from './pages/XAuthCallback';
 import Docs from './pages/Docs';
+import Points from './pages/Points';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 
@@ -24,6 +25,7 @@ function App() {
           <Route path="/submit-agent" element={<SubmitAgent />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/docs" element={<Docs />} />
+          <Route path="/points" element={<Points />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/auth/x/callback" element={<XAuthCallback />} />

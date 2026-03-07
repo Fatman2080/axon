@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { Bot, Menu, X, Coins, Users, LogOut, Twitter, User, ChevronDown, Globe, BookOpen } from 'lucide-react';
+import { Bot, Menu, X, Coins, Users, LogOut, Twitter, User, ChevronDown, Globe, BookOpen, Target } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { logoutUser, fetchUser } from '../../store/slices/userSlice';
 import { useLanguage } from '../../context/LanguageContext';
@@ -130,7 +130,20 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           </nav>
 
           {/* Right Controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* Points Section */}
+            <Link
+              to="/points"
+              className="flex items-center gap-2 px-3 py-1.5 rounded transition-all group border border-transparent hover:border-white/10"
+              style={{ background: 'rgba(0, 255, 65, 0.1)', color: 'var(--neon-green)', textShadow: '0 0 10px rgba(0,255,65,0.4)', boxShadow: '0 0 15px rgba(0, 255, 65, 0.1)' }}
+            >
+              <Target size={14} className="group-hover:rotate-90 transition-transform duration-500" />
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold font-mono tracking-widest leading-none uppercase">{t('nav.points')}</span>
+                <span className="text-xs font-bold font-mono leading-none mt-0.5" style={{ color: 'var(--text-primary)' }}>0 Pts</span>
+              </div>
+            </Link>
+
             {/* Language Toggle */}
             <div
               className="hidden md:flex items-center gap-0.5 p-1 rounded"
@@ -429,7 +442,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               <h4 className="text-xs font-bold font-mono uppercase tracking-widest mb-4" style={{ color: 'var(--text-secondary)' }}>{t('footer.resources')}</h4>
               <ul className="space-y-2.5">
                 <li><Link to="/docs" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.documentation')}</Link></li>
-                <li><a href="https://www.npmjs.com/package/clawfi-hyperliquid-skill" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>npm</a></li>
+                <li><a href="https://github.com/binance/binance-skills-hub" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.binanceSkills')}</a></li>
+                <li><a href="https://github.com/okx/onchainos-skills" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.okxSkills')}</a></li>
+                <li><a href="https://www.npmjs.com/package/clawfi-hyperliquid-skill" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>NPM Package</a></li>
               </ul>
             </div>
             {/* Community */}

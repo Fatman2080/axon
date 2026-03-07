@@ -380,6 +380,81 @@ const Home = () => {
         </div>
       </section>
 
+      {/* ── Connected Platforms ── */}
+      <section className="max-w-5xl mx-auto pt-16 mt-12 text-center" style={{ borderTop: '1px solid var(--border)' }}>
+        <h3 className="text-sm font-bold mb-8 font-mono uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
+          {t('home.connected.title')}
+        </h3>
+        <div className="flex justify-center items-center gap-6 flex-wrap">
+          {/* Hyperliquid: Lit up */}
+          <div 
+            className="flex items-center gap-4 px-6 py-4 rounded border transition-all duration-300 hover:-translate-y-1" 
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+          >
+            <div className="w-10 h-10 rounded flex items-center justify-center overflow-hidden shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <img src="/placeholder-hl.png" alt="Hyperliquid" className="w-full h-full object-cover" />
+            </div>
+            <span className="font-mono text-xl font-black tracking-wider uppercase" style={{ color: 'var(--text-primary)', fontStyle: 'italic' }}>
+              {t('home.connected.hyperliquid')}
+            </span>
+          </div>
+
+          {/* Polymarket: Dimmed */}
+          <div 
+            className="flex items-center gap-4 px-6 py-4 rounded border border-dashed transition-all duration-300 opacity-40 grayscale hover:opacity-100 hover:grayscale-0" 
+            style={{ background: 'transparent', borderColor: 'var(--border)' }}
+          >
+            <div className="w-10 h-10 rounded flex items-center justify-center overflow-hidden shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <img src="/placeholder-poly.png" alt="Polymarket" className="w-full h-full object-cover opacity-60" />
+            </div>
+            <div className="flex flex-col text-left justify-center">
+              <span className="font-mono text-xl font-black tracking-wider uppercase leading-none font-italic" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                {t('home.connected.polymarket')}
+              </span>
+              <span className="text-[10px] font-mono mt-1 px-1.5 py-0.5 rounded uppercase tracking-widest self-start" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-tertiary)' }}>
+                {t('home.connected.comingSoon')}
+              </span>
+            </div>
+          </div>
+
+          {/* Binance: Coming Soon */}
+          <div 
+            className="flex items-center gap-4 px-6 py-4 rounded border border-dashed transition-all duration-300 opacity-40 grayscale hover:opacity-100 hover:grayscale-0" 
+            style={{ background: 'transparent', borderColor: 'var(--border)' }}
+          >
+            <div className="w-10 h-10 rounded flex items-center justify-center overflow-hidden shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <img src="/placeholder-binance.png" alt="Binance" className="w-full h-full object-cover opacity-60" />
+            </div>
+            <div className="flex flex-col text-left justify-center">
+              <span className="font-mono text-xl font-black tracking-wider uppercase leading-none font-italic" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                {t('home.connected.binance')}
+              </span>
+              <span className="text-[10px] font-mono mt-1 px-1.5 py-0.5 rounded uppercase tracking-widest self-start" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-tertiary)' }}>
+                {t('home.connected.comingSoon')}
+              </span>
+            </div>
+          </div>
+
+          {/* OKX: Coming Soon */}
+          <div 
+            className="flex items-center gap-4 px-6 py-4 rounded border border-dashed transition-all duration-300 opacity-40 grayscale hover:opacity-100 hover:grayscale-0" 
+            style={{ background: 'transparent', borderColor: 'var(--border)' }}
+          >
+            <div className="w-10 h-10 rounded flex items-center justify-center overflow-hidden shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <img src="/placeholder-okx.png" alt="OKX" className="w-full h-full object-cover opacity-60" />
+            </div>
+            <div className="flex flex-col text-left justify-center">
+              <span className="font-mono text-xl font-black tracking-wider uppercase leading-none font-italic" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                {t('home.connected.okx')}
+              </span>
+              <span className="text-[10px] font-mono mt-1 px-1.5 py-0.5 rounded uppercase tracking-widest self-start" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-tertiary)' }}>
+                {t('home.connected.comingSoon')}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div>
   );
 };

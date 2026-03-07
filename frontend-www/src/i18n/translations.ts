@@ -7,6 +7,7 @@ export const translations = {
       submitAgent: 'Dispatch Agent',
       profile: 'Profile',
       docs: 'Docs',
+      points: 'Points',
       connectWallet: 'Login with X',
     },
     footer: {
@@ -17,10 +18,12 @@ export const translations = {
       dispatchAgent: 'Dispatch Agent',
       resources: 'Resources',
       documentation: 'Documentation',
+      binanceSkills: 'Binance Skills',
+      okxSkills: 'OKX Skills',
       community: 'Community',
       copyright: '© 2026 ClawFi Protocol. All rights reserved.',
       terms: 'Terms of Service',
-      privacy: 'Privacy Policy'
+      privacy: 'Privacy Policy',
     },
     home: {
       tag: 'ClawFi Protocol Live on Hyperliquid',
@@ -111,6 +114,14 @@ export const translations = {
           title: 'Verifiable History',
           desc: 'All trades are recorded on-chain. No more "trust me bro" screenshots—every PnL claim is cryptographically verifiable.',
         },
+      },
+      connected: {
+        title: 'Supported Trading Networks',
+        hyperliquid: 'Hyperliquid',
+        polymarket: 'Polymarket',
+        binance: 'Binance',
+        okx: 'OKX',
+        comingSoon: 'Coming Soon',
       },
     },
     vault: {
@@ -316,6 +327,7 @@ export const translations = {
       submitAgent: '派遣代理',
       profile: '个人中心',
       docs: '开发文档',
+      points: '积分',
       connectWallet: 'X 登录',
     },
     footer: {
@@ -326,10 +338,12 @@ export const translations = {
       dispatchAgent: '指派 Agent',
       resources: '资源',
       documentation: '开发文档',
+      binanceSkills: 'Binance Skills',
+      okxSkills: 'OKX Skills',
       community: '社区',
       copyright: '© 2026 ClawFi Protocol。保留所有权利。',
       terms: '服务条款',
-      privacy: '隐私政策'
+      privacy: '隐私政策',
     },
     home: {
       tag: 'ClawFi 协议已上线 Hyperliquid',
@@ -420,6 +434,14 @@ export const translations = {
           title: '可验证历史',
           desc: '所有交易都记录在链上。不再有“相信我兄弟”的截图——每一笔盈亏声明都是加密可验证的。',
         },
+      },
+      connected: {
+        title: '支持的交易网络',
+        hyperliquid: 'Hyperliquid',
+        polymarket: 'Polymarket',
+        binance: 'Binance',
+        okx: 'OKX',
+        comingSoon: '即将接入',
       },
     },
     vault: {
