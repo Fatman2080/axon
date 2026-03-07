@@ -104,6 +104,7 @@ info "installing to ${INSTALL_DIR}..."
 mkdir -p "${INSTALL_DIR}"
 cp    "${SCRIPT_DIR}/openfi-server" "${INSTALL_DIR}/openfi-server"
 cp    "${SCRIPT_DIR}/start.sh"      "${INSTALL_DIR}/start.sh"
+rm -rf "${INSTALL_DIR}/assets"
 cp -r "${SCRIPT_DIR}/assets"        "${INSTALL_DIR}/assets"
 
 # Config — don't overwrite if already exists (preserve user edits)
