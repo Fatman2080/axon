@@ -65,6 +65,12 @@ func (s *Server) registerAdminRoutes(g *echo.Group) {
 
 	secured.GET("/treasury", s.handleAdminTreasury)
 	secured.GET("/treasury/history", s.handleAdminTreasuryHistory)
+
+	secured.GET("/settings/backup", s.handleAdminGetBackupSettings)
+	secured.PATCH("/settings/backup", s.handleAdminUpdateBackupSettings)
+	secured.GET("/backups", s.handleAdminListBackups)
+	secured.POST("/backups", s.handleAdminCreateBackup)
+	secured.POST("/backups/restore", s.handleAdminRestoreBackup)
 }
 
 func (s *Server) handleAdminLogin(c echo.Context) error {
@@ -910,4 +916,114 @@ func (s *Server) handleAdminTreasuryHistory(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_treasury_history"})
 	}
 	return c.JSON(http.StatusOK, items)
+}
+
+func (s *Server) backupSettingsJSON() echo.Map {
+	return echo.Map{
+		"intervalHours": getPositiveIntSetting(s.store, "backup_interval_hours", 24),
+		"retainHourly":  getPositiveIntSetting(s.store, "backup_retain_hourly", 3),
+		"retainDaily":   getPositiveIntSetting(s.store, "backup_retain_daily", 3),
+		"retainWeekly":  getPositiveIntSetting(s.store, "backup_retain_weekly", 3),
+		"lastBackupAt":  s.store.getSettingDefault("backup_last_at", ""),
+	}
+}
+
+func (s *Server) handleAdminGetBackupSettings(c echo.Context) error {
+	return c.JSON(http.StatusOK, s.backupSettingsJSON())
+}
+
+func (s *Server) handleAdminUpdateBackupSettings(c echo.Context) error {
+	req := struct {
+		IntervalHours *int `json:"intervalHours"`
+		RetainHourly  *int `json:"retainHourly"`
+		RetainDaily   *int `json:"retainDaily"`
+		RetainWeekly  *int `json:"retainWeekly"`
+	}{}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
+	}
+
+	if req.IntervalHours != nil {
+		v := *req.IntervalHours
+		if v < 0 {
+			v = 0
+		}
+		_ = s.store.setSetting("backup_interval_hours", strconv.Itoa(v))
+	}
+	if req.RetainHourly != nil {
+		v := *req.RetainHourly
+		if v < 1 {
+			v = 1
+		}
+		_ = s.store.setSetting("backup_retain_hourly", strconv.Itoa(v))
+	}
+	if req.RetainDaily != nil {
+		v := *req.RetainDaily
+		if v < 1 {
+			v = 1
+		}
+		_ = s.store.setSetting("backup_retain_daily", strconv.Itoa(v))
+	}
+	if req.RetainWeekly != nil {
+		v := *req.RetainWeekly
+		if v < 1 {
+			v = 1
+		}
+		_ = s.store.setSetting("backup_retain_weekly", strconv.Itoa(v))
+	}
+
+	// Run cleanup with new settings, then restart goroutine
+	s.cleanupOldBackups()
+	s.startAutoBackup()
+
+	return c.JSON(http.StatusOK, s.backupSettingsJSON())
+}
+
+func (s *Server) handleAdminListBackups(c echo.Context) error {
+	backups, err := s.listBackups()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_list_backups"})
+	}
+	return c.JSON(http.StatusOK, backups)
+}
+
+func (s *Server) handleAdminCreateBackup(c echo.Context) error {
+	info, err := s.performBackup()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, info)
+}
+
+func (s *Server) handleAdminRestoreBackup(c echo.Context) error {
+	req := struct {
+		Name     string `json:"name"`
+		Password string `json:"password"`
+	}{}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
+	}
+	if strings.TrimSpace(req.Name) == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "name_required"})
+	}
+	if strings.TrimSpace(req.Password) == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "password_required"})
+	}
+
+	adminID := c.Get("subject").(string)
+	storedHash, err := s.store.getAdminPasswordHashByID(adminID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.JSON(http.StatusUnauthorized, echo.Map{"error": "admin_not_found"})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_verify_password"})
+	}
+	if !verifyPassword(req.Password, storedHash) {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "invalid_password"})
+	}
+
+	if err := s.restoreFromBackup(req.Name); err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, echo.Map{"ok": true, "restored": req.Name})
 }

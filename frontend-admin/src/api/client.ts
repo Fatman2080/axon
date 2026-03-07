@@ -243,6 +243,31 @@ export const adminApi = {
     const { data } = await http.get('/admin/api/agents/leaderboard', { params: { sortBy, limit } });
     return data;
   },
+
+  async getBackupSettings(): Promise<{ intervalHours: number; retainHourly: number; retainDaily: number; retainWeekly: number; lastBackupAt: string }> {
+    const { data } = await http.get('/admin/api/settings/backup');
+    return data;
+  },
+
+  async updateBackupSettings(payload: { intervalHours?: number; retainHourly?: number; retainDaily?: number; retainWeekly?: number }): Promise<{ intervalHours: number; retainHourly: number; retainDaily: number; retainWeekly: number; lastBackupAt: string }> {
+    const { data } = await http.patch('/admin/api/settings/backup', payload);
+    return data;
+  },
+
+  async listBackups(): Promise<{ name: string; size: number; createdAt: string }[]> {
+    const { data } = await http.get('/admin/api/backups');
+    return data;
+  },
+
+  async createBackup(): Promise<{ name: string; size: number; createdAt: string }> {
+    const { data } = await http.post('/admin/api/backups');
+    return data;
+  },
+
+  async restoreBackup(name: string, password: string): Promise<{ ok: boolean; restored: string }> {
+    const { data } = await http.post('/admin/api/backups/restore', { name, password });
+    return data;
+  },
 };
 
 export default http;

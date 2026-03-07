@@ -28,7 +28,10 @@ type Server struct {
 	syncIntervalSecs  int
 	syncStop          chan struct{}
 	syncRoundRunning  int32
-	extraUsdcAddress  string
+	cache             *apiCache
+	dbPath            string
+	backupStop        chan struct{}
+	backupRunning     int32
 }
 
 func (s *Server) getEVMClient() *EVMClient {
@@ -373,6 +376,11 @@ func (s *Server) handleConsumeInviteCode(c echo.Context) error {
 
 func (s *Server) handleAgentMarket(c echo.Context) error {
 	search := c.QueryParam("search")
+	if search == "" {
+		if data, ok := s.cache.get("agent_market"); ok {
+			return c.JSONBlob(http.StatusOK, data)
+		}
+	}
 	items, err := s.store.listAgentStats(search)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_agent_market"})
@@ -384,6 +392,10 @@ func (s *Server) handleAgentMarketDetail(c echo.Context) error {
 	publicKey := strings.ToLower(strings.TrimSpace(c.Param("publicKey")))
 	if publicKey == "" {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "public_key_required"})
+	}
+
+	if data, ok := s.cache.get("agent_detail:" + publicKey); ok {
+		return c.JSONBlob(http.StatusOK, data)
 	}
 
 	agent, err := s.store.getAgentStats(publicKey)
@@ -461,6 +473,9 @@ func (s *Server) handleUserAgentHistory(c echo.Context) error {
 }
 
 func (s *Server) handleVaultStats(c echo.Context) error {
+	if data, ok := s.cache.get("vault_stats"); ok {
+		return c.JSONBlob(http.StatusOK, data)
+	}
 	items, err := s.store.listAgentStats("")
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_stats"})
@@ -490,6 +505,9 @@ func (s *Server) handleVaultStats(c echo.Context) error {
 }
 
 func (s *Server) handleVaultOverview(c echo.Context) error {
+	if data, ok := s.cache.get("vault_overview"); ok {
+		return c.JSONBlob(http.StatusOK, data)
+	}
 	items, err := s.store.listAgentStats("")
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_stats"})
@@ -574,6 +592,9 @@ func (s *Server) handleUserAgentStats(c echo.Context) error {
 }
 
 func (s *Server) handleDailySlots(c echo.Context) error {
+	if data, ok := s.cache.get("daily_slots"); ok {
+		return c.JSONBlob(http.StatusOK, data)
+	}
 	slots, err := s.store.getDailySlots()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_get_daily_slots"})
@@ -643,6 +664,9 @@ func (s *Server) getTreasuryTotal() float64 {
 }
 
 func (s *Server) handlePublicTreasury(c echo.Context) error {
+	if data, ok := s.cache.get("treasury"); ok {
+		return c.JSONBlob(http.StatusOK, data)
+	}
 	snap, err := s.store.getLatestTreasurySnapshot()
 	if err != nil {
 		return c.JSON(http.StatusOK, echo.Map{})
@@ -655,6 +679,9 @@ func (s *Server) handlePublicTreasuryHistory(c echo.Context) error {
 	if period == "" {
 		period = "30d"
 	}
+	if data, ok := s.cache.get("treasury_history:" + period); ok {
+		return c.JSONBlob(http.StatusOK, data)
+	}
 	items, err := s.store.listTreasurySnapshots(200, period)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_treasury_history"})
@@ -663,6 +690,9 @@ func (s *Server) handlePublicTreasuryHistory(c echo.Context) error {
 }
 
 func (s *Server) handlePlatformStats(c echo.Context) error {
+	if data, ok := s.cache.get("platform_stats"); ok {
+		return c.JSONBlob(http.StatusOK, data)
+	}
 	latest, err := s.store.getLatestPlatformSnapshot()
 	if err != nil || latest == nil {
 		items, listErr := s.store.listAgentStats("")
@@ -720,6 +750,12 @@ func (s *Server) handlePlatformHistory(c echo.Context) error {
 	if raw := strings.TrimSpace(c.QueryParam("limit")); raw != "" {
 		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
 			limit = n
+		}
+	}
+	// Serve from cache when using default limit (custom limits fall through to DB)
+	if limit == 200 {
+		if data, ok := s.cache.get("platform_history:" + period); ok {
+			return c.JSONBlob(http.StatusOK, data)
 		}
 	}
 	items, err := s.store.listPlatformSnapshots(limit, period)

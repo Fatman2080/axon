@@ -221,6 +221,9 @@ func (s *Server) runSyncRound() {
 		logInfo("sync", "consistency: %d assigned accounts checked, %d lost vault access", len(assignedKeys), lostCount)
 	}
 
+	// --- Phase 4: Refresh public API cache ---
+	s.refreshPublicCache()
+
 	elapsed := time.Since(start).Seconds()
 	logInfo("sync", "=== round #%d completed in %.1fs === next in %ds", round, elapsed, s.syncIntervalSecs)
 }
@@ -361,16 +364,6 @@ func (s *Server) collectTreasurySnapshot(evm *EVMClient, records []VaultRecord, 
 		(allocBal.evmBal + allocBal.perpsBal + allocBal.spotBal) +
 		(ownerBal.evmBal + ownerBal.perpsBal + ownerBal.spotBal)
 
-	// Fetch requested extra balance from Hyper EVM network (USDC ERC20 token)
-	if s.extraUsdcAddress != "" && evm != nil {
-		userAddr := common.HexToAddress(s.extraUsdcAddress)
-		tokenAddr := common.HexToAddress("0xb88339CB7199b77E23DB6E890353E22632Ba630f") // USDC contract on HyperEVM
-		if bal, err := evm.GetERC20Balance(tokenAddr, userAddr); err == nil {
-			snap.ExtraUsdc = bal
-			snap.TotalFunds += bal
-		}
-	}
-
 	if err := s.store.saveTreasurySnapshot(snap); err != nil {
 		logError("sync", "treasury: save snapshot failed: %v", err)
 	}
@@ -378,8 +371,8 @@ func (s *Server) collectTreasurySnapshot(evm *EVMClient, records []VaultRecord, 
 	vaultTotal := vaultEvm + vaultPerps + vaultSpot
 	allocTotal := allocBal.evmBal + allocBal.perpsBal + allocBal.spotBal
 	ownerTotal := ownerBal.evmBal + ownerBal.perpsBal + ownerBal.spotBal
-	logInfo("sync", "treasury: total=$%.2f (vault=$%.2f alloc=$%.2f owner=$%.2f extra=$%.2f)",
-		snap.TotalFunds, vaultTotal, allocTotal, ownerTotal, snap.ExtraUsdc)
+	logInfo("sync", "treasury: total=$%.2f (vault=$%.2f alloc=$%.2f owner=$%.2f)",
+		snap.TotalFunds, vaultTotal, allocTotal, ownerTotal)
 }
 
 // collectPlatformSnapshot gathers platform-level stats and saves a platform snapshot.

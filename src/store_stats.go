@@ -200,12 +200,12 @@ func (s *Store) saveTreasurySnapshot(snap TreasurySnapshot) error {
 		`INSERT INTO treasury_snapshots(id, vault_evm, vault_perps, vault_spot, vault_pnl, vault_capital,
 			allocator_evm, allocator_perps, allocator_spot,
 			owner_evm, owner_perps, owner_spot,
-			total_funds, vault_count, active_vault_count, allocator_address, owner_address, extra_usdc, created_at)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			total_funds, vault_count, active_vault_count, allocator_address, owner_address, created_at)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		snap.ID, snap.VaultEvm, snap.VaultPerps, snap.VaultSpot, snap.VaultPnl, snap.VaultCapital,
 		snap.AllocatorEvm, snap.AllocatorPerps, snap.AllocatorSpot,
 		snap.OwnerEvm, snap.OwnerPerps, snap.OwnerSpot,
-		snap.TotalFunds, snap.VaultCount, snap.ActiveVaultCount, snap.AllocatorAddress, snap.OwnerAddress, snap.ExtraUsdc, snap.CreatedAt,
+		snap.TotalFunds, snap.VaultCount, snap.ActiveVaultCount, snap.AllocatorAddress, snap.OwnerAddress, snap.CreatedAt,
 	)
 	return err
 }
@@ -215,7 +215,7 @@ func (s *Store) getLatestTreasurySnapshot() (*TreasurySnapshot, error) {
 		`SELECT id, vault_evm, vault_perps, vault_spot, vault_pnl, vault_capital,
 			allocator_evm, allocator_perps, allocator_spot,
 			owner_evm, owner_perps, owner_spot,
-			total_funds, vault_count, active_vault_count, allocator_address, owner_address, extra_usdc, created_at
+			total_funds, vault_count, active_vault_count, allocator_address, owner_address, created_at
 		FROM treasury_snapshots ORDER BY created_at DESC LIMIT 1`,
 	)
 	var snap TreasurySnapshot
@@ -223,7 +223,7 @@ func (s *Store) getLatestTreasurySnapshot() (*TreasurySnapshot, error) {
 		&snap.ID, &snap.VaultEvm, &snap.VaultPerps, &snap.VaultSpot, &snap.VaultPnl, &snap.VaultCapital,
 		&snap.AllocatorEvm, &snap.AllocatorPerps, &snap.AllocatorSpot,
 		&snap.OwnerEvm, &snap.OwnerPerps, &snap.OwnerSpot,
-		&snap.TotalFunds, &snap.VaultCount, &snap.ActiveVaultCount, &snap.AllocatorAddress, &snap.OwnerAddress, &snap.ExtraUsdc, &snap.CreatedAt,
+		&snap.TotalFunds, &snap.VaultCount, &snap.ActiveVaultCount, &snap.AllocatorAddress, &snap.OwnerAddress, &snap.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -254,7 +254,7 @@ func (s *Store) listTreasurySnapshots(limit int, period string) ([]TreasurySnaps
 	query := `SELECT id, vault_evm, vault_perps, vault_spot, vault_pnl, vault_capital,
 		allocator_evm, allocator_perps, allocator_spot,
 		owner_evm, owner_perps, owner_spot,
-		total_funds, vault_count, active_vault_count, allocator_address, owner_address, extra_usdc, created_at
+		total_funds, vault_count, active_vault_count, allocator_address, owner_address, created_at
 		FROM treasury_snapshots`
 	var args []any
 	if cutoff != "" {
@@ -277,7 +277,7 @@ func (s *Store) listTreasurySnapshots(limit int, period string) ([]TreasurySnaps
 			&snap.ID, &snap.VaultEvm, &snap.VaultPerps, &snap.VaultSpot, &snap.VaultPnl, &snap.VaultCapital,
 			&snap.AllocatorEvm, &snap.AllocatorPerps, &snap.AllocatorSpot,
 			&snap.OwnerEvm, &snap.OwnerPerps, &snap.OwnerSpot,
-			&snap.TotalFunds, &snap.VaultCount, &snap.ActiveVaultCount, &snap.AllocatorAddress, &snap.OwnerAddress, &snap.ExtraUsdc, &snap.CreatedAt,
+			&snap.TotalFunds, &snap.VaultCount, &snap.ActiveVaultCount, &snap.AllocatorAddress, &snap.OwnerAddress, &snap.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

@@ -407,8 +407,10 @@ const getBrowserLanguage = () => {
         return 'zh';
     try {
         const saved = localStorage.getItem('openfi_admin_language');
-        if (saved === 'en' || saved === 'zh') return saved;
-    } catch {
+        if (saved === 'en' || saved === 'zh')
+            return saved;
+    }
+    catch {
         // ignore
     }
     const parser = navigator.language || (navigator.languages && navigator.languages[0]) || '';
@@ -426,7 +428,8 @@ const i18n = createI18n({
 watch(() => i18n.global.locale.value, (newVal) => {
     try {
         localStorage.setItem('openfi_admin_language', newVal);
-    } catch {
+    }
+    catch {
         // ignore
     }
 });

@@ -76,7 +76,8 @@ func main() {
 			FrontendFailureURL: cfg.AppBaseURL + "/auth/x/callback",
 			Scopes:             xoauthScopes,
 		},
-		extraUsdcAddress: cfg.Treasury.ExtraUsdcAddress,
+		cache:            newAPICache(),
+		dbPath:           cfg.Storage.DBPath,
 	}
 
 	// EVM client init is async — it can be slow to dial the RPC endpoint.
@@ -109,6 +110,7 @@ func main() {
 	staticHost.registerRoutes(e)
 
 	server.startAutoSync(syncInterval)
+	server.startAutoBackup()
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	logInfo("main", "OpenFi server listening on %s (db: %s, frontend: %s)", addr, cfg.Storage.DBPath, cfg.Frontend.Mode)

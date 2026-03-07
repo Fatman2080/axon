@@ -179,7 +179,6 @@ type TreasurySnapshot struct {
 	ActiveVaultCount int     `json:"activeVaultCount"`
 	AllocatorAddress string  `json:"allocatorAddress"`
 	OwnerAddress     string  `json:"ownerAddress"`
-	ExtraUsdc        float64 `json:"extraUsdc"`
 	CreatedAt        string  `json:"createdAt"`
 }
 

@@ -190,5 +190,25 @@ export const adminApi = {
         const { data } = await http.get('/admin/api/agents/leaderboard', { params: { sortBy, limit } });
         return data;
     },
+    async getBackupSettings() {
+        const { data } = await http.get('/admin/api/settings/backup');
+        return data;
+    },
+    async updateBackupSettings(payload) {
+        const { data } = await http.patch('/admin/api/settings/backup', payload);
+        return data;
+    },
+    async listBackups() {
+        const { data } = await http.get('/admin/api/backups');
+        return data;
+    },
+    async createBackup() {
+        const { data } = await http.post('/admin/api/backups');
+        return data;
+    },
+    async restoreBackup(name, password) {
+        const { data } = await http.post('/admin/api/backups/restore', { name, password });
+        return data;
+    },
 };
 export default http;
