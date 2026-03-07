@@ -23,5 +23,11 @@
       "wwwDevServer": "http://127.0.0.1:9334",
       "adminDevServer": "http://127.0.0.1:9335"
     }
+  },
+  "log": {
+    "dir": "../logs",
+    "level": "info",
+    "maxDays": 30,
+    "console": true
   }
 }

@@ -89,12 +89,14 @@ func (s *Server) handleAdminLogin(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_login"})
 	}
 	if !verifyPassword(req.Password, passwordHash) {
+		logWarn("audit", "login failed: email=%s", req.Email)
 		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "invalid_credentials"})
 	}
 	token, err := issueToken(s.tokenSecret, admin.ID, "admin", 12*time.Hour)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_issue_token"})
 	}
+	logInfo("audit", "login success: email=%s", req.Email)
 	return c.JSON(http.StatusOK, echo.Map{
 		"token": token,
 		"admin": admin,
@@ -144,6 +146,8 @@ func (s *Server) handleAdminCreateAdmin(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_create_admin"})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: created admin email=%s", adminID, req.Email)
 	return c.JSON(http.StatusCreated, item)
 }
 
@@ -164,6 +168,8 @@ func (s *Server) handleAdminUpdateAdminPassword(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_update_admin_password"})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: changed password for admin %s", adminID, id)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
 }
 
@@ -183,6 +189,7 @@ func (s *Server) handleAdminDeleteAdmin(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_delete_admin"})
 	}
+	logInfo("audit", "admin %s: deleted admin %s", operatorID, id)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
 }
 
@@ -284,6 +291,8 @@ func (s *Server) handleAdminCreateInviteCode(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_create_invite_code"})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: created invite code", adminID)
 	return c.JSON(http.StatusCreated, item)
 }
 
@@ -304,6 +313,8 @@ func (s *Server) handleAdminUpdateInviteCode(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_update_invite_code"})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: updated invite code %s", adminID, id)
 	return c.JSON(http.StatusOK, item)
 }
 
@@ -328,6 +339,8 @@ func (s *Server) handleAdminCreateInviteCodesBatch(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_create_invite_codes"})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: created %d invite codes", adminID, len(items))
 	return c.JSON(http.StatusCreated, items)
 }
 
@@ -345,6 +358,8 @@ func (s *Server) handleAdminDeleteInviteCodes(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_delete_invite_codes"})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: deleted %d invite codes", adminID, deleted)
 	return c.JSON(http.StatusOK, echo.Map{"deleted": deleted})
 }
 
@@ -406,6 +421,8 @@ func (s *Server) handleAdminImportAgentAccounts(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_import_agent_accounts"})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: imported %d agent accounts", adminID, result.Imported)
 	return c.JSON(http.StatusOK, result)
 }
 
@@ -445,6 +462,8 @@ func (s *Server) handleAdminBatchDeleteAgentVaults(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_delete_agent_vaults"})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: deleted %d agent vaults", adminID, deleted)
 	return c.JSON(http.StatusOK, echo.Map{"deleted": deleted})
 }
 
@@ -482,6 +501,8 @@ func (s *Server) handleAdminUpdateAgentProfile(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_update_agent_profile"})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: updated profile for agent %s", adminID, publicKey)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
 }
 
@@ -528,6 +549,8 @@ func (s *Server) handleAdminUpdateSyncSettings(c echo.Context) error {
 			hlConcurrency = n
 		}
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: updated sync settings", adminID)
 	return c.JSON(http.StatusOK, echo.Map{
 		"intervalSeconds": s.syncIntervalSecs,
 		"hlConcurrency":   hlConcurrency,
@@ -649,6 +672,8 @@ func (s *Server) handleAdminUpdateDailySlotsSettings(c echo.Context) error {
 		_ = s.store.setSetting("daily_slots_reset_at", time.Now().UTC().Format(time.RFC3339))
 	}
 
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: updated daily slots", adminID)
 	slots, err := s.store.getDailySlots()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_get_daily_slots"})
@@ -687,6 +712,7 @@ func (s *Server) handleAdminBatchDeleteAgentPool(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_delete_agent_accounts"})
 	}
+	logInfo("audit", "admin %s: deleted %d agent accounts", adminID, deleted)
 	return c.JSON(http.StatusOK, echo.Map{"deleted": deleted})
 }
 
@@ -721,6 +747,7 @@ func (s *Server) handleAdminBatchDeleteUsers(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_delete_users"})
 	}
+	logInfo("audit", "admin %s: deleted %d users", adminID, deleted)
 	return c.JSON(http.StatusOK, echo.Map{"deleted": deleted})
 }
 
@@ -739,7 +766,8 @@ func (s *Server) handleAdminUpdateDispatchSettings(c echo.Context) error {
 	if err := s.store.setSetting("dispatch_command", strings.TrimSpace(req.Command)); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_save"})
 	}
-	logInfo("admin", "dispatch command template updated")
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: updated dispatch settings", adminID)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
 }
 
@@ -766,7 +794,8 @@ func (s *Server) handleAdminDispatchAgent(c echo.Context) error {
 
 	cmd := buildDispatchCommand(cmdTemplate, privateKey, publicKey, vaultAddress)
 
-	logInfo("admin", "dispatching agent %s", publicKey)
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: dispatching agent %s", adminID, publicKey)
 	go func() {
 		out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
 		if err != nil {
@@ -826,6 +855,8 @@ func (s *Server) handleAdminRevokeAgent(c echo.Context) error {
 	if err := s.store.revokeUserAgent(publicKey); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: revoked agent %s", adminID, publicKey)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
 }
 
@@ -857,6 +888,8 @@ func (s *Server) handleAdminReassignAgent(c echo.Context) error {
 	if err := s.store.reassignAgent(publicKey, userID); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: reassigned agent %s to %s", adminID, publicKey, req.UserName)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
 }
 
@@ -868,6 +901,8 @@ func (s *Server) handleAdminRevokeUserInvite(c echo.Context) error {
 	if err := s.store.revokeUserInviteCode(userID); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: revoked invite for user %s", adminID, userID)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
 }
 
@@ -889,6 +924,8 @@ func (s *Server) handleAdminRevokeUserAgent(c echo.Context) error {
 	if err := s.store.revokeUserAgent(user.AgentPublicKey); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: revoked agent for user %s", adminID, userID)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
 }
 
@@ -976,6 +1013,8 @@ func (s *Server) handleAdminUpdateBackupSettings(c echo.Context) error {
 	s.cleanupOldBackups()
 	s.startAutoBackup()
 
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: updated backup settings", adminID)
 	return c.JSON(http.StatusOK, s.backupSettingsJSON())
 }
 
@@ -988,6 +1027,8 @@ func (s *Server) handleAdminListBackups(c echo.Context) error {
 }
 
 func (s *Server) handleAdminCreateBackup(c echo.Context) error {
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: triggered manual backup", adminID)
 	info, err := s.performBackup()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
@@ -1022,6 +1063,7 @@ func (s *Server) handleAdminRestoreBackup(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "invalid_password"})
 	}
 
+	logWarn("audit", "admin %s: restoring from backup %s", adminID, req.Name)
 	if err := s.restoreFromBackup(req.Name); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}

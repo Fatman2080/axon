@@ -27,6 +27,8 @@ func main() {
 		logFatal("main", "failed to load config: %v", err)
 	}
 
+	initLogger(cfg.Log, filepath.Dir(*configPath))
+
 	if err := os.MkdirAll(filepath.Dir(cfg.Storage.DBPath), 0o755); err != nil {
 		logFatal("main", "failed to create data directory: %v", err)
 	}
@@ -103,6 +105,8 @@ func main() {
 	e.HideBanner = true
 	e.HidePort = true
 	e.Use(middleware.Recover())
+	e.Use(middleware.BodyLimit("10M"))
+	e.Use(securityHeadersMiddleware())
 	e.Use(requestLoggerMiddleware())
 
 	server.registerPublicRoutes(e.Group("/api"))

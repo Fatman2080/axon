@@ -259,19 +259,20 @@ func (s *Server) restoreFromBackup(name string) error {
 	backupPath := filepath.Join(dir, name)
 
 	// Validate name to prevent path traversal
-	if strings.Contains(name, "/") || strings.Contains(name, "\\") || strings.Contains(name, "..") {
+	absDir, _ := filepath.Abs(dir)
+	absPath, _ := filepath.Abs(backupPath)
+	if !strings.HasPrefix(absPath, absDir+string(filepath.Separator)) {
 		return fmt.Errorf("invalid backup name")
 	}
 	if _, err := os.Stat(backupPath); err != nil {
 		return fmt.Errorf("backup file not found: %s", name)
 	}
 
-	// Stop sync goroutine
-	if s.syncStop != nil {
-		close(s.syncStop)
-		s.syncStop = nil
-	}
-	// Stop backup goroutine
+	// Stop sync and backup goroutines via their own safe stop-and-restart methods.
+	// startAutoSync(0) closes the old stop channel and disables sync.
+	// startAutoBackup() closes the old stop channel — the new goroutine won't
+	// fire during restore because performBackup holds the atomic guard.
+	s.startAutoSync(0)
 	if s.backupStop != nil {
 		close(s.backupStop)
 		s.backupStop = nil

@@ -16,6 +16,7 @@ echo "[release] preparing directories..."
 rm -rf "${RELEASE_DIR}"
 mkdir -p "${RELEASE_DIR}/config"
 mkdir -p "${RELEASE_DIR}/data"
+mkdir -p "${RELEASE_DIR}/logs"
 mkdir -p "${RELEASE_DIR}/assets/www"
 mkdir -p "${RELEASE_DIR}/assets/admin"
 
@@ -66,6 +67,12 @@ else
       "wwwDistDir": "../assets/www",
       "adminDistDir": "../assets/admin"
     }
+  },
+  "log": {
+    "dir": "../logs",
+    "level": "info",
+    "maxDays": 30,
+    "console": true
   }
 }
 CONF

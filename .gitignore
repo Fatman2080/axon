@@ -3,6 +3,10 @@ dist/
 local_run/
 openfi-server-bin
 
+# Log files
+*.log
+logs/
+
 # Config files (keep only sample)
 config/config.json
 config/config.*.json

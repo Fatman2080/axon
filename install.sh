@@ -90,6 +90,9 @@ fi
 # Data dir
 mkdir -p "${INSTALL_DIR}/data"
 
+# Logs dir
+mkdir -p "${INSTALL_DIR}/logs"
+
 # 3. Permissions
 chmod 755 "${INSTALL_DIR}/openfi-server"
 chmod 755 "${INSTALL_DIR}/start.sh"
@@ -115,7 +118,7 @@ RestartSec=5
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=${INSTALL_DIR}/data ${INSTALL_DIR}/config
+ReadWritePaths=${INSTALL_DIR}/data ${INSTALL_DIR}/config ${INSTALL_DIR}/logs
 PrivateTmp=true
 
 # Logging
