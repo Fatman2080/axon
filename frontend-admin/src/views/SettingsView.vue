@@ -19,6 +19,14 @@ const dispatch = reactive({
   msg: "",
   ok: true,
 });
+const internSlots = reactive({
+  total: 100,
+  consumed: 0,
+  remaining: 100,
+  saving: false,
+  msg: "",
+  ok: true,
+});
 const tvlOffset = reactive({
   value: 0,
   saving: false,
@@ -73,10 +81,11 @@ const load = async () => {
   loading.value = true;
   loadError.value = "";
   try {
-    const [syncData, xoauthData, contractsData, tvlOffsetData, dispatchData, backupData, backupsData] = await Promise.all([
+    const [syncData, xoauthData, contractsData, internSlotsData, tvlOffsetData, dispatchData, backupData, backupsData] = await Promise.all([
       adminApi.getSyncSettings(),
       adminApi.getXOAuthSettings(),
       adminApi.getContractsSettings(),
+      adminApi.getInternSlots(),
       adminApi.getTvlOffset(),
       adminApi.getDispatchSettings(),
       adminApi.getBackupSettings(),
@@ -90,6 +99,9 @@ const load = async () => {
     contracts.rpcURL = contractsData.rpcURL || "";
     contracts.allocatorAddress = contractsData.allocatorAddress || "";
     dispatch.command = dispatchData.command || "";
+    internSlots.total = internSlotsData.total;
+    internSlots.consumed = internSlotsData.consumed;
+    internSlots.remaining = internSlotsData.remaining;
     tvlOffset.value = tvlOffsetData.tvlOffset || 0;
     backup.intervalHours = backupData.intervalHours;
     backup.retainHourly = backupData.retainHourly;
@@ -158,6 +170,22 @@ const saveDispatchSettings = async () => {
     flash(dispatch, err?.response?.data?.error || "保存失败", false);
   } finally {
     dispatch.saving = false;
+  }
+};
+
+const saveInternSlots = async () => {
+  internSlots.saving = true;
+  internSlots.msg = "";
+  try {
+    const r = await adminApi.updateInternSlots(internSlots.total);
+    internSlots.total = r.total;
+    internSlots.consumed = r.consumed;
+    internSlots.remaining = r.remaining;
+    flash(internSlots, "配置已更新", true);
+  } catch (err: any) {
+    flash(internSlots, err?.response?.data?.error || "保存失败", false);
+  } finally {
+    internSlots.saving = false;
   }
 };
 
@@ -409,6 +437,35 @@ onMounted(load);
             :disabled="dispatch.saving"
           >
             {{ dispatch.saving ? "保存中..." : "保存" }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 实习生名额 -->
+      <div class="setting-card">
+        <div class="setting-card-head">
+          <h3>实习生名额</h3>
+          <p class="muted">
+            已消耗 {{ internSlots.consumed }} / {{ internSlots.total }}，剩余 {{ internSlots.remaining }}
+          </p>
+        </div>
+        <div class="setting-card-body">
+          <label>
+            总名额
+            <input v-model.number="internSlots.total" type="number" min="1" />
+          </label>
+        </div>
+        <div class="setting-card-foot">
+          <span v-if="internSlots.msg" :class="internSlots.ok ? 'success' : 'error'">{{
+            internSlots.msg
+          }}</span>
+          <span class="toolbar-spacer"></span>
+          <button
+            class="btn btn-primary btn-sm"
+            @click="saveInternSlots"
+            :disabled="internSlots.saving"
+          >
+            {{ internSlots.saving ? "保存中..." : "保存" }}
           </button>
         </div>
       </div>

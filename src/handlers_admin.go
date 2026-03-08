@@ -57,6 +57,8 @@ func (s *Server) registerAdminRoutes(g *echo.Group) {
 	secured.PATCH("/settings/xoauth", s.handleAdminUpdateXOAuthSettings)
 	secured.GET("/settings/contracts", s.handleAdminGetContractsSettings)
 	secured.PATCH("/settings/contracts", s.handleAdminUpdateContractsSettings)
+	secured.GET("/settings/intern-slots", s.handleAdminGetInternSlots)
+	secured.PATCH("/settings/intern-slots", s.handleAdminUpdateInternSlots)
 	secured.GET("/settings/tvl-offset", s.handleAdminGetTvlOffset)
 	secured.PATCH("/settings/tvl-offset", s.handleAdminUpdateTvlOffset)
 	secured.GET("/settings/dispatch", s.handleAdminGetDispatchSettings)
@@ -633,6 +635,37 @@ func (s *Server) handleAdminUpdateContractsSettings(c echo.Context) error {
 
 	logInfo("admin", "contracts settings updated (rpc: %s)", rpcURL)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
+}
+
+func (s *Server) handleAdminGetInternSlots(c echo.Context) error {
+	slots, err := s.store.getDailySlots()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_get_slots"})
+	}
+	return c.JSON(http.StatusOK, slots)
+}
+
+func (s *Server) handleAdminUpdateInternSlots(c echo.Context) error {
+	req := struct {
+		Total *int `json:"total"`
+	}{}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
+	}
+	if req.Total != nil {
+		v := *req.Total
+		if v < 1 {
+			return c.JSON(http.StatusBadRequest, echo.Map{"error": "total must be >= 1"})
+		}
+		_ = s.store.setSetting("intern_slots_total", strconv.Itoa(v))
+	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: updated intern slots", adminID)
+	slots, err := s.store.getDailySlots()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_get_slots"})
+	}
+	return c.JSON(http.StatusOK, slots)
 }
 
 func (s *Server) handleAdminGetTvlOffset(c echo.Context) error {

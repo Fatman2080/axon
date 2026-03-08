@@ -690,6 +690,12 @@ func (s *Server) handlePublicTreasuryHistory(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_treasury_history"})
 	}
+	offset := s.store.getTvlOffset()
+	if offset != 0 {
+		for i := range items {
+			items[i].TotalFunds += offset
+		}
+	}
 	return c.JSON(http.StatusOK, items)
 }
 
@@ -766,6 +772,12 @@ func (s *Server) handlePlatformHistory(c echo.Context) error {
 	items, err := s.store.listPlatformSnapshots(limit, period)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_platform_history"})
+	}
+	pOffset := s.store.getTvlOffset()
+	if pOffset != 0 {
+		for i := range items {
+			items[i].TotalTVL += pOffset
+		}
 	}
 	return c.JSON(http.StatusOK, items)
 }

@@ -1102,10 +1102,12 @@ func (s *Store) getSettingDefaultTx(tx *sql.Tx, key string, defaultVal string) (
 }
 
 func (s *Store) getDailySlots() (DailySlots, error) {
-	var total, consumed int
-	_ = s.db.QueryRow(`SELECT COUNT(1) FROM agent_accounts a
-		JOIN agent_vaults v ON lower(a.vault_address) = lower(v.vault_address)
-		WHERE a.vault_address != '' AND v.valid = 1`).Scan(&total)
+	totalStr := s.getSettingDefault("intern_slots_total", "100")
+	total, _ := strconv.Atoi(totalStr)
+	if total <= 0 {
+		total = 100
+	}
+	var consumed int
 	_ = s.db.QueryRow(`SELECT COUNT(1) FROM agent_accounts a
 		JOIN agent_vaults v ON lower(a.vault_address) = lower(v.vault_address)
 		WHERE a.vault_address != '' AND v.valid = 1 AND a.status = 'assigned'`).Scan(&consumed)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -189,15 +190,23 @@ func (s *Store) consumeInviteAndAssignAccount(code string, userID string) (Invit
 	if err != nil {
 		return InviteCode{}, AgentAccount{}, err
 	}
-	// Check remaining slots (agents with valid vault that are not yet assigned)
-	var remaining int
-	err = tx.QueryRow(`SELECT COUNT(1) FROM agent_accounts a
-		JOIN agent_vaults v ON lower(a.vault_address) = lower(v.vault_address)
-		WHERE a.vault_address != '' AND v.valid = 1 AND a.status = 'unused'`).Scan(&remaining)
+	// Check remaining slots: configured total minus actually consumed
+	totalStr, err := s.getSettingDefaultTx(tx, "intern_slots_total", "100")
 	if err != nil {
 		return InviteCode{}, AgentAccount{}, err
 	}
-	if remaining <= 0 {
+	slotsTotal, _ := strconv.Atoi(totalStr)
+	if slotsTotal <= 0 {
+		slotsTotal = 100
+	}
+	var slotsConsumed int
+	err = tx.QueryRow(`SELECT COUNT(1) FROM agent_accounts a
+		JOIN agent_vaults v ON lower(a.vault_address) = lower(v.vault_address)
+		WHERE a.vault_address != '' AND v.valid = 1 AND a.status = 'assigned'`).Scan(&slotsConsumed)
+	if err != nil {
+		return InviteCode{}, AgentAccount{}, err
+	}
+	if slotsConsumed >= slotsTotal {
 		return InviteCode{}, AgentAccount{}, errNoSlotsRemaining
 	}
 

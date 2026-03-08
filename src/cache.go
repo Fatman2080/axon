@@ -87,7 +87,7 @@ func (s *Server) refreshPublicCache() {
 		"totalL1Value":        totalL1Value,
 		"agentCount":          activeCount,
 		"totalInitialCapital": totalInitialCapital,
-		"treasuryTotal":       s.getTreasuryTotal() + tvlOffset,
+		"treasuryTotal":       s.getTreasuryTotal(),
 	})
 
 	// vault_overview
@@ -162,7 +162,7 @@ func (s *Server) refreshPublicCache() {
 	}
 
 	// --- treasury_history:{period} ---
-	for _, period := range []string{"24h", "7d", "30d", "ALL"} {
+	for _, period := range []string{"1d", "7d", "30d", "ALL"} {
 		if hist, err := s.store.listTreasurySnapshots(200, period); err == nil {
 			offsetHist := make([]TreasurySnapshot, len(hist))
 			for i, h := range hist {
@@ -191,7 +191,7 @@ func (s *Server) refreshPublicCache() {
 	}
 
 	// --- platform_history:{period} ---
-	for _, period := range []string{"24h", "7d", "30d", "ALL"} {
+	for _, period := range []string{"1d", "7d", "30d", "ALL"} {
 		if hist, err := s.store.listPlatformSnapshots(200, period); err == nil {
 			offsetPHist := make([]PlatformSnapshot, len(hist))
 			for i, h := range hist {

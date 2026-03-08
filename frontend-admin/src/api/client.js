@@ -122,6 +122,14 @@ export const adminApi = {
         const { data } = await http.patch('/admin/api/settings/xoauth', payload);
         return data;
     },
+    async getInternSlots() {
+        const { data } = await http.get('/admin/api/settings/intern-slots');
+        return data;
+    },
+    async updateInternSlots(total) {
+        const { data } = await http.patch('/admin/api/settings/intern-slots', { total });
+        return data;
+    },
     async getTvlOffset() {
         const { data } = await http.get('/admin/api/settings/tvl-offset');
         return data;
