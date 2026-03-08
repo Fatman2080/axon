@@ -57,8 +57,8 @@ func (s *Server) registerAdminRoutes(g *echo.Group) {
 	secured.PATCH("/settings/xoauth", s.handleAdminUpdateXOAuthSettings)
 	secured.GET("/settings/contracts", s.handleAdminGetContractsSettings)
 	secured.PATCH("/settings/contracts", s.handleAdminUpdateContractsSettings)
-	secured.GET("/settings/daily-slots", s.handleAdminGetDailySlotsSettings)
-	secured.PATCH("/settings/daily-slots", s.handleAdminUpdateDailySlotsSettings)
+	secured.GET("/settings/tvl-offset", s.handleAdminGetTvlOffset)
+	secured.PATCH("/settings/tvl-offset", s.handleAdminUpdateTvlOffset)
 	secured.GET("/settings/dispatch", s.handleAdminGetDispatchSettings)
 	secured.PATCH("/settings/dispatch", s.handleAdminUpdateDispatchSettings)
 	secured.POST("/agent-accounts/:publicKey/dispatch", s.handleAdminDispatchAgent)
@@ -635,50 +635,26 @@ func (s *Server) handleAdminUpdateContractsSettings(c echo.Context) error {
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
 }
 
-func (s *Server) handleAdminGetDailySlotsSettings(c echo.Context) error {
-	slots, err := s.store.getDailySlots()
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_get_daily_slots"})
-	}
-	return c.JSON(http.StatusOK, slots)
+func (s *Server) handleAdminGetTvlOffset(c echo.Context) error {
+	return c.JSON(http.StatusOK, echo.Map{"tvlOffset": s.store.getTvlOffset()})
 }
 
-func (s *Server) handleAdminUpdateDailySlotsSettings(c echo.Context) error {
+func (s *Server) handleAdminUpdateTvlOffset(c echo.Context) error {
 	req := struct {
-		Total         *int  `json:"total"`
-		ResetHour     *int  `json:"resetHour"`
-		ResetConsumed *bool `json:"resetConsumed"`
+		TvlOffset *float64 `json:"tvlOffset"`
 	}{}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
 	}
-
-	if req.Total != nil {
-		v := *req.Total
-		if v < 1 {
-			return c.JSON(http.StatusBadRequest, echo.Map{"error": "total must be >= 1"})
-		}
-		_ = s.store.setSetting("daily_slots_total", strconv.Itoa(v))
+	if req.TvlOffset == nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "tvlOffset is required"})
 	}
-	if req.ResetHour != nil {
-		v := *req.ResetHour
-		if v < 0 || v > 23 {
-			return c.JSON(http.StatusBadRequest, echo.Map{"error": "resetHour must be 0-23"})
-		}
-		_ = s.store.setSetting("daily_slots_reset_hour", strconv.Itoa(v))
+	if err := s.store.setSetting("tvl_offset", strconv.FormatFloat(*req.TvlOffset, 'f', -1, 64)); err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_save"})
 	}
-	if req.ResetConsumed != nil && *req.ResetConsumed {
-		_ = s.store.setSetting("daily_slots_consumed", "0")
-		_ = s.store.setSetting("daily_slots_reset_at", time.Now().UTC().Format(time.RFC3339))
-	}
-
 	adminID := c.Get("subject").(string)
-	logInfo("audit", "admin %s: updated daily slots", adminID)
-	slots, err := s.store.getDailySlots()
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_get_daily_slots"})
-	}
-	return c.JSON(http.StatusOK, slots)
+	logInfo("audit", "admin %s: updated tvl offset to %f", adminID, *req.TvlOffset)
+	return c.JSON(http.StatusOK, echo.Map{"tvlOffset": *req.TvlOffset})
 }
 
 func (s *Server) handleAdminBatchDeleteAgentPool(c echo.Context) error {

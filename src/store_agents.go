@@ -189,8 +189,16 @@ func (s *Store) consumeInviteAndAssignAccount(code string, userID string) (Invit
 	if err != nil {
 		return InviteCode{}, AgentAccount{}, err
 	}
-	if err = s.consumeDailySlotTx(tx); err != nil {
+	// Check remaining slots (agents with valid vault that are not yet assigned)
+	var remaining int
+	err = tx.QueryRow(`SELECT COUNT(1) FROM agent_accounts a
+		JOIN agent_vaults v ON lower(a.vault_address) = lower(v.vault_address)
+		WHERE a.vault_address != '' AND v.valid = 1 AND a.status = 'unused'`).Scan(&remaining)
+	if err != nil {
 		return InviteCode{}, AgentAccount{}, err
+	}
+	if remaining <= 0 {
+		return InviteCode{}, AgentAccount{}, errNoSlotsRemaining
 	}
 
 	if _, err = tx.Exec(`UPDATE invite_codes SET used_count = used_count + 1 WHERE id = ?`, invite.ID); err != nil {

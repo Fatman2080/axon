@@ -19,13 +19,9 @@ const dispatch = reactive({
   msg: "",
   ok: true,
 });
-const slots = reactive({
-  total: 1000,
-  resetHour: 0,
-  consumed: 0,
-  remaining: 1000,
+const tvlOffset = reactive({
+  value: 0,
   saving: false,
-  resetting: false,
   msg: "",
   ok: true,
 });
@@ -77,11 +73,11 @@ const load = async () => {
   loading.value = true;
   loadError.value = "";
   try {
-    const [syncData, xoauthData, contractsData, slotsData, dispatchData, backupData, backupsData] = await Promise.all([
+    const [syncData, xoauthData, contractsData, tvlOffsetData, dispatchData, backupData, backupsData] = await Promise.all([
       adminApi.getSyncSettings(),
       adminApi.getXOAuthSettings(),
       adminApi.getContractsSettings(),
-      adminApi.getDailySlotsSettings(),
+      adminApi.getTvlOffset(),
       adminApi.getDispatchSettings(),
       adminApi.getBackupSettings(),
       adminApi.listBackups(),
@@ -94,10 +90,7 @@ const load = async () => {
     contracts.rpcURL = contractsData.rpcURL || "";
     contracts.allocatorAddress = contractsData.allocatorAddress || "";
     dispatch.command = dispatchData.command || "";
-    slots.total = slotsData.total;
-    slots.resetHour = slotsData.resetHour;
-    slots.consumed = slotsData.consumed;
-    slots.remaining = slotsData.remaining;
+    tvlOffset.value = tvlOffsetData.tvlOffset || 0;
     backup.intervalHours = backupData.intervalHours;
     backup.retainHourly = backupData.retainHourly;
     backup.retainDaily = backupData.retainDaily;
@@ -168,42 +161,17 @@ const saveDispatchSettings = async () => {
   }
 };
 
-const saveDailySlotsSettings = async () => {
-  slots.saving = true;
-  slots.msg = "";
+const saveTvlOffset = async () => {
+  tvlOffset.saving = true;
+  tvlOffset.msg = "";
   try {
-    const r = await adminApi.updateDailySlotsSettings({
-      total: slots.total,
-      resetHour: slots.resetHour,
-    });
-    slots.total = r.total;
-    slots.resetHour = r.resetHour;
-    slots.consumed = r.consumed;
-    slots.remaining = r.remaining;
-    flash(slots, "配置已更新", true);
+    const r = await adminApi.updateTvlOffset(tvlOffset.value);
+    tvlOffset.value = r.tvlOffset;
+    flash(tvlOffset, "TVL 偏移量已更新", true);
   } catch (err: any) {
-    flash(slots, err?.response?.data?.error || "保存失败", false);
+    flash(tvlOffset, err?.response?.data?.error || "保存失败", false);
   } finally {
-    slots.saving = false;
-  }
-};
-
-const resetDailySlotsConsumed = async () => {
-  slots.resetting = true;
-  slots.msg = "";
-  try {
-    const r = await adminApi.updateDailySlotsSettings({ resetConsumed: true });
-    slots.consumed = r.consumed;
-    slots.remaining = r.remaining;
-    flash(slots, "今日消耗已重置", true);
-  } catch (err: any) {
-    flash(
-      slots,
-      err?.response?.data?.error || "重置失败",
-      false,
-    );
-  } finally {
-    slots.resetting = false;
+    tvlOffset.saving = false;
   }
 };
 
@@ -445,49 +413,29 @@ onMounted(load);
         </div>
       </div>
 
-      <!-- 每日名额 -->
+      <!-- TVL 偏移量 -->
       <div class="setting-card">
         <div class="setting-card-head">
-          <h3>每日名额</h3>
-          <p class="muted">
-            已消耗 {{ slots.consumed }} / {{ slots.total }}，剩余 {{ slots.remaining }}
-          </p>
+          <h3>TVL 偏移量</h3>
+          <p class="muted">公开 API 输出总 TVL 时加上该偏移，不影响数据库真实数据。</p>
         </div>
         <div class="setting-card-body">
-          <div class="grid-2">
-            <label>
-              每日总名额
-              <input v-model.number="slots.total" type="number" min="1" />
-            </label>
-            <label>
-              重置小时 (UTC)
-              <input
-                v-model.number="slots.resetHour"
-                type="number"
-                min="0"
-                max="23"
-              />
-            </label>
-          </div>
+          <label>
+            偏移量 (USDC)
+            <input v-model.number="tvlOffset.value" type="number" step="any" />
+          </label>
         </div>
         <div class="setting-card-foot">
-          <span v-if="slots.msg" :class="slots.ok ? 'success' : 'error'">{{
-            slots.msg
+          <span v-if="tvlOffset.msg" :class="tvlOffset.ok ? 'success' : 'error'">{{
+            tvlOffset.msg
           }}</span>
           <span class="toolbar-spacer"></span>
           <button
-            class="btn btn-sm"
-            @click="resetDailySlotsConsumed"
-            :disabled="slots.resetting"
-          >
-            {{ slots.resetting ? "..." : "重置今日消耗" }}
-          </button>
-          <button
             class="btn btn-primary btn-sm"
-            @click="saveDailySlotsSettings"
-            :disabled="slots.saving"
+            @click="saveTvlOffset"
+            :disabled="tvlOffset.saving"
           >
-            {{ slots.saving ? "保存中..." : "保存" }}
+            {{ tvlOffset.saving ? "保存中..." : "保存" }}
           </button>
         </div>
       </div>

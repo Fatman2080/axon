@@ -172,8 +172,6 @@ export interface DailySlotsResponse {
   total: number;
   consumed: number;
   remaining: number;
-  resetHour: number;
-  resetsAt: string;
 }
 
 export interface VaultPosition {

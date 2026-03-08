@@ -58,6 +58,9 @@ func (s *Server) refreshPublicCache() {
 		m[key] = data
 	}
 
+	// TVL offset from admin settings
+	tvlOffset := s.store.getTvlOffset()
+
 	// --- agent list (used by vault_stats, vault_overview, agent_market) ---
 	items, err := s.store.listAgentStats("")
 	if err != nil {
@@ -79,12 +82,12 @@ func (s *Server) refreshPublicCache() {
 		activeCount++
 	}
 	marshal("vault_stats", echo.Map{
-		"totalTvl":            totalTvl,
+		"totalTvl":            totalTvl + tvlOffset,
 		"totalEvmBalance":     totalEvmBalance,
 		"totalL1Value":        totalL1Value,
 		"agentCount":          activeCount,
 		"totalInitialCapital": totalInitialCapital,
-		"treasuryTotal":       s.getTreasuryTotal(),
+		"treasuryTotal":       s.getTreasuryTotal() + tvlOffset,
 	})
 
 	// vault_overview
@@ -106,6 +109,7 @@ func (s *Server) refreshPublicCache() {
 	if fills, err := s.store.listRecentFillsForActiveAgents(50); err == nil {
 		overview.RecentFills = fills
 	}
+	overview.TotalTvl += tvlOffset
 	marshal("vault_overview", overview)
 
 	// agent_market (no search filter)
@@ -152,13 +156,20 @@ func (s *Server) refreshPublicCache() {
 
 	// --- treasury ---
 	if snap, err := s.store.getLatestTreasurySnapshot(); err == nil && snap != nil {
-		marshal("treasury", snap)
+		offsetSnap := *snap
+		offsetSnap.TotalFunds += tvlOffset
+		marshal("treasury", &offsetSnap)
 	}
 
 	// --- treasury_history:{period} ---
 	for _, period := range []string{"24h", "7d", "30d", "ALL"} {
 		if hist, err := s.store.listTreasurySnapshots(200, period); err == nil {
-			marshal("treasury_history:"+period, hist)
+			offsetHist := make([]TreasurySnapshot, len(hist))
+			for i, h := range hist {
+				offsetHist[i] = h
+				offsetHist[i].TotalFunds += tvlOffset
+			}
+			marshal("treasury_history:"+period, offsetHist)
 		}
 	}
 
@@ -167,7 +178,7 @@ func (s *Server) refreshPublicCache() {
 	if err == nil && latest != nil {
 		growth := s.store.getPlatformGrowth("7d")
 		marshal("platform_stats", echo.Map{
-			"totalTvl":        latest.TotalTVL,
+			"totalTvl":        latest.TotalTVL + tvlOffset,
 			"totalPnl":        latest.TotalPnL,
 			"totalCapital":    latest.TotalCapital,
 			"agentCount":      latest.ActiveAgentCount,
@@ -182,7 +193,12 @@ func (s *Server) refreshPublicCache() {
 	// --- platform_history:{period} ---
 	for _, period := range []string{"24h", "7d", "30d", "ALL"} {
 		if hist, err := s.store.listPlatformSnapshots(200, period); err == nil {
-			marshal("platform_history:"+period, hist)
+			offsetPHist := make([]PlatformSnapshot, len(hist))
+			for i, h := range hist {
+				offsetPHist[i] = h
+				offsetPHist[i].TotalTVL += tvlOffset
+			}
+			marshal("platform_history:"+period, offsetPHist)
 		}
 	}
 
