@@ -20,6 +20,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const Agents = () => {
   const { t } = useLanguage();
   const [vaultOverview, setVaultOverview] = useState<VaultOverview | null>(null);
+  const [treasury, setTreasury] = useState<TreasurySnapshot | null>(null);
   const [treasuryHistory, setTreasuryHistory] = useState<TreasurySnapshot[]>([]);
   const [chartPeriod, setChartPeriod] = useState('1D');
 
@@ -37,6 +38,7 @@ const Agents = () => {
         });
       }).catch(() => {});
     });
+    marketApi.getTreasury().then(setTreasury).catch(() => {});
   }, []);
 
   const periodToApi = (period: string) => {
@@ -77,7 +79,7 @@ const Agents = () => {
     loadTreasuryHistory();
   }, [chartPeriod]);
 
-  const totalTvl = (vaultOverview?.totalL1Value ?? 0) + (vaultOverview?.totalEvmBalance ?? 0);
+  const totalTvl = treasury?.totalFunds ?? vaultOverview?.totalTvl ?? 0;
   const totalPnl = vaultOverview?.totalPnl ?? 0;
   const agentCount = vaultOverview?.agentCount ?? 0;
   const totalInitialCapital = vaultOverview?.totalInitialCapital ?? 0;

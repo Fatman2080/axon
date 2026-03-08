@@ -65,15 +65,6 @@ const Home = () => {
     return () => clearInterval(refreshInterval);
   }, [dispatch]);
 
-  useEffect(() => {
-    if (!dailySlots) return;
-    const resetTime = new Date(dailySlots.resetsAt).getTime();
-    const diff = resetTime - Date.now();
-    if (diff <= 0) { fetchSlots(); return; }
-    const timer = setTimeout(fetchSlots, diff);
-    return () => clearTimeout(timer);
-  }, [dailySlots]);
-
   const stats = vaultStats ?? defaultStats;
   const agentCount = stats?.agentCount || strategies?.length || 0;
   const tvlValue = treasury?.totalFunds ?? 0;
@@ -213,9 +204,6 @@ const Home = () => {
               }}
             />
           </div>
-          <p className="text-xs font-mono animate-pulse" style={{ color: 'var(--text-tertiary)' }}>
-            {t('home.dailySlots.resets')}
-          </p>
         </div>
 
         {/* Stats Grid */}

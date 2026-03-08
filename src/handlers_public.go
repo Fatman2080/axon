@@ -494,8 +494,9 @@ func (s *Server) handleVaultStats(c echo.Context) error {
 		activeCount++
 	}
 
+	offset := s.store.getTvlOffset()
 	return c.JSON(http.StatusOK, echo.Map{
-		"totalTvl":            totalTvl,
+		"totalTvl":            totalTvl + offset,
 		"totalEvmBalance":     totalEvmBalance,
 		"totalL1Value":        totalL1Value,
 		"agentCount":          activeCount,
@@ -536,6 +537,7 @@ func (s *Server) handleVaultOverview(c echo.Context) error {
 		overview.RecentFills = fills
 	}
 
+	overview.TotalTvl += s.store.getTvlOffset()
 	return c.JSON(http.StatusOK, overview)
 }
 
@@ -660,7 +662,7 @@ func (s *Server) getTreasuryTotal() float64 {
 	if err != nil {
 		return 0
 	}
-	return snap.TotalFunds
+	return snap.TotalFunds + s.store.getTvlOffset()
 }
 
 func (s *Server) handlePublicTreasury(c echo.Context) error {
@@ -671,7 +673,9 @@ func (s *Server) handlePublicTreasury(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusOK, echo.Map{})
 	}
-	return c.JSON(http.StatusOK, snap)
+	offsetSnap := *snap
+	offsetSnap.TotalFunds += s.store.getTvlOffset()
+	return c.JSON(http.StatusOK, &offsetSnap)
 }
 
 func (s *Server) handlePublicTreasuryHistory(c echo.Context) error {
@@ -686,6 +690,12 @@ func (s *Server) handlePublicTreasuryHistory(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_treasury_history"})
 	}
+	offset := s.store.getTvlOffset()
+	if offset != 0 {
+		for i := range items {
+			items[i].TotalFunds += offset
+		}
+	}
 	return c.JSON(http.StatusOK, items)
 }
 
@@ -694,6 +704,7 @@ func (s *Server) handlePlatformStats(c echo.Context) error {
 		return c.JSONBlob(http.StatusOK, data)
 	}
 	latest, err := s.store.getLatestPlatformSnapshot()
+	pOffset := s.store.getTvlOffset()
 	if err != nil || latest == nil {
 		items, listErr := s.store.listAgentStats("")
 		if listErr != nil {
@@ -716,7 +727,7 @@ func (s *Server) handlePlatformStats(c echo.Context) error {
 		_ = s.store.db.QueryRow(`SELECT COUNT(1) FROM agent_fills`).Scan(&totalTrades)
 
 		return c.JSON(http.StatusOK, echo.Map{
-			"totalTvl":        totalTvl,
+			"totalTvl":        totalTvl + pOffset,
 			"totalPnl":        totalPnl,
 			"totalCapital":    totalCapital,
 			"agentCount":      activeCount,
@@ -729,7 +740,7 @@ func (s *Server) handlePlatformStats(c echo.Context) error {
 	}
 	growth := s.store.getPlatformGrowth("7d")
 	return c.JSON(http.StatusOK, echo.Map{
-		"totalTvl":        latest.TotalTVL,
+		"totalTvl":        latest.TotalTVL + pOffset,
 		"totalPnl":        latest.TotalPnL,
 		"totalCapital":    latest.TotalCapital,
 		"agentCount":      latest.ActiveAgentCount,
@@ -761,6 +772,12 @@ func (s *Server) handlePlatformHistory(c echo.Context) error {
 	items, err := s.store.listPlatformSnapshots(limit, period)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_load_platform_history"})
+	}
+	pOffset := s.store.getTvlOffset()
+	if pOffset != 0 {
+		for i := range items {
+			items[i].TotalTVL += pOffset
+		}
 	}
 	return c.JSON(http.StatusOK, items)
 }

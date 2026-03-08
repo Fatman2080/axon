@@ -1102,156 +1102,26 @@ func (s *Store) getSettingDefaultTx(tx *sql.Tx, key string, defaultVal string) (
 }
 
 func (s *Store) getDailySlots() (DailySlots, error) {
-	totalStr := s.getSettingDefault("daily_slots_total", "1000")
-	resetHourStr := s.getSettingDefault("daily_slots_reset_hour", "0")
-	consumedStr := s.getSettingDefault("daily_slots_consumed", "0")
-	resetAtStr := s.getSettingDefault("daily_slots_reset_at", "")
-
+	totalStr := s.getSettingDefault("intern_slots_total", "100")
 	total, _ := strconv.Atoi(totalStr)
 	if total <= 0 {
-		total = 1000
+		total = 100
 	}
-	resetHour, _ := strconv.Atoi(resetHourStr)
-	if resetHour < 0 || resetHour > 23 {
-		resetHour = 0
-	}
-	consumed, _ := strconv.Atoi(consumedStr)
-
-	now := time.Now().UTC()
-	cycleStart := time.Date(now.Year(), now.Month(), now.Day(), resetHour, 0, 0, 0, time.UTC)
-	if now.Before(cycleStart) {
-		cycleStart = cycleStart.Add(-24 * time.Hour)
-	}
-	cycleEnd := cycleStart.Add(24 * time.Hour)
-
-	// Lazy reset: if stored reset_at is before current cycle start, reset consumed
-	needsReset := false
-	if resetAtStr == "" {
-		needsReset = true
-	} else {
-		storedResetAt, err := time.Parse(time.RFC3339, resetAtStr)
-		if err != nil || storedResetAt.Before(cycleStart) {
-			needsReset = true
-		}
-	}
-	if needsReset {
-		consumed = 0
-		_ = s.setSetting("daily_slots_consumed", "0")
-		_ = s.setSetting("daily_slots_reset_at", cycleStart.Format(time.RFC3339))
-	}
-
+	var consumed int
+	_ = s.db.QueryRow(`SELECT COUNT(1) FROM agent_accounts a
+		JOIN agent_vaults v ON lower(a.vault_address) = lower(v.vault_address)
+		WHERE a.vault_address != '' AND v.valid = 1 AND a.status = 'assigned'`).Scan(&consumed)
 	remaining := total - consumed
 	if remaining < 0 {
 		remaining = 0
 	}
-
-	return DailySlots{
-		Total:     total,
-		Consumed:  consumed,
-		Remaining: remaining,
-		ResetHour: resetHour,
-		ResetsAt:  cycleEnd,
-	}, nil
+	return DailySlots{Total: total, Consumed: consumed, Remaining: remaining}, nil
 }
 
-func (s *Store) consumeDailySlotTx(tx *sql.Tx) error {
-	totalStr, err := s.getSettingDefaultTx(tx, "daily_slots_total", "1000")
-	if err != nil {
-		return err
-	}
-	resetHourStr, err := s.getSettingDefaultTx(tx, "daily_slots_reset_hour", "0")
-	if err != nil {
-		return err
-	}
-	consumedStr, err := s.getSettingDefaultTx(tx, "daily_slots_consumed", "0")
-	if err != nil {
-		return err
-	}
-	resetAtStr, err := s.getSettingDefaultTx(tx, "daily_slots_reset_at", "")
-	if err != nil {
-		return err
-	}
-
-	total, _ := strconv.Atoi(totalStr)
-	if total <= 0 {
-		total = 1000
-	}
-	resetHour, _ := strconv.Atoi(resetHourStr)
-	if resetHour < 0 || resetHour > 23 {
-		resetHour = 0
-	}
-	consumed, _ := strconv.Atoi(consumedStr)
-
-	now := time.Now().UTC()
-	cycleStart := time.Date(now.Year(), now.Month(), now.Day(), resetHour, 0, 0, 0, time.UTC)
-	if now.Before(cycleStart) {
-		cycleStart = cycleStart.Add(-24 * time.Hour)
-	}
-
-	needsReset := false
-	if resetAtStr == "" {
-		needsReset = true
-	} else {
-		storedResetAt, parseErr := time.Parse(time.RFC3339, resetAtStr)
-		if parseErr != nil || storedResetAt.Before(cycleStart) {
-			needsReset = true
-		}
-	}
-	if needsReset {
-		consumed = 0
-		if err := s.setSettingTx(tx, "daily_slots_consumed", "0"); err != nil {
-			return err
-		}
-		if err := s.setSettingTx(tx, "daily_slots_reset_at", cycleStart.Format(time.RFC3339)); err != nil {
-			return err
-		}
-	}
-
-	if consumed >= total {
-		return errNoSlotsRemaining
-	}
-	if err := s.setSettingTx(tx, "daily_slots_consumed", strconv.Itoa(consumed)); err != nil {
-		return err
-	}
-	res, err := tx.Exec(`
-		UPDATE settings
-		SET value = CAST(value AS INTEGER) + 1, updated_at = ?
-		WHERE key = 'daily_slots_consumed'
-		  AND CAST(value AS INTEGER) < ?`,
-		nowISO(), total,
-	)
-	if err != nil {
-		return err
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		return errNoSlotsRemaining
-	}
-
-	return nil
-}
-
-func (s *Store) consumeDailySlot() (DailySlots, error) {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return DailySlots{}, err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.consumeDailySlotTx(tx); err != nil {
-		if errors.Is(err, errNoSlotsRemaining) {
-			current, _ := s.getDailySlots()
-			return current, err
-		}
-		return DailySlots{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		return DailySlots{}, err
-	}
-	return s.getDailySlots()
+func (s *Store) getTvlOffset() float64 {
+	str := s.getSettingDefault("tvl_offset", "0")
+	v, _ := strconv.ParseFloat(str, 64)
+	return v
 }
 
 func boolToInt(v bool) int {

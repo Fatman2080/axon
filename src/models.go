@@ -102,11 +102,9 @@ type DashboardStats struct {
 }
 
 type DailySlots struct {
-	Total     int       `json:"total"`
-	Consumed  int       `json:"consumed"`
-	Remaining int       `json:"remaining"`
-	ResetHour int       `json:"resetHour"`
-	ResetsAt  time.Time `json:"resetsAt"`
+	Total     int `json:"total"`
+	Consumed  int `json:"consumed"`
+	Remaining int `json:"remaining"`
 }
 
 type VaultRecord struct {

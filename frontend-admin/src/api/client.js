@@ -122,12 +122,20 @@ export const adminApi = {
         const { data } = await http.patch('/admin/api/settings/xoauth', payload);
         return data;
     },
-    async getDailySlotsSettings() {
-        const { data } = await http.get('/admin/api/settings/daily-slots');
+    async getInternSlots() {
+        const { data } = await http.get('/admin/api/settings/intern-slots');
         return data;
     },
-    async updateDailySlotsSettings(payload) {
-        const { data } = await http.patch('/admin/api/settings/daily-slots', payload);
+    async updateInternSlots(total) {
+        const { data } = await http.patch('/admin/api/settings/intern-slots', { total });
+        return data;
+    },
+    async getTvlOffset() {
+        const { data } = await http.get('/admin/api/settings/tvl-offset');
+        return data;
+    },
+    async updateTvlOffset(tvlOffset) {
+        const { data } = await http.patch('/admin/api/settings/tvl-offset', { tvlOffset });
         return data;
     },
     async getContractsSettings() {

@@ -159,13 +159,23 @@ export const adminApi = {
     return data;
   },
 
-  async getDailySlotsSettings(): Promise<{ total: number; consumed: number; remaining: number; resetHour: number; resetsAt: string }> {
-    const { data } = await http.get('/admin/api/settings/daily-slots');
+  async getInternSlots(): Promise<{ total: number; consumed: number; remaining: number }> {
+    const { data } = await http.get('/admin/api/settings/intern-slots');
     return data;
   },
 
-  async updateDailySlotsSettings(payload: { total?: number; resetHour?: number; resetConsumed?: boolean }): Promise<{ total: number; consumed: number; remaining: number; resetHour: number; resetsAt: string }> {
-    const { data } = await http.patch('/admin/api/settings/daily-slots', payload);
+  async updateInternSlots(total: number): Promise<{ total: number; consumed: number; remaining: number }> {
+    const { data } = await http.patch('/admin/api/settings/intern-slots', { total });
+    return data;
+  },
+
+  async getTvlOffset(): Promise<{ tvlOffset: number }> {
+    const { data } = await http.get('/admin/api/settings/tvl-offset');
+    return data;
+  },
+
+  async updateTvlOffset(tvlOffset: number): Promise<{ tvlOffset: number }> {
+    const { data } = await http.patch('/admin/api/settings/tvl-offset', { tvlOffset });
     return data;
   },
 
