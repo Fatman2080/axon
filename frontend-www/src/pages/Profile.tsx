@@ -15,6 +15,7 @@ import {
   Edit2,
   Check,
   X,
+  Twitter,
 } from "lucide-react";
 import { Line } from "react-chartjs-2";
 import { useLanguage } from "../context/LanguageContext";
@@ -43,6 +44,8 @@ ChartJS.register(
   Filler,
 );
 
+const SHOW_X_ON_LEADERBOARD_KEY = "profile.showXOnLeaderboard";
+
 const Profile = () => {
   const dispatch = useAppDispatch();
   const { currentUser: user, loading: userLoading } = useAppSelector(
@@ -58,6 +61,7 @@ const Profile = () => {
     totalPnl: number;
     initialCapital: number;
   } | null>(null);
+  const [showXOnLeaderboard, setShowXOnLeaderboard] = useState(false);
   const { t } = useLanguage();
 
   // Local state for fake editing
@@ -82,6 +86,18 @@ const Profile = () => {
       })
       .catch(() => {});
   }, [user]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(SHOW_X_ON_LEADERBOARD_KEY);
+    setShowXOnLeaderboard(saved === "true");
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(
+      SHOW_X_ON_LEADERBOARD_KEY,
+      String(showXOnLeaderboard),
+    );
+  }, [showXOnLeaderboard]);
 
   const periodToApi = (period: string) => {
     switch (period) {
@@ -407,14 +423,51 @@ const Profile = () => {
               className="flex items-center gap-4 text-xs font-mono"
               style={{ color: "var(--text-tertiary)" }}
             >
+              <button
+                type="button"
+                onClick={() => setShowXOnLeaderboard((value) => !value)}
+                className="flex items-center gap-2 rounded-full px-2.5 py-1 transition-colors"
+                style={{
+                  border: "1px solid var(--border)",
+                  background: showXOnLeaderboard
+                    ? "rgba(0,255,102,0.08)"
+                    : "rgba(255,255,255,0.03)",
+                  color: showXOnLeaderboard
+                    ? "var(--green)"
+                    : "var(--text-tertiary)",
+                }}
+                aria-pressed={showXOnLeaderboard}
+                aria-label={t("profile.showXOnLeaderboard")}
+              >
+                <Twitter size={12} />
+                <span>{t("profile.showXOnLeaderboard")}</span>
+                <span
+                  className="relative inline-flex h-4 w-7 items-center rounded-full transition-colors"
+                  style={{
+                    background: showXOnLeaderboard
+                      ? "rgba(0,255,102,0.25)"
+                      : "rgba(255,255,255,0.1)",
+                  }}
+                >
+                  <span
+                    className="absolute h-3 w-3 rounded-full transition-all"
+                    style={{
+                      left: showXOnLeaderboard ? "14px" : "2px",
+                      background: showXOnLeaderboard
+                        ? "var(--green)"
+                        : "var(--text-secondary)",
+                    }}
+                  />
+                </span>
+              </button>
               <span className="flex items-center gap-1.5">
                 <Calendar size={12} />
                 {t("profile.joined")}{" "}
                 {(user as any).createdAt
                   ? new Date((user as any).createdAt).toLocaleDateString()
-                  : user.joinedAt
-                    ? new Date(user.joinedAt).toLocaleDateString()
-                    : "-"}
+                    : user.joinedAt
+                      ? new Date(user.joinedAt).toLocaleDateString()
+                      : "-"}
               </span>
             </div>
           </div>

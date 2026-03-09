@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
 import { fetchStrategies } from "../store/slices/strategySlice";
-import { Link } from "react-router-dom";
-import { Search, TrendingUp, ArrowRight, Trophy, Grid } from "lucide-react";
+import { Search, TrendingUp } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 
 const tierColor = (category: string) => {
@@ -433,28 +432,13 @@ const FloatingEmojis = ({
 
 const Strategies = () => {
   const dispatch = useAppDispatch();
-  const { items: strategies, loading } = useAppSelector(
-    (state) => state.strategies,
-  );
+  useAppSelector((state) => state.strategies);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filter] = useState("all");
-  const [viewMode, setViewMode] = useState<"grid" | "leaderboard">(
-    "leaderboard",
-  );
   const { t } = useLanguage();
 
   useEffect(() => {
     dispatch(fetchStrategies());
   }, [dispatch]);
-
-  const filteredStrategies = strategies.filter((strategy) => {
-    const isActive = strategy.status === "active";
-    const matchesFilter = filter === "all" || strategy.category === filter;
-    const matchesSearch = strategy.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    return isActive && matchesFilter && matchesSearch;
-  });
 
   const isMarketEnabled = true; // import.meta.env.VITE_ENABLE_STRATEGIES === 'true';
 
@@ -509,25 +493,6 @@ const Strategies = () => {
         </div>
 
         <div className="flex flex-wrap gap-3 items-center">
-          {/* View Toggle */}
-          <div className="flex bg-[var(--bg-input)] rounded border border-[var(--border)] p-0.5">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded transition-all ${viewMode === "grid" ? "bg-[rgba(0,255,65,0.12)] text-[var(--neon-green)]" : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"}`}
-              style={{ fontFamily: "var(--font-mono)" }}
-            >
-              <Grid size={14} />
-              {t("strategies.viewMode.grid")}
-            </button>
-            <button
-              onClick={() => setViewMode("leaderboard")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded transition-all ${viewMode === "leaderboard" ? "bg-[rgba(0,255,65,0.12)] text-[var(--neon-green)]" : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"}`}
-              style={{ fontFamily: "var(--font-mono)" }}
-            >
-              <Trophy size={14} />
-              {t("strategies.viewMode.leaderboard")}
-            </button>
-          </div>
           {/* Search */}
           <div className="relative">
             <Search
@@ -560,234 +525,95 @@ const Strategies = () => {
         </div>
       </div>
 
-      {viewMode === "leaderboard" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up">
-          {/* Main Leaderboard */}
-          <div className="lg:col-span-2 rounded border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden flex flex-col">
-            <div className="overflow-x-auto custom-scrollbar">
-              <div className="min-w-[850px]">
-                {/* Table Header */}
-                <div className="grid grid-cols-12 gap-4 py-5 px-4 border-b border-[var(--border)] bg-[rgba(0,0,0,0.2)] text-xs font-mono font-bold text-[var(--text-tertiary)] uppercase tracking-wider relative overflow-hidden items-center min-h-[56px]">
-                  <FloatingEmojis
-                    emojis={["💰", "💵", "🤑", "🚀", "🔥"]}
-                    intervalRange={[2000, 6000]}
-                    direction="down-left"
-                  />
-                  <div className="col-span-1 text-center relative z-10">
-                    {t("strategies.leaderboard.rank")}
-                  </div>
-                  <div className="col-span-3 relative z-10">
-                    {t("strategies.leaderboard.agentOwner")}
-                  </div>
-                  <div className="col-span-1 relative z-10">
-                    {t("strategies.leaderboard.tier")}
-                  </div>
-                  <div className="col-span-2 text-right relative z-10">
-                    {t("strategies.leaderboard.uptime")}
-                  </div>
-                  <div className="col-span-2 text-right relative z-10">
-                    {t("strategies.leaderboard.roi30d")}
-                  </div>
-                  <div className="col-span-3 text-right relative z-10">
-                    {t("strategies.leaderboard.accountValue")}
-                  </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up">
+        {/* Main Leaderboard */}
+        <div className="lg:col-span-2 rounded border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden flex flex-col">
+          <div className="overflow-x-auto custom-scrollbar">
+            <div className="min-w-[850px]">
+              {/* Table Header */}
+              <div className="grid grid-cols-12 gap-4 py-5 px-4 border-b border-[var(--border)] bg-[rgba(0,0,0,0.2)] text-xs font-mono font-bold text-[var(--text-tertiary)] uppercase tracking-wider relative overflow-hidden items-center min-h-[56px]">
+                <FloatingEmojis
+                  emojis={["💰", "💵", "🤑", "🚀", "🔥"]}
+                  intervalRange={[2000, 6000]}
+                  direction="down-left"
+                />
+                <div className="col-span-1 text-center relative z-10">
+                  {t("strategies.leaderboard.rank")}
                 </div>
+                <div className="col-span-3 relative z-10">
+                  {t("strategies.leaderboard.agentOwner")}
+                </div>
+                <div className="col-span-1 relative z-10">
+                  {t("strategies.leaderboard.tier")}
+                </div>
+                <div className="col-span-2 text-right relative z-10">
+                  {t("strategies.leaderboard.uptime")}
+                </div>
+                <div className="col-span-2 text-right relative z-10">
+                  {t("strategies.leaderboard.roi30d")}
+                </div>
+                <div className="col-span-3 text-right relative z-10">
+                  {t("strategies.leaderboard.accountValue")}
+                </div>
+              </div>
 
-                {/* Table Body */}
-                <div className="flex flex-col">
-                  {mockLeaderboardData.map((item) => (
-                    <LeaderboardRow key={item.id} item={item} />
-                  ))}
-                </div>
+              {/* Table Body */}
+              <div className="flex flex-col">
+                {mockLeaderboardData.map((item) => (
+                  <LeaderboardRow key={item.id} item={item} />
+                ))}
               </div>
             </div>
           </div>
-
-          {/* Eliminated List */}
-          <div className="lg:col-span-1 rounded border border-[#3C161D] bg-[#12070A] overflow-hidden flex flex-col">
-            <div className="py-5 px-4 border-b border-[#3C161D] bg-[#1A0A0E] text-xs font-mono font-bold text-[#FF4B4B] uppercase tracking-wider flex items-center gap-2 relative overflow-hidden min-h-[56px]">
-              <FloatingEmojis
-                emojis={["💣", "💀", "📉", "🩸", "😭"]}
-                intervalRange={[3000, 7000]}
-                direction="down-right"
-              />
-              <span className="w-2 h-2 rounded-full bg-[#FF4B4B] animate-pulse relative z-10"></span>
-              <span className="relative z-10">
-                {t("strategies.leaderboard.eliminatedList")}
-              </span>
-            </div>
-
-            <div className="flex flex-col overflow-y-auto max-h-[700px] custom-scrollbar">
-              {mockEliminatedData.map((item) => (
-                <div
-                  key={item.id}
-                  className="py-2.5 px-4 border-b border-[#2A0F14] hover:bg-[#1A0A0E] transition-colors flex justify-between items-center text-sm font-mono text-[#D4C3C6]"
-                >
-                  <div className="flex flex-col gap-1">
-                    <span
-                      className="font-bold text-[#FF7A7A] truncate max-w-[120px]"
-                      title={item.agentName}
-                    >
-                      {item.agentName}
-                    </span>
-                    <span className="text-[10px] text-[#FF4B4B] opacity-80 uppercase">
-                      {t("strategies.leaderboard.hoursAgo").replace(
-                        "{h}",
-                        item.eliminatedHoursAgo.toString(),
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-[10px] text-[var(--text-tertiary)] border border-[var(--text-tertiary)] rounded px-1 uppercase">
-                      {item.category}
-                    </span>
-                    <span className="text-[10px] opacity-70 border-b border-dotted border-[#6A4040]">
-                      {t("strategies.leaderboard.survived")} {item.uptime}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
-      ) : /* Cards */
-      loading ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div
-              key={i}
-              className="h-60 rounded animate-pulse"
-              style={{ background: "var(--bg-card)" }}
+
+        {/* Eliminated List */}
+        <div className="lg:col-span-1 rounded border border-[#3C161D] bg-[#12070A] overflow-hidden flex flex-col">
+          <div className="py-5 px-4 border-b border-[#3C161D] bg-[#1A0A0E] text-xs font-mono font-bold text-[#FF4B4B] uppercase tracking-wider flex items-center gap-2 relative overflow-hidden min-h-[56px]">
+            <FloatingEmojis
+              emojis={["💣", "💀", "📉", "🩸", "😭"]}
+              intervalRange={[3000, 7000]}
+              direction="down-right"
             />
-          ))}
-        </div>
-      ) : filteredStrategies.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <TrendingUp
-            size={40}
-            className="mb-4"
-            style={{ color: "var(--text-tertiary)" }}
-          />
-          <p
-            className="font-mono text-sm"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            // NO_AGENTS_FOUND
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredStrategies.map((strategy) => {
-            const tier = tierColor(strategy.category);
-            const pnlPositive = strategy.pnlContribution >= 0;
+            <span className="w-2 h-2 rounded-full bg-[#FF4B4B] animate-pulse relative z-10"></span>
+            <span className="relative z-10">
+              {t("strategies.leaderboard.eliminatedList")}
+            </span>
+          </div>
 
-            return (
+          <div className="flex flex-col overflow-y-auto max-h-[700px] custom-scrollbar">
+            {mockEliminatedData.map((item) => (
               <div
-                key={strategy.id}
-                className="group flex flex-col justify-between rounded p-5 transition-all duration-200"
-                style={{
-                  background: "var(--bg-card)",
-                  border: "1px solid var(--border)",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor =
-                    "var(--border-hover)";
-                  (e.currentTarget as HTMLElement).style.background =
-                    "var(--bg-card-hover)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor =
-                    "var(--border)";
-                  (e.currentTarget as HTMLElement).style.background =
-                    "var(--bg-card)";
-                }}
+                key={item.id}
+                className="py-2.5 px-4 border-b border-[#2A0F14] hover:bg-[#1A0A0E] transition-colors flex justify-between items-center text-sm font-mono text-[#D4C3C6]"
               >
-                <div>
-                  <div className="mb-4 flex items-start justify-between">
-                    <div>
-                      <span
-                        className="inline-block text-[10px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded mb-2"
-                        style={{
-                          background: tier.bg,
-                          color: tier.text,
-                          border: `1px solid ${tier.border}`,
-                        }}
-                      >
-                        {strategy.category}
-                      </span>
-                      <h3
-                        className="text-base font-bold"
-                        style={{ color: "var(--text-primary)" }}
-                      >
-                        {strategy.name}
-                      </h3>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 mb-5">
-                    {/* PnL */}
-                    <div className="flex justify-between text-sm items-center">
-                      <span
-                        className="font-mono text-xs uppercase tracking-widest"
-                        style={{ color: "var(--text-tertiary)" }}
-                      >
-                        {t("strategies.card.apr")}
-                      </span>
-                      <span
-                        className="font-mono font-bold"
-                        style={{
-                          color: pnlPositive ? "var(--green)" : "var(--red)",
-                        }}
-                      >
-                        {pnlPositive ? "+" : ""}
-                        {strategy.pnlContribution.toFixed(2)}
-                      </span>
-                    </div>
-
-                    {/* TVL */}
-                    <div>
-                      <div className="flex justify-between text-sm items-center mb-1.5">
-                        <span
-                          className="font-mono text-xs uppercase tracking-widest"
-                          style={{ color: "var(--text-tertiary)" }}
-                        >
-                          {t("strategies.card.tvl")}
-                        </span>
-                        <span
-                          className="font-mono text-sm"
-                          style={{ color: "var(--text-primary)" }}
-                        >
-                          ${strategy.currentTvl.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                <div className="flex flex-col gap-1">
+                  <span
+                    className="font-bold text-[#FF7A7A] truncate max-w-[120px]"
+                    title={item.agentName}
+                  >
+                    {item.agentName}
+                  </span>
+                  <span className="text-[10px] text-[#FF4B4B] opacity-80 uppercase">
+                    {t("strategies.leaderboard.hoursAgo").replace(
+                      "{h}",
+                      item.eliminatedHoursAgo.toString(),
+                    )}
+                  </span>
                 </div>
-
-                <Link
-                  to={`/strategies/${strategy.id}`}
-                  className="flex items-center justify-between text-sm font-mono font-bold transition-all group-hover:gap-3 pt-4"
-                  style={{
-                    color: "var(--text-secondary)",
-                    borderTop: "1px solid var(--border)",
-                  }}
-                  onMouseEnter={(e) =>
-                    ((e.currentTarget as HTMLElement).style.color =
-                      "var(--neon-green)")
-                  }
-                  onMouseLeave={(e) =>
-                    ((e.currentTarget as HTMLElement).style.color =
-                      "var(--text-secondary)")
-                  }
-                >
-                  {t("strategies.card.hire")}
-                  <ArrowRight size={14} />
-                </Link>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-[10px] text-[var(--text-tertiary)] border border-[var(--text-tertiary)] rounded px-1 uppercase">
+                    {item.category}
+                  </span>
+                  <span className="text-[10px] opacity-70 border-b border-dotted border-[#6A4040]">
+                    {t("strategies.leaderboard.survived")} {item.uptime}
+                  </span>
+                </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
