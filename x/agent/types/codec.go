@@ -25,7 +25,7 @@ func RegisterInterfaces(registry types.InterfaceRegistry) {
 		&MsgSubmitAIChallengeResponse{},
 		&MsgRevealAIChallengeResponse{},
 	)
-	msgservice.RegisterMsgServiceDesc(registry, &_Msg_serviceDesc)
+	msgservice.RegisterMsgServiceDesc(registry, &Msg_ServiceDesc)
 }
 
 var (

@@ -10,9 +10,18 @@ import (
 	"github.com/axon-chain/axon/x/agent/types"
 )
 
-var _ types.QueryServer = Keeper{}
+type queryServer struct {
+	types.UnimplementedQueryServer
+	Keeper
+}
 
-func (k Keeper) Params(goCtx context.Context, req *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
+var _ types.QueryServer = queryServer{}
+
+func NewQueryServerImpl(keeper Keeper) types.QueryServer {
+	return &queryServer{Keeper: keeper}
+}
+
+func (k queryServer) Params(goCtx context.Context, req *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -20,7 +29,7 @@ func (k Keeper) Params(goCtx context.Context, req *types.QueryParamsRequest) (*t
 	return &types.QueryParamsResponse{Params: k.GetParams(ctx)}, nil
 }
 
-func (k Keeper) Agent(goCtx context.Context, req *types.QueryAgentRequest) (*types.QueryAgentResponse, error) {
+func (k queryServer) Agent(goCtx context.Context, req *types.QueryAgentRequest) (*types.QueryAgentResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -34,7 +43,7 @@ func (k Keeper) Agent(goCtx context.Context, req *types.QueryAgentRequest) (*typ
 	return &types.QueryAgentResponse{Agent: &agent}, nil
 }
 
-func (k Keeper) Agents(goCtx context.Context, req *types.QueryAgentsRequest) (*types.QueryAgentsResponse, error) {
+func (k queryServer) Agents(goCtx context.Context, req *types.QueryAgentsRequest) (*types.QueryAgentsResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -43,7 +52,7 @@ func (k Keeper) Agents(goCtx context.Context, req *types.QueryAgentsRequest) (*t
 	return &types.QueryAgentsResponse{Agents: agents}, nil
 }
 
-func (k Keeper) Reputation(goCtx context.Context, req *types.QueryReputationRequest) (*types.QueryReputationResponse, error) {
+func (k queryServer) Reputation(goCtx context.Context, req *types.QueryReputationRequest) (*types.QueryReputationResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -52,7 +61,7 @@ func (k Keeper) Reputation(goCtx context.Context, req *types.QueryReputationRequ
 	return &types.QueryReputationResponse{Reputation: rep}, nil
 }
 
-func (k Keeper) CurrentChallenge(goCtx context.Context, req *types.QueryCurrentChallengeRequest) (*types.QueryCurrentChallengeResponse, error) {
+func (k queryServer) CurrentChallenge(goCtx context.Context, req *types.QueryCurrentChallengeRequest) (*types.QueryCurrentChallengeResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
