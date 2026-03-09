@@ -71,10 +71,16 @@ func (s *Store) dashboardStatsEnhanced() (DashboardStatsEnhanced, error) {
 		s.db.QueryRow(`SELECT COUNT(1) FROM invite_codes WHERE used_count > 0`).Scan(&totalUsed)
 		stats.InviteConversionRate = float64(totalUsed) / float64(stats.TotalInviteCodes)
 	}
-	stats.TopInviteCodes = s.getTopInviteCodes(5)
+	topCodes, err := s.getTopInviteCodes(5)
+	if err != nil {
+		return stats, err
+	}
+	stats.TopInviteCodes = topCodes
 
 	// 4.5) Agent performance summary
-	s.fillAgentPerfSummary(&stats)
+	if err := s.fillAgentPerfSummary(&stats); err != nil {
+		return stats, err
+	}
 
 	// 5) System health
 	stats.LastSyncAt = s.getSettingDefault("last_sync_at", "")
@@ -90,7 +96,7 @@ func (s *Store) dashboardStatsEnhanced() (DashboardStatsEnhanced, error) {
 	return stats, nil
 }
 
-func (s *Store) fillAgentPerfSummary(stats *DashboardStatsEnhanced) {
+func (s *Store) fillAgentPerfSummary(stats *DashboardStatsEnhanced) error {
 	// Query per-agent PnL from agent_vaults
 	rows, err := s.db.Query(`
 		SELECT v.user_address,
@@ -101,7 +107,7 @@ func (s *Store) fillAgentPerfSummary(stats *DashboardStatsEnhanced) {
 		LEFT JOIN agent_accounts a ON lower(a.public_key) = lower(v.user_address)
 		WHERE v.user_address != '' AND v.initial_capital > 0`)
 	if err != nil {
-		return
+		return err
 	}
 	defer rows.Close()
 
@@ -112,7 +118,7 @@ func (s *Store) fillAgentPerfSummary(stats *DashboardStatsEnhanced) {
 		var ap agentPnl
 		var accountValue, initialCapital float64
 		if err := rows.Scan(&ap.publicKey, &ap.name, &accountValue, &initialCapital); err != nil {
-			continue
+			return err
 		}
 		ap.initialCapital = initialCapital
 		ap.pnl = accountValue - initialCapital
@@ -121,6 +127,9 @@ func (s *Store) fillAgentPerfSummary(stats *DashboardStatsEnhanced) {
 		}
 		totalROI += ap.roi
 		agents = append(agents, ap)
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 
 	if len(agents) > 0 {
@@ -152,6 +161,7 @@ func (s *Store) fillAgentPerfSummary(stats *DashboardStatsEnhanced) {
 			ROI:       best[i].roi,
 		})
 	}
+	return nil
 }
 
 type agentPnl struct {
@@ -168,7 +178,7 @@ func sortAgentPnl(agents []agentPnl) {
 	})
 }
 
-func (s *Store) getTopInviteCodes(limit int) []InviteCodeSummary {
+func (s *Store) getTopInviteCodes(limit int) ([]InviteCodeSummary, error) {
 	rows, err := s.db.Query(`
 		SELECT code, used_count, IFNULL(max_uses, 0)
 		FROM invite_codes
@@ -176,7 +186,7 @@ func (s *Store) getTopInviteCodes(limit int) []InviteCodeSummary {
 		ORDER BY used_count DESC
 		LIMIT ?`, limit)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -184,11 +194,11 @@ func (s *Store) getTopInviteCodes(limit int) []InviteCodeSummary {
 	for rows.Next() {
 		var item InviteCodeSummary
 		if err := rows.Scan(&item.Code, &item.UsedCount, &item.MaxUses); err != nil {
-			continue
+			return nil, err
 		}
 		items = append(items, item)
 	}
-	return items
+	return items, rows.Err()
 }
 
 // --- Treasury snapshots ---
@@ -403,22 +413,22 @@ func (s *Store) getAgentPerformance(publicKey string) (AgentPerformance, error) 
 			       ),
 			       IFNULL(initial_capital, 0)
 			FROM agent_accounts
-			WHERE public_key = ?`, publicKey, publicKey).Scan(&accountValue, &initialCapital)
+			WHERE lower(public_key) = ?`, publicKey, publicKey).Scan(&accountValue, &initialCapital)
 	}
 	if initialCapital > 0 {
 		perf.ROI = (accountValue - initialCapital) / initialCapital
 	}
 
-	// Win rate + PnL from agent_fills using json_extract
+	// Win rate + PnL from structured agent_vault_orders columns
 	var totalFills, profitableFills int
 	var totalClosedPnl, sumWin, sumLoss float64
 	err = s.db.QueryRow(`
 		SELECT COUNT(1),
-		       IFNULL(SUM(CASE WHEN CAST(json_extract(data_json, '$.closedPnl') AS REAL) > 0 THEN 1 ELSE 0 END), 0),
-		       IFNULL(SUM(CAST(json_extract(data_json, '$.closedPnl') AS REAL)), 0),
-		       IFNULL(SUM(CASE WHEN CAST(json_extract(data_json, '$.closedPnl') AS REAL) > 0 THEN CAST(json_extract(data_json, '$.closedPnl') AS REAL) ELSE 0 END), 0),
-		       IFNULL(SUM(CASE WHEN CAST(json_extract(data_json, '$.closedPnl') AS REAL) < 0 THEN CAST(json_extract(data_json, '$.closedPnl') AS REAL) ELSE 0 END), 0)
-		FROM agent_fills WHERE public_key = ?`, publicKey,
+		       IFNULL(SUM(CASE WHEN closed_pnl > 0 THEN 1 ELSE 0 END), 0),
+		       IFNULL(SUM(closed_pnl), 0),
+		       IFNULL(SUM(CASE WHEN closed_pnl > 0 THEN closed_pnl ELSE 0 END), 0),
+		       IFNULL(SUM(CASE WHEN closed_pnl < 0 THEN closed_pnl ELSE 0 END), 0)
+		FROM agent_vault_orders WHERE lower(agent_vault_user) = ?`, publicKey,
 	).Scan(&totalFills, &profitableFills, &totalClosedPnl, &sumWin, &sumLoss)
 	if err == nil {
 		perf.TotalFills = totalFills
@@ -437,10 +447,18 @@ func (s *Store) getAgentPerformance(publicKey string) (AgentPerformance, error) 
 	}
 
 	// Max drawdown from agent_snapshots
-	perf.MaxDrawdown = s.calcMaxDrawdown(publicKey)
+	maxDrawdown, err := s.calcMaxDrawdown(publicKey)
+	if err != nil {
+		return perf, err
+	}
+	perf.MaxDrawdown = maxDrawdown
 
 	// Sharpe ratio from daily returns
-	perf.SharpeRatio = s.calcSharpeRatio(publicKey)
+	sharpe, err := s.calcSharpeRatio(publicKey)
+	if err != nil {
+		return perf, err
+	}
+	perf.SharpeRatio = sharpe
 
 	// Trading frequency
 	createdAt := s.getAgentCreatedAt(publicKey)
@@ -457,13 +475,13 @@ func (s *Store) getAgentPerformance(publicKey string) (AgentPerformance, error) 
 	return perf, nil
 }
 
-func (s *Store) calcMaxDrawdown(publicKey string) float64 {
+func (s *Store) calcMaxDrawdown(publicKey string) (float64, error) {
 	rows, err := s.db.Query(`
 		SELECT account_value FROM agent_snapshots
 		WHERE public_key = ?
 		ORDER BY created_at ASC`, publicKey)
 	if err != nil {
-		return 0
+		return 0, err
 	}
 	defer rows.Close()
 
@@ -471,7 +489,7 @@ func (s *Store) calcMaxDrawdown(publicKey string) float64 {
 	for rows.Next() {
 		var val float64
 		if err := rows.Scan(&val); err != nil {
-			continue
+			return 0, err
 		}
 		if val > peak {
 			peak = val
@@ -483,10 +501,10 @@ func (s *Store) calcMaxDrawdown(publicKey string) float64 {
 			}
 		}
 	}
-	return maxDD
+	return maxDD, rows.Err()
 }
 
-func (s *Store) calcSharpeRatio(publicKey string) float64 {
+func (s *Store) calcSharpeRatio(publicKey string) (float64, error) {
 	// Get daily end-of-day values
 	rows, err := s.db.Query(`
 		SELECT date(created_at) AS d, account_value
@@ -496,7 +514,7 @@ func (s *Store) calcSharpeRatio(publicKey string) float64 {
 		HAVING created_at = MAX(created_at)
 		ORDER BY d ASC`, publicKey)
 	if err != nil {
-		return 0
+		return 0, err
 	}
 	defer rows.Close()
 
@@ -505,13 +523,16 @@ func (s *Store) calcSharpeRatio(publicKey string) float64 {
 		var d string
 		var v float64
 		if err := rows.Scan(&d, &v); err != nil {
-			continue
+			return 0, err
 		}
 		values = append(values, v)
 	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
 
 	if len(values) < 3 {
-		return 0
+		return 0, nil
 	}
 
 	// Calculate daily returns
@@ -523,7 +544,7 @@ func (s *Store) calcSharpeRatio(publicKey string) float64 {
 	}
 
 	if len(returns) < 2 {
-		return 0
+		return 0, nil
 	}
 
 	// Mean and stddev
@@ -542,10 +563,10 @@ func (s *Store) calcSharpeRatio(publicKey string) float64 {
 	stddev := math.Sqrt(variance)
 
 	if stddev == 0 {
-		return 0
+		return 0, nil
 	}
 
-	return (mean / stddev) * math.Sqrt(365)
+	return (mean / stddev) * math.Sqrt(365), nil
 }
 
 func (s *Store) getAgentLeaderboard(sortBy string, limit int) ([]AgentLeaderboardItem, error) {
@@ -555,17 +576,17 @@ func (s *Store) getAgentLeaderboard(sortBy string, limit int) ([]AgentLeaderboar
 
 	// Get per-agent fill stats
 	rows, err := s.db.Query(`
-		SELECT f.public_key,
+		SELECT lower(f.agent_vault_user),
 		       IFNULL(a.name, ''),
 		       COUNT(1) AS total_fills,
-		       IFNULL(SUM(CASE WHEN CAST(json_extract(f.data_json, '$.closedPnl') AS REAL) > 0 THEN 1 ELSE 0 END), 0) AS profitable_fills,
-		       IFNULL(SUM(CAST(json_extract(f.data_json, '$.closedPnl') AS REAL)), 0) AS total_closed_pnl,
+		       IFNULL(SUM(CASE WHEN f.closed_pnl > 0 THEN 1 ELSE 0 END), 0) AS profitable_fills,
+		       IFNULL(SUM(f.closed_pnl), 0) AS total_closed_pnl,
 		       IFNULL(v.account_value, 0),
 		       IFNULL(v.initial_capital, 0)
-		FROM agent_fills f
-		LEFT JOIN agent_accounts a ON a.public_key = f.public_key
-		LEFT JOIN agent_vaults v ON lower(v.user_address) = f.public_key
-		GROUP BY f.public_key
+		FROM agent_vault_orders f
+		LEFT JOIN agent_accounts a ON lower(a.public_key) = lower(f.agent_vault_user)
+		LEFT JOIN agent_vaults v ON lower(v.user_address) = lower(f.agent_vault_user)
+		GROUP BY lower(f.agent_vault_user)
 		HAVING total_fills > 0`)
 	if err != nil {
 		return nil, err
@@ -580,7 +601,7 @@ func (s *Store) getAgentLeaderboard(sortBy string, limit int) ([]AgentLeaderboar
 			&item.PublicKey, &item.Name, &item.TotalFills, &item.ProfitableFills,
 			&item.TotalClosedPnl, &accountValue, &initialCapital,
 		); err != nil {
-			continue
+			return nil, err
 		}
 		if item.TotalFills > 0 {
 			item.WinRate = float64(item.ProfitableFills) / float64(item.TotalFills)

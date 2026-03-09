@@ -57,6 +57,8 @@ export interface Strategy {
   vaultAddress?: string;
   evmBalance?: number;
   agentStatus?: 'inactive' | 'active' | 'revoked';
+  initialCapital?: number;
+  lastSyncedAt?: string;
 }
 
 export interface Review {

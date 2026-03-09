@@ -40,9 +40,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user }) => {
     loadData();
   }, []);
 
-  const chartValues = historyData.length > 0
-    ? historyData
-    : Array.from({ length: 30 }, (_, i) => accountValue + (i * 100) + Math.random() * 500);
+  const chartValues = historyData;
 
   const chartData = {
     labels: chartValues.map((_, i) => `Point ${i + 1}`),
@@ -144,6 +142,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user }) => {
           <div className="h-[200px] w-full">
             {historyLoading ? (
               <div className="h-full flex items-center justify-center text-zinc-400 text-sm">Loading chart...</div>
+            ) : chartValues.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-zinc-400 text-sm">No history data</div>
             ) : (
               <Line data={chartData} options={chartOptions} />
             )}

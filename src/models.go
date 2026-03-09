@@ -3,16 +3,17 @@ package main
 import "time"
 
 type User struct {
-	ID              string `json:"id"`
-	Email           string `json:"email,omitempty"`
-	Name            string `json:"name,omitempty"`
-	XID             string `json:"xId,omitempty"`
-	XUsername       string `json:"xUsername,omitempty"`
-	Avatar          string `json:"avatar,omitempty"`
-	InviteCodeUsed  string `json:"inviteCodeUsed,omitempty"`
-	AgentPublicKey  string `json:"agentPublicKey,omitempty"`
-	AgentAssignedAt string `json:"agentAssignedAt,omitempty"`
-	CreatedAt       string `json:"createdAt"`
+	ID                 string `json:"id"`
+	Email              string `json:"email,omitempty"`
+	Name               string `json:"name,omitempty"`
+	XID                string `json:"xId,omitempty"`
+	XUsername          string `json:"xUsername,omitempty"`
+	Avatar             string `json:"avatar,omitempty"`
+	ShowXOnLeaderboard bool   `json:"showXOnLeaderboard"`
+	InviteCodeUsed     string `json:"inviteCodeUsed,omitempty"`
+	AgentPublicKey     string `json:"agentPublicKey,omitempty"`
+	AgentAssignedAt    string `json:"agentAssignedAt,omitempty"`
+	CreatedAt          string `json:"createdAt"`
 }
 
 type InviteCode struct {

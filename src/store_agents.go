@@ -289,26 +289,22 @@ func (s *Store) revokeUserAgent(publicKey string) error {
 		return err
 	}
 
-	var payload string
-	err = tx.QueryRow(`SELECT data_json FROM users WHERE id = ?`, assignedUserID).Scan(&payload)
+	err = tx.QueryRow(`SELECT id FROM users WHERE id = ?`, assignedUserID).Scan(&assignedUserID)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
 		// user may have been deleted, just commit agent changes
 	} else {
-		var user User
-		if err = json.Unmarshal([]byte(payload), &user); err != nil {
-			return err
-		}
-		user.AgentPublicKey = ""
-		user.AgentAssignedAt = ""
-		userPayload, err2 := json.Marshal(user)
-		if err2 != nil {
-			err = err2
-			return err
-		}
-		if _, err = tx.Exec(`UPDATE users SET data_json = ?, updated_at = ? WHERE id = ?`, string(userPayload), nowISO(), assignedUserID); err != nil {
+		if _, err = tx.Exec(`
+			UPDATE users
+			SET agent_public_key = '',
+			    agent_assigned_at = '',
+			    updated_at = ?
+			WHERE id = ?`,
+			nowISO(),
+			assignedUserID,
+		); err != nil {
 			return err
 		}
 	}
@@ -326,23 +322,17 @@ func (s *Store) revokeUserInviteCode(userID string) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var payload string
-	err = tx.QueryRow(`SELECT data_json FROM users WHERE id = ?`, userID).Scan(&payload)
+	var userAgentPublicKey string
+	err = tx.QueryRow(`SELECT IFNULL(agent_public_key, '') FROM users WHERE id = ?`, userID).Scan(&userAgentPublicKey)
 	if err != nil {
-		return err
-	}
-	var user User
-	if err = json.Unmarshal([]byte(payload), &user); err != nil {
 		return err
 	}
 
 	// If user has an assigned agent, revoke it first (within the same tx)
-	if user.AgentPublicKey != "" {
-		if _, err = tx.Exec(`UPDATE agent_accounts SET status = 'unused', assigned_user_id = NULL, assigned_at = NULL WHERE public_key = ?`, user.AgentPublicKey); err != nil {
+	if strings.TrimSpace(userAgentPublicKey) != "" {
+		if _, err = tx.Exec(`UPDATE agent_accounts SET status = 'unused', assigned_user_id = NULL, assigned_at = NULL WHERE public_key = ?`, strings.ToLower(strings.TrimSpace(userAgentPublicKey))); err != nil {
 			return err
 		}
-		user.AgentPublicKey = ""
-		user.AgentAssignedAt = ""
 	}
 
 	// Find usage record and decrement invite code used_count
@@ -360,13 +350,16 @@ func (s *Store) revokeUserInviteCode(userID string) error {
 		return err
 	}
 
-	user.InviteCodeUsed = ""
-	userPayload, err2 := json.Marshal(user)
-	if err2 != nil {
-		err = err2
-		return err
-	}
-	if _, err = tx.Exec(`UPDATE users SET data_json = ?, updated_at = ? WHERE id = ?`, string(userPayload), nowISO(), userID); err != nil {
+	if _, err = tx.Exec(`
+		UPDATE users
+		SET invite_code_used = '',
+		    agent_public_key = '',
+		    agent_assigned_at = '',
+		    updated_at = ?
+		WHERE id = ?`,
+		nowISO(),
+		userID,
+	); err != nil {
 		return err
 	}
 
@@ -392,16 +385,12 @@ func (s *Store) reassignAgent(publicKey string, userID string) error {
 		return errors.New("agent not available")
 	}
 
-	var payload string
-	err = tx.QueryRow(`SELECT data_json FROM users WHERE id = ?`, userID).Scan(&payload)
+	var currentAgentPublicKey string
+	err = tx.QueryRow(`SELECT IFNULL(agent_public_key, '') FROM users WHERE id = ?`, userID).Scan(&currentAgentPublicKey)
 	if err != nil {
 		return err
 	}
-	var user User
-	if err = json.Unmarshal([]byte(payload), &user); err != nil {
-		return err
-	}
-	if user.AgentPublicKey != "" {
+	if strings.TrimSpace(currentAgentPublicKey) != "" {
 		return errors.New("user already has agent")
 	}
 
@@ -410,14 +399,17 @@ func (s *Store) reassignAgent(publicKey string, userID string) error {
 		return err
 	}
 
-	user.AgentPublicKey = publicKey
-	user.AgentAssignedAt = now
-	userPayload, err2 := json.Marshal(user)
-	if err2 != nil {
-		err = err2
-		return err
-	}
-	if _, err = tx.Exec(`UPDATE users SET data_json = ?, updated_at = ? WHERE id = ?`, string(userPayload), nowISO(), userID); err != nil {
+	if _, err = tx.Exec(`
+		UPDATE users
+		SET agent_public_key = ?,
+		    agent_assigned_at = ?,
+		    updated_at = ?
+		WHERE id = ?`,
+		strings.ToLower(strings.TrimSpace(publicKey)),
+		now,
+		nowISO(),
+		userID,
+	); err != nil {
 		return err
 	}
 
@@ -508,7 +500,10 @@ func (s *Store) listAgentStats(search string) ([]AgentMarketItem, error) {
 		       IFNULL(a.description, ''),
 		       IFNULL(a.category, 'trend'),
 		       IFNULL(a.assigned_user_id, ''),
-		       IFNULL(u.name, ''),
+		       CASE
+		         WHEN IFNULL(u.show_x_on_leaderboard, 0) = 1 THEN IFNULL(u.x_username, '')
+		         ELSE ''
+		       END,
 		       IFNULL(latest.account_value, 0),
 		       IFNULL(latest.account_value, 0) - IFNULL(first.account_value, 0),
 		       IFNULL(latest.created_at, ''),
@@ -536,7 +531,7 @@ func (s *Store) listAgentStats(search string) ([]AgentMarketItem, error) {
 		WHERE a.status = 'assigned'`
 	args := make([]any, 0)
 	if s := strings.TrimSpace(search); s != "" {
-		query += ` AND (lower(a.public_key) LIKE ? OR lower(u.name) LIKE ? OR lower(a.name) LIKE ?)`
+		query += ` AND (lower(a.public_key) LIKE ? OR lower(CASE WHEN IFNULL(u.show_x_on_leaderboard, 0) = 1 THEN IFNULL(u.x_username, '') ELSE '' END) LIKE ? OR lower(a.name) LIKE ?)`
 		pattern := "%" + strings.ToLower(s) + "%"
 		args = append(args, pattern, pattern, pattern)
 	}
@@ -588,7 +583,10 @@ func (s *Store) getAgentStats(publicKey string) (AgentMarketItem, error) {
 		       IFNULL(a.description, ''),
 		       IFNULL(a.category, 'trend'),
 		       IFNULL(a.assigned_user_id, ''),
-		       IFNULL(u.name, ''),
+		       CASE
+		         WHEN IFNULL(u.show_x_on_leaderboard, 0) = 1 THEN IFNULL(u.x_username, '')
+		         ELSE ''
+		       END,
 		       IFNULL(latest.account_value, 0),
 		       IFNULL(latest.account_value, 0) - IFNULL(first.account_value, 0),
 		       IFNULL(latest.created_at, ''),
@@ -708,32 +706,74 @@ func (s *Store) updateAgentProfile(publicKey string, name *string, description *
 	return nil
 }
 
-func (s *Store) upsertAgentFill(publicKey string, fillID string, fillTime int64, rawJSON string) error {
+func (s *Store) upsertAgentVaultOrder(vaultAddress string, agentVaultUser string, fillID string, fillTime int64, rawJSON string) error {
+	fill := VaultFill{}
+	if strings.TrimSpace(rawJSON) != "" {
+		if err := json.Unmarshal([]byte(rawJSON), &fill); err != nil {
+			return err
+		}
+	}
+	if fillTime <= 0 && fill.Time > 0 {
+		fillTime = fill.Time
+	}
 	if fillID == "" {
-		fillID = fmt.Sprintf("%s_%d", strings.ToLower(publicKey), fillTime)
+		fillID = fmt.Sprintf("%s_%d", strings.ToLower(strings.TrimSpace(agentVaultUser)), fillTime)
+	}
+	fillHash := strings.TrimSpace(fill.Hash)
+	if fillHash == "" {
+		fillHash = fillID
 	}
 	_, err := s.db.Exec(`
-		INSERT INTO agent_fills(id, public_key, fill_time, data_json, created_at)
-		VALUES(?, ?, ?, ?, ?)
+		INSERT INTO agent_vault_orders(
+			id, vault_address, agent_vault_user, fill_time, coin, side, size, price, fee, closed_pnl, fill_hash, start_position, direction, created_at
+		)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
+			-- Keep first bound ownership; only backfill when legacy row has empty owner/vault.
+			vault_address = CASE
+				WHEN IFNULL(agent_vault_orders.vault_address, '') = '' THEN excluded.vault_address
+				ELSE agent_vault_orders.vault_address
+			END,
+			agent_vault_user = CASE
+				WHEN IFNULL(agent_vault_orders.agent_vault_user, '') = '' THEN excluded.agent_vault_user
+				ELSE agent_vault_orders.agent_vault_user
+			END,
 			fill_time = excluded.fill_time,
-			data_json = excluded.data_json`,
+			coin = excluded.coin,
+			side = excluded.side,
+			size = excluded.size,
+			price = excluded.price,
+			fee = excluded.fee,
+			closed_pnl = excluded.closed_pnl,
+			fill_hash = excluded.fill_hash,
+			start_position = excluded.start_position,
+			direction = excluded.direction`,
 		fillID,
-		strings.ToLower(publicKey),
+		strings.ToLower(strings.TrimSpace(vaultAddress)),
+		strings.ToLower(strings.TrimSpace(agentVaultUser)),
 		fillTime,
-		rawJSON,
+		strings.TrimSpace(fill.Coin),
+		strings.TrimSpace(fill.Side),
+		fill.Size,
+		fill.Price,
+		fill.Fee,
+		fill.ClosedPnl,
+		fillHash,
+		fill.StartPosition,
+		strings.TrimSpace(fill.Direction),
 		nowISO(),
 	)
 	return err
 }
 
-func (s *Store) listAgentFills(publicKey string, limit int) ([]VaultFill, error) {
+func (s *Store) listAgentVaultOrders(publicKey string, limit int) ([]VaultFill, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 50
 	}
 	rows, err := s.db.Query(`
-		SELECT data_json FROM agent_fills
-		WHERE public_key = ?
+		SELECT coin, side, size, price, fill_time, fee, closed_pnl, fill_hash, start_position, direction
+		FROM agent_vault_orders
+		WHERE lower(agent_vault_user) = ?
 		ORDER BY fill_time DESC
 		LIMIT ?`,
 		strings.ToLower(publicKey),
@@ -745,27 +785,34 @@ func (s *Store) listAgentFills(publicKey string, limit int) ([]VaultFill, error)
 	defer rows.Close()
 	fills := make([]VaultFill, 0)
 	for rows.Next() {
-		var raw string
-		if err := rows.Scan(&raw); err != nil {
-			return nil, err
-		}
 		var f VaultFill
-		if err := json.Unmarshal([]byte(raw), &f); err != nil {
-			continue
+		if err := rows.Scan(
+			&f.Coin,
+			&f.Side,
+			&f.Size,
+			&f.Price,
+			&f.Time,
+			&f.Fee,
+			&f.ClosedPnl,
+			&f.Hash,
+			&f.StartPosition,
+			&f.Direction,
+		); err != nil {
+			return nil, err
 		}
 		fills = append(fills, f)
 	}
-	return fills, nil
+	return fills, rows.Err()
 }
 
-func (s *Store) listRecentFillsForActiveAgents(limit int) ([]VaultFill, error) {
+func (s *Store) listRecentVaultOrdersForActiveAgents(limit int) ([]VaultFill, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 50
 	}
 	rows, err := s.db.Query(`
-		SELECT f.data_json
-		FROM agent_fills f
-		INNER JOIN agent_accounts a ON lower(a.public_key) = lower(f.public_key)
+		SELECT f.coin, f.side, f.size, f.price, f.fill_time, f.fee, f.closed_pnl, f.fill_hash, f.start_position, f.direction
+		FROM agent_vault_orders f
+		INNER JOIN agent_accounts a ON lower(a.public_key) = lower(f.agent_vault_user)
 		WHERE a.status = 'assigned' AND a.agent_status = 'active'
 		ORDER BY f.fill_time DESC
 		LIMIT ?`,
@@ -778,13 +825,20 @@ func (s *Store) listRecentFillsForActiveAgents(limit int) ([]VaultFill, error) {
 
 	fills := make([]VaultFill, 0, limit)
 	for rows.Next() {
-		var raw string
-		if err := rows.Scan(&raw); err != nil {
-			return nil, err
-		}
 		var f VaultFill
-		if err := json.Unmarshal([]byte(raw), &f); err != nil {
-			continue
+		if err := rows.Scan(
+			&f.Coin,
+			&f.Side,
+			&f.Size,
+			&f.Price,
+			&f.Time,
+			&f.Fee,
+			&f.ClosedPnl,
+			&f.Hash,
+			&f.StartPosition,
+			&f.Direction,
+		); err != nil {
+			return nil, err
 		}
 		fills = append(fills, f)
 	}
@@ -822,61 +876,22 @@ func (s *Store) deleteAgentAccounts(publicKeys []string) (int, error) {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Clear stale references from user profiles before deleting accounts.
-	keySet := make(map[string]struct{}, len(filtered))
-	for _, pk := range filtered {
-		keySet[pk] = struct{}{}
-	}
-	userRows, err := tx.Query(`SELECT id, data_json FROM users`)
-	if err != nil {
+	// Clear stale references from users before deleting accounts.
+	if _, err = tx.Exec(`
+		UPDATE users
+		SET agent_public_key = '',
+		    agent_assigned_at = '',
+		    updated_at = ?
+		WHERE lower(agent_public_key) IN (`+placeholders+`)`,
+		append([]any{nowISO()}, args...)...,
+	); err != nil {
 		return 0, err
-	}
-	type userPatch struct {
-		id      string
-		payload string
-	}
-	patches := make([]userPatch, 0)
-	for userRows.Next() {
-		var id string
-		var payload string
-		if err := userRows.Scan(&id, &payload); err != nil {
-			_ = userRows.Close()
-			return 0, err
-		}
-		var user User
-		if err := json.Unmarshal([]byte(payload), &user); err != nil {
-			continue
-		}
-		if _, ok := keySet[strings.ToLower(strings.TrimSpace(user.AgentPublicKey))]; !ok {
-			continue
-		}
-		user.AgentPublicKey = ""
-		user.AgentAssignedAt = ""
-		updated, err := json.Marshal(user)
-		if err != nil {
-			_ = userRows.Close()
-			return 0, err
-		}
-		patches = append(patches, userPatch{
-			id:      id,
-			payload: string(updated),
-		})
-	}
-	if err := userRows.Err(); err != nil {
-		_ = userRows.Close()
-		return 0, err
-	}
-	_ = userRows.Close()
-	for _, p := range patches {
-		if _, err = tx.Exec(`UPDATE users SET data_json = ?, updated_at = ? WHERE id = ?`, p.payload, nowISO(), p.id); err != nil {
-			return 0, err
-		}
 	}
 
 	if _, err = tx.Exec(`DELETE FROM agent_snapshots WHERE public_key IN (`+placeholders+`)`, args...); err != nil {
 		return 0, err
 	}
-	if _, err = tx.Exec(`DELETE FROM agent_fills WHERE public_key IN (`+placeholders+`)`, args...); err != nil {
+	if _, err = tx.Exec(`DELETE FROM agent_vault_orders WHERE lower(agent_vault_user) IN (`+placeholders+`)`, args...); err != nil {
 		return 0, err
 	}
 	if _, err = tx.Exec(`DELETE FROM agent_reviews WHERE public_key IN (`+placeholders+`)`, args...); err != nil {

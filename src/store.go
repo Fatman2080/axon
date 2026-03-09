@@ -42,7 +42,12 @@ func (s *Store) initSchema() error {
 			email TEXT,
 			name TEXT,
 			level TEXT,
-			data_json TEXT NOT NULL,
+			x_username TEXT NOT NULL DEFAULT '',
+			avatar TEXT NOT NULL DEFAULT '',
+			show_x_on_leaderboard INTEGER NOT NULL DEFAULT 0,
+			invite_code_used TEXT NOT NULL DEFAULT '',
+			agent_public_key TEXT NOT NULL DEFAULT '',
+			agent_assigned_at TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		);`,
@@ -64,7 +69,6 @@ func (s *Store) initSchema() error {
 			max_tvl REAL NOT NULL,
 			pnl_contribution REAL NOT NULL,
 			rating REAL NOT NULL,
-			data_json TEXT NOT NULL,
 			review_note TEXT,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
@@ -77,13 +81,22 @@ func (s *Store) initSchema() error {
 			status TEXT NOT NULL,
 			investment REAL NOT NULL,
 			total_profit REAL NOT NULL,
-			data_json TEXT NOT NULL,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		);`,
 		`CREATE TABLE IF NOT EXISTS vault (
 			id TEXT PRIMARY KEY,
-			data_json TEXT NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			total_tvl REAL NOT NULL DEFAULT 0,
+			share_price REAL NOT NULL DEFAULT 0,
+			apy REAL NOT NULL DEFAULT 0,
+			total_profit REAL NOT NULL DEFAULT 0,
+			agent_count INTEGER NOT NULL DEFAULT 0,
+			depositor_count INTEGER NOT NULL DEFAULT 0,
+			chain_balance REAL NOT NULL DEFAULT 0,
+			cluster_balance REAL NOT NULL DEFAULT 0,
+			hype_balance REAL NOT NULL DEFAULT 0,
+			agent_balance REAL NOT NULL DEFAULT 0,
 			updated_at TEXT NOT NULL
 		);`,
 		`CREATE TABLE IF NOT EXISTS invite_codes (
@@ -119,11 +132,20 @@ func (s *Store) initSchema() error {
 			source TEXT NOT NULL,
 			created_at TEXT NOT NULL
 		);`,
-		`CREATE TABLE IF NOT EXISTS agent_fills (
+		`CREATE TABLE IF NOT EXISTS agent_vault_orders (
 			id TEXT PRIMARY KEY,
-			public_key TEXT NOT NULL,
+			vault_address TEXT NOT NULL DEFAULT '',
+			agent_vault_user TEXT NOT NULL DEFAULT '',
 			fill_time INTEGER NOT NULL,
-			data_json TEXT NOT NULL,
+			coin TEXT NOT NULL DEFAULT '',
+			side TEXT NOT NULL DEFAULT '',
+			size REAL NOT NULL DEFAULT 0,
+			price REAL NOT NULL DEFAULT 0,
+			fee REAL NOT NULL DEFAULT 0,
+			closed_pnl REAL NOT NULL DEFAULT 0,
+			fill_hash TEXT NOT NULL DEFAULT '',
+			start_position REAL NOT NULL DEFAULT 0,
+			direction TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
 		);`,
 		`CREATE TABLE IF NOT EXISTS nonces (
@@ -151,7 +173,8 @@ func (s *Store) initSchema() error {
 		`CREATE INDEX IF NOT EXISTS idx_agent_accounts_status ON agent_accounts(status);`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_accounts_assigned_user_unique ON agent_accounts(assigned_user_id) WHERE assigned_user_id IS NOT NULL;`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_snapshots_pub_created ON agent_snapshots(public_key, created_at);`,
-		`CREATE INDEX IF NOT EXISTS idx_agent_fills_pub_time ON agent_fills(public_key, fill_time);`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_vault_orders_user_time ON agent_vault_orders(agent_vault_user, fill_time);`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_vault_orders_vault_time ON agent_vault_orders(vault_address, fill_time);`,
 		`CREATE INDEX IF NOT EXISTS idx_oauth_states_provider_created ON oauth_states(provider, created_at);`,
 
 		// agent_accounts profile columns (safe to re-run)
@@ -248,6 +271,41 @@ func (s *Store) initSchema() error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_platform_snapshots_created ON platform_snapshots(created_at)`,
 		`ALTER TABLE treasury_snapshots ADD COLUMN extra_usdc REAL NOT NULL DEFAULT 0`,
+
+		// users structured columns (safe to re-run)
+		`ALTER TABLE users ADD COLUMN x_username TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN show_x_on_leaderboard INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE users ADD COLUMN invite_code_used TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN agent_public_key TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN agent_assigned_at TEXT NOT NULL DEFAULT ''`,
+		`CREATE INDEX IF NOT EXISTS idx_users_agent_public_key ON users(agent_public_key);`,
+
+		// vault structured columns (safe to re-run)
+		`ALTER TABLE vault ADD COLUMN name TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE vault ADD COLUMN total_tvl REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE vault ADD COLUMN share_price REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE vault ADD COLUMN apy REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE vault ADD COLUMN total_profit REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE vault ADD COLUMN agent_count INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE vault ADD COLUMN depositor_count INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE vault ADD COLUMN chain_balance REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE vault ADD COLUMN cluster_balance REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE vault ADD COLUMN hype_balance REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE vault ADD COLUMN agent_balance REAL NOT NULL DEFAULT 0`,
+
+		// agent_vault_orders structured columns (safe to re-run)
+		`ALTER TABLE agent_vault_orders ADD COLUMN coin TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE agent_vault_orders ADD COLUMN side TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE agent_vault_orders ADD COLUMN size REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE agent_vault_orders ADD COLUMN price REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE agent_vault_orders ADD COLUMN fee REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE agent_vault_orders ADD COLUMN closed_pnl REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE agent_vault_orders ADD COLUMN fill_hash TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE agent_vault_orders ADD COLUMN start_position REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE agent_vault_orders ADD COLUMN direction TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE agent_vault_orders ADD COLUMN vault_address TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE agent_vault_orders ADD COLUMN agent_vault_user TEXT NOT NULL DEFAULT ''`,
 	}
 
 	for _, stmt := range schema {
@@ -259,6 +317,983 @@ func (s *Store) initSchema() error {
 			return err
 		}
 	}
+	if err := s.migrateUsersDataJSONIfNeeded(); err != nil {
+		return err
+	}
+	if err := s.migrateStrategiesDataJSONIfNeeded(); err != nil {
+		return err
+	}
+	if err := s.migrateAgentsDataJSONIfNeeded(); err != nil {
+		return err
+	}
+	if err := s.migrateVaultDataJSONIfNeeded(); err != nil {
+		return err
+	}
+	if err := s.migrateAgentFillsToAgentVaultOrdersIfNeeded(); err != nil {
+		return err
+	}
+	return nil
+}
+
+type legacyUserDataJSON struct {
+	Email              string `json:"email"`
+	Name               string `json:"name"`
+	XID                string `json:"xId"`
+	XUsername          string `json:"xUsername"`
+	Avatar             string `json:"avatar"`
+	ShowXOnLeaderboard *bool  `json:"showXOnLeaderboard,omitempty"`
+	InviteCodeUsed     string `json:"inviteCodeUsed"`
+	AgentPublicKey     string `json:"agentPublicKey"`
+	AgentAssignedAt    string `json:"agentAssignedAt"`
+	CreatedAt          string `json:"createdAt"`
+}
+
+type legacyStrategyDataJSON struct {
+	Name            string   `json:"name"`
+	Category        string   `json:"category"`
+	Status          string   `json:"status"`
+	Creator         string   `json:"creator"`
+	AgentLevel      string   `json:"agentLevel"`
+	CurrentTVL      *float64 `json:"currentTvl"`
+	MaxTVL          *float64 `json:"maxTvl"`
+	PnLContribution *float64 `json:"pnlContribution"`
+	Rating          *float64 `json:"rating"`
+	ReviewNote      string   `json:"reviewNote"`
+	CreatedAt       string   `json:"createdAt"`
+	UpdatedAt       string   `json:"updatedAt"`
+}
+
+type legacyAgentDataJSON struct {
+	Name        string   `json:"name"`
+	StrategyID  string   `json:"strategyId"`
+	UserID      string   `json:"userId"`
+	Status      string   `json:"status"`
+	Investment  *float64 `json:"investment"`
+	TotalProfit *float64 `json:"totalProfit"`
+	CreatedAt   string   `json:"createdAt"`
+	UpdatedAt   string   `json:"updatedAt"`
+}
+
+type legacyVaultDataJSON struct {
+	Name           string   `json:"name"`
+	TotalTVL       *float64 `json:"totalTvl"`
+	SharePrice     *float64 `json:"sharePrice"`
+	APY            *float64 `json:"apy"`
+	TotalProfit    *float64 `json:"totalProfit"`
+	AgentCount     *int     `json:"agentCount"`
+	DepositorCount *int     `json:"depositorCount"`
+	ChainBalance   *float64 `json:"chainBalance"`
+	ClusterBalance *float64 `json:"clusterBalance"`
+	HypeBalance    *float64 `json:"hypeBalance"`
+	AgentBalance   *float64 `json:"agentBalance"`
+	UpdatedAt      string   `json:"updatedAt"`
+}
+
+func (s *Store) tableHasColumn(tableName string, columnName string) (bool, error) {
+	rows, err := s.db.Query(`PRAGMA table_info(` + tableName + `)`)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull int
+		var defaultValue sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &defaultValue, &pk); err != nil {
+			return false, err
+		}
+		if strings.EqualFold(name, columnName) {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
+}
+
+func (s *Store) tableExists(tableName string) (bool, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(1) FROM sqlite_master WHERE type = 'table' AND name = ?`, tableName).Scan(&n)
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+func (s *Store) migrateUsersDataJSONIfNeeded() error {
+	hasDataJSON, err := s.tableHasColumn("users", "data_json")
+	if err != nil {
+		return err
+	}
+	if !hasDataJSON {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.Query(`
+		SELECT id,
+		       IFNULL(email, ''),
+		       IFNULL(name, ''),
+		       IFNULL(x_id, ''),
+		       IFNULL(created_at, ''),
+		       IFNULL(x_username, ''),
+		       IFNULL(avatar, ''),
+		       IFNULL(invite_code_used, ''),
+		       IFNULL(agent_public_key, ''),
+		       IFNULL(agent_assigned_at, ''),
+		       IFNULL(show_x_on_leaderboard, 0),
+		       IFNULL(data_json, '')
+		FROM users`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			id                 string
+			email              string
+			name               string
+			xID                string
+			createdAt          string
+			xUsername          string
+			avatar             string
+			inviteCodeUsed     string
+			agentPublicKey     string
+			agentAssignedAt    string
+			showXInt           int
+			payload            string
+			showXOnLeaderboard bool
+			legacy             legacyUserDataJSON
+		)
+		if err := rows.Scan(
+			&id,
+			&email,
+			&name,
+			&xID,
+			&createdAt,
+			&xUsername,
+			&avatar,
+			&inviteCodeUsed,
+			&agentPublicKey,
+			&agentAssignedAt,
+			&showXInt,
+			&payload,
+		); err != nil {
+			return err
+		}
+
+		showXOnLeaderboard = showXInt != 0
+		payload = strings.TrimSpace(payload)
+		if payload != "" {
+			if err := json.Unmarshal([]byte(payload), &legacy); err != nil {
+				return fmt.Errorf("users.data_json invalid (id=%s): %w", id, err)
+			} else {
+				if email == "" {
+					email = strings.TrimSpace(legacy.Email)
+				}
+				if name == "" {
+					name = strings.TrimSpace(legacy.Name)
+				}
+				if xID == "" {
+					xID = strings.ToLower(strings.TrimSpace(legacy.XID))
+				}
+				if xUsername == "" {
+					xUsername = strings.TrimSpace(legacy.XUsername)
+				}
+				if avatar == "" {
+					avatar = strings.TrimSpace(legacy.Avatar)
+				}
+				if inviteCodeUsed == "" {
+					inviteCodeUsed = strings.TrimSpace(legacy.InviteCodeUsed)
+				}
+				if agentPublicKey == "" {
+					agentPublicKey = strings.ToLower(strings.TrimSpace(legacy.AgentPublicKey))
+				}
+				if agentAssignedAt == "" {
+					agentAssignedAt = strings.TrimSpace(legacy.AgentAssignedAt)
+				}
+				if createdAt == "" {
+					createdAt = strings.TrimSpace(legacy.CreatedAt)
+				}
+				if !showXOnLeaderboard && legacy.ShowXOnLeaderboard != nil {
+					showXOnLeaderboard = *legacy.ShowXOnLeaderboard
+				}
+			}
+		}
+
+		if createdAt == "" {
+			createdAt = nowISO()
+		}
+		xID = strings.ToLower(strings.TrimSpace(xID))
+		agentPublicKey = strings.ToLower(strings.TrimSpace(agentPublicKey))
+
+		if _, err := tx.Exec(`
+			UPDATE users
+			SET email = ?,
+			    name = ?,
+			    x_id = ?,
+			    x_username = ?,
+			    avatar = ?,
+			    invite_code_used = ?,
+			    agent_public_key = ?,
+			    agent_assigned_at = ?,
+			    show_x_on_leaderboard = ?,
+			    created_at = ?,
+			    updated_at = ?,
+			    data_json = ''
+			WHERE id = ?`,
+			email,
+			name,
+			xID,
+			xUsername,
+			avatar,
+			inviteCodeUsed,
+			agentPublicKey,
+			agentAssignedAt,
+			boolToInt(showXOnLeaderboard),
+			createdAt,
+			nowISO(),
+			id,
+		); err != nil {
+			return err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`ALTER TABLE users DROP COLUMN data_json`); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	logInfo("db", "users.data_json migrated into structured columns and dropped")
+	return nil
+}
+
+func (s *Store) migrateStrategiesDataJSONIfNeeded() error {
+	hasDataJSON, err := s.tableHasColumn("strategies", "data_json")
+	if err != nil {
+		return err
+	}
+	if !hasDataJSON {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.Query(`
+		SELECT id,
+		       IFNULL(name, ''),
+		       IFNULL(category, ''),
+		       IFNULL(status, ''),
+		       IFNULL(creator, ''),
+		       IFNULL(agent_level, ''),
+		       IFNULL(current_tvl, 0),
+		       IFNULL(max_tvl, 0),
+		       IFNULL(pnl_contribution, 0),
+		       IFNULL(rating, 0),
+		       IFNULL(review_note, ''),
+		       IFNULL(created_at, ''),
+		       IFNULL(updated_at, ''),
+		       IFNULL(data_json, '')
+		FROM strategies`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			id              string
+			name            string
+			category        string
+			status          string
+			creator         string
+			agentLevel      string
+			currentTVL      float64
+			maxTVL          float64
+			pnlContribution float64
+			rating          float64
+			reviewNote      string
+			createdAt       string
+			updatedAt       string
+			payload         string
+			legacy          legacyStrategyDataJSON
+		)
+		if err := rows.Scan(
+			&id,
+			&name,
+			&category,
+			&status,
+			&creator,
+			&agentLevel,
+			&currentTVL,
+			&maxTVL,
+			&pnlContribution,
+			&rating,
+			&reviewNote,
+			&createdAt,
+			&updatedAt,
+			&payload,
+		); err != nil {
+			return err
+		}
+
+		payload = strings.TrimSpace(payload)
+		if payload != "" {
+			if err := json.Unmarshal([]byte(payload), &legacy); err != nil {
+				return fmt.Errorf("strategies.data_json invalid (id=%s): %w", id, err)
+			} else {
+				if name == "" {
+					name = strings.TrimSpace(legacy.Name)
+				}
+				if category == "" {
+					category = strings.TrimSpace(legacy.Category)
+				}
+				if status == "" {
+					status = strings.TrimSpace(legacy.Status)
+				}
+				if creator == "" {
+					creator = strings.TrimSpace(legacy.Creator)
+				}
+				if agentLevel == "" {
+					agentLevel = strings.TrimSpace(legacy.AgentLevel)
+				}
+				if currentTVL == 0 && legacy.CurrentTVL != nil {
+					currentTVL = *legacy.CurrentTVL
+				}
+				if maxTVL == 0 && legacy.MaxTVL != nil {
+					maxTVL = *legacy.MaxTVL
+				}
+				if pnlContribution == 0 && legacy.PnLContribution != nil {
+					pnlContribution = *legacy.PnLContribution
+				}
+				if rating == 0 && legacy.Rating != nil {
+					rating = *legacy.Rating
+				}
+				if reviewNote == "" {
+					reviewNote = strings.TrimSpace(legacy.ReviewNote)
+				}
+				if createdAt == "" {
+					createdAt = strings.TrimSpace(legacy.CreatedAt)
+				}
+				if updatedAt == "" {
+					updatedAt = strings.TrimSpace(legacy.UpdatedAt)
+				}
+			}
+		}
+
+		if createdAt == "" {
+			createdAt = nowISO()
+		}
+		if updatedAt == "" {
+			updatedAt = nowISO()
+		}
+
+		if _, err := tx.Exec(`
+			UPDATE strategies
+			SET name = ?,
+			    category = ?,
+			    status = ?,
+			    creator = ?,
+			    agent_level = ?,
+			    current_tvl = ?,
+			    max_tvl = ?,
+			    pnl_contribution = ?,
+			    rating = ?,
+			    review_note = ?,
+			    created_at = ?,
+			    updated_at = ?,
+			    data_json = ''
+			WHERE id = ?`,
+			name,
+			category,
+			status,
+			creator,
+			agentLevel,
+			currentTVL,
+			maxTVL,
+			pnlContribution,
+			rating,
+			reviewNote,
+			createdAt,
+			updatedAt,
+			id,
+		); err != nil {
+			return err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`ALTER TABLE strategies DROP COLUMN data_json`); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	logInfo("db", "strategies.data_json migrated into structured columns and dropped")
+	return nil
+}
+
+func (s *Store) migrateAgentsDataJSONIfNeeded() error {
+	hasDataJSON, err := s.tableHasColumn("agents", "data_json")
+	if err != nil {
+		return err
+	}
+	if !hasDataJSON {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.Query(`
+		SELECT id,
+		       IFNULL(name, ''),
+		       IFNULL(strategy_id, ''),
+		       IFNULL(user_id, ''),
+		       IFNULL(status, ''),
+		       IFNULL(investment, 0),
+		       IFNULL(total_profit, 0),
+		       IFNULL(created_at, ''),
+		       IFNULL(updated_at, ''),
+		       IFNULL(data_json, '')
+		FROM agents`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			id          string
+			name        string
+			strategyID  string
+			userID      string
+			status      string
+			investment  float64
+			totalProfit float64
+			createdAt   string
+			updatedAt   string
+			payload     string
+			legacy      legacyAgentDataJSON
+		)
+		if err := rows.Scan(
+			&id,
+			&name,
+			&strategyID,
+			&userID,
+			&status,
+			&investment,
+			&totalProfit,
+			&createdAt,
+			&updatedAt,
+			&payload,
+		); err != nil {
+			return err
+		}
+
+		payload = strings.TrimSpace(payload)
+		if payload != "" {
+			if err := json.Unmarshal([]byte(payload), &legacy); err != nil {
+				return fmt.Errorf("agents.data_json invalid (id=%s): %w", id, err)
+			} else {
+				if name == "" {
+					name = strings.TrimSpace(legacy.Name)
+				}
+				if strategyID == "" {
+					strategyID = strings.TrimSpace(legacy.StrategyID)
+				}
+				if userID == "" {
+					userID = strings.TrimSpace(legacy.UserID)
+				}
+				if status == "" {
+					status = strings.TrimSpace(legacy.Status)
+				}
+				if investment == 0 && legacy.Investment != nil {
+					investment = *legacy.Investment
+				}
+				if totalProfit == 0 && legacy.TotalProfit != nil {
+					totalProfit = *legacy.TotalProfit
+				}
+				if createdAt == "" {
+					createdAt = strings.TrimSpace(legacy.CreatedAt)
+				}
+				if updatedAt == "" {
+					updatedAt = strings.TrimSpace(legacy.UpdatedAt)
+				}
+			}
+		}
+
+		if createdAt == "" {
+			createdAt = nowISO()
+		}
+		if updatedAt == "" {
+			updatedAt = nowISO()
+		}
+
+		if _, err := tx.Exec(`
+			UPDATE agents
+			SET name = ?,
+			    strategy_id = ?,
+			    user_id = ?,
+			    status = ?,
+			    investment = ?,
+			    total_profit = ?,
+			    created_at = ?,
+			    updated_at = ?,
+			    data_json = ''
+			WHERE id = ?`,
+			name,
+			strategyID,
+			userID,
+			status,
+			investment,
+			totalProfit,
+			createdAt,
+			updatedAt,
+			id,
+		); err != nil {
+			return err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`ALTER TABLE agents DROP COLUMN data_json`); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	logInfo("db", "agents.data_json migrated into structured columns and dropped")
+	return nil
+}
+
+func (s *Store) migrateVaultDataJSONIfNeeded() error {
+	hasDataJSON, err := s.tableHasColumn("vault", "data_json")
+	if err != nil {
+		return err
+	}
+	if !hasDataJSON {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.Query(`
+		SELECT id,
+		       IFNULL(name, ''),
+		       IFNULL(total_tvl, 0),
+		       IFNULL(share_price, 0),
+		       IFNULL(apy, 0),
+		       IFNULL(total_profit, 0),
+		       IFNULL(agent_count, 0),
+		       IFNULL(depositor_count, 0),
+		       IFNULL(chain_balance, 0),
+		       IFNULL(cluster_balance, 0),
+		       IFNULL(hype_balance, 0),
+		       IFNULL(agent_balance, 0),
+		       IFNULL(updated_at, ''),
+		       IFNULL(data_json, '')
+		FROM vault`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			id             string
+			name           string
+			totalTVL       float64
+			sharePrice     float64
+			apy            float64
+			totalProfit    float64
+			agentCount     int
+			depositorCount int
+			chainBalance   float64
+			clusterBalance float64
+			hypeBalance    float64
+			agentBalance   float64
+			updatedAt      string
+			payload        string
+			legacy         legacyVaultDataJSON
+		)
+		if err := rows.Scan(
+			&id,
+			&name,
+			&totalTVL,
+			&sharePrice,
+			&apy,
+			&totalProfit,
+			&agentCount,
+			&depositorCount,
+			&chainBalance,
+			&clusterBalance,
+			&hypeBalance,
+			&agentBalance,
+			&updatedAt,
+			&payload,
+		); err != nil {
+			return err
+		}
+
+		payload = strings.TrimSpace(payload)
+		if payload != "" {
+			if err := json.Unmarshal([]byte(payload), &legacy); err != nil {
+				return fmt.Errorf("vault.data_json invalid (id=%s): %w", id, err)
+			} else {
+				if name == "" {
+					name = strings.TrimSpace(legacy.Name)
+				}
+				if totalTVL == 0 && legacy.TotalTVL != nil {
+					totalTVL = *legacy.TotalTVL
+				}
+				if sharePrice == 0 && legacy.SharePrice != nil {
+					sharePrice = *legacy.SharePrice
+				}
+				if apy == 0 && legacy.APY != nil {
+					apy = *legacy.APY
+				}
+				if totalProfit == 0 && legacy.TotalProfit != nil {
+					totalProfit = *legacy.TotalProfit
+				}
+				if agentCount == 0 && legacy.AgentCount != nil {
+					agentCount = *legacy.AgentCount
+				}
+				if depositorCount == 0 && legacy.DepositorCount != nil {
+					depositorCount = *legacy.DepositorCount
+				}
+				if chainBalance == 0 && legacy.ChainBalance != nil {
+					chainBalance = *legacy.ChainBalance
+				}
+				if clusterBalance == 0 && legacy.ClusterBalance != nil {
+					clusterBalance = *legacy.ClusterBalance
+				}
+				if hypeBalance == 0 && legacy.HypeBalance != nil {
+					hypeBalance = *legacy.HypeBalance
+				}
+				if agentBalance == 0 && legacy.AgentBalance != nil {
+					agentBalance = *legacy.AgentBalance
+				}
+				if updatedAt == "" {
+					updatedAt = strings.TrimSpace(legacy.UpdatedAt)
+				}
+			}
+		}
+
+		if updatedAt == "" {
+			updatedAt = nowISO()
+		}
+
+		if _, err := tx.Exec(`
+			UPDATE vault
+			SET name = ?,
+			    total_tvl = ?,
+			    share_price = ?,
+			    apy = ?,
+			    total_profit = ?,
+			    agent_count = ?,
+			    depositor_count = ?,
+			    chain_balance = ?,
+			    cluster_balance = ?,
+			    hype_balance = ?,
+			    agent_balance = ?,
+			    updated_at = ?,
+			    data_json = ''
+			WHERE id = ?`,
+			name,
+			totalTVL,
+			sharePrice,
+			apy,
+			totalProfit,
+			agentCount,
+			depositorCount,
+			chainBalance,
+			clusterBalance,
+			hypeBalance,
+			agentBalance,
+			updatedAt,
+			id,
+		); err != nil {
+			return err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`ALTER TABLE vault DROP COLUMN data_json`); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	logInfo("db", "vault.data_json migrated into structured columns and dropped")
+	return nil
+}
+
+func (s *Store) migrateAgentFillsToAgentVaultOrdersIfNeeded() error {
+	oldExists, err := s.tableExists("agent_fills")
+	if err != nil {
+		return err
+	}
+	if !oldExists {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	hasDataJSON, err := s.tableHasColumn("agent_fills", "data_json")
+	if err != nil {
+		return err
+	}
+	hasStructuredCols, err := s.tableHasColumn("agent_fills", "closed_pnl")
+	if err != nil {
+		return err
+	}
+
+	if hasDataJSON {
+		query := `SELECT
+			IFNULL(id, ''),
+			IFNULL(public_key, ''),
+			IFNULL(fill_time, 0), `
+		if hasStructuredCols {
+			query += `IFNULL(coin, ''),
+			          IFNULL(side, ''),
+			          IFNULL(size, 0),
+			          IFNULL(price, 0),
+			          IFNULL(fee, 0),
+			          IFNULL(closed_pnl, 0),
+			          IFNULL(fill_hash, ''),
+			          IFNULL(start_position, 0),
+			          IFNULL(direction, ''), `
+		}
+		query += `IFNULL(data_json, ''),
+		          IFNULL(created_at, '')
+		          FROM agent_fills`
+
+		rows, qErr := tx.Query(query)
+		if qErr != nil {
+			return qErr
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var (
+				id            string
+				publicKey     string
+				fillTime      int64
+				coin          string
+				side          string
+				size          float64
+				price         float64
+				fee           float64
+				closedPnl     float64
+				fillHash      string
+				startPosition float64
+				direction     string
+				payload       string
+				createdAt     string
+				fill          VaultFill
+				vaultAddress  string
+			)
+			if hasStructuredCols {
+				if err := rows.Scan(
+					&id,
+					&publicKey,
+					&fillTime,
+					&coin,
+					&side,
+					&size,
+					&price,
+					&fee,
+					&closedPnl,
+					&fillHash,
+					&startPosition,
+					&direction,
+					&payload,
+					&createdAt,
+				); err != nil {
+					return err
+				}
+			} else {
+				if err := rows.Scan(
+					&id,
+					&publicKey,
+					&fillTime,
+					&payload,
+					&createdAt,
+				); err != nil {
+					return err
+				}
+			}
+
+			payload = strings.TrimSpace(payload)
+			if payload != "" {
+				if err := json.Unmarshal([]byte(payload), &fill); err != nil {
+					return fmt.Errorf("agent_fills.data_json invalid (id=%s): %w", id, err)
+				} else {
+					if fillTime == 0 && fill.Time > 0 {
+						fillTime = fill.Time
+					}
+					if coin == "" {
+						coin = strings.TrimSpace(fill.Coin)
+					}
+					if side == "" {
+						side = strings.TrimSpace(fill.Side)
+					}
+					if size == 0 {
+						size = fill.Size
+					}
+					if price == 0 {
+						price = fill.Price
+					}
+					if fee == 0 {
+						fee = fill.Fee
+					}
+					if closedPnl == 0 {
+						closedPnl = fill.ClosedPnl
+					}
+					if fillHash == "" {
+						fillHash = strings.TrimSpace(fill.Hash)
+					}
+					if startPosition == 0 {
+						startPosition = fill.StartPosition
+					}
+					if direction == "" {
+						direction = strings.TrimSpace(fill.Direction)
+					}
+				}
+			}
+			if fillHash == "" {
+				fillHash = id
+			}
+			if createdAt == "" {
+				createdAt = nowISO()
+			}
+
+			_ = tx.QueryRow(
+				`SELECT IFNULL(vault_address, '') FROM agent_accounts WHERE lower(public_key) = lower(?) LIMIT 1`,
+				strings.ToLower(strings.TrimSpace(publicKey)),
+			).Scan(&vaultAddress)
+
+			if _, err := tx.Exec(`
+				INSERT INTO agent_vault_orders(
+					id, vault_address, agent_vault_user, fill_time, coin, side, size, price, fee, closed_pnl, fill_hash, start_position, direction, created_at
+				)
+				VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				ON CONFLICT(id) DO UPDATE SET
+					vault_address = excluded.vault_address,
+					agent_vault_user = excluded.agent_vault_user,
+					fill_time = excluded.fill_time,
+					coin = excluded.coin,
+					side = excluded.side,
+					size = excluded.size,
+					price = excluded.price,
+					fee = excluded.fee,
+					closed_pnl = excluded.closed_pnl,
+					fill_hash = excluded.fill_hash,
+					start_position = excluded.start_position,
+					direction = excluded.direction`,
+				id,
+				strings.ToLower(strings.TrimSpace(vaultAddress)),
+				strings.ToLower(strings.TrimSpace(publicKey)),
+				fillTime,
+				coin,
+				side,
+				size,
+				price,
+				fee,
+				closedPnl,
+				fillHash,
+				startPosition,
+				direction,
+				createdAt,
+			); err != nil {
+				return err
+			}
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+	} else if hasStructuredCols {
+		if _, err := tx.Exec(`
+			INSERT INTO agent_vault_orders(
+				id, vault_address, agent_vault_user, fill_time, coin, side, size, price, fee, closed_pnl, fill_hash, start_position, direction, created_at
+			)
+			SELECT f.id,
+			       lower(trim(IFNULL(a.vault_address, ''))),
+			       lower(trim(IFNULL(f.public_key, ''))),
+			       IFNULL(f.fill_time, 0),
+			       IFNULL(f.coin, ''),
+			       IFNULL(f.side, ''),
+			       IFNULL(f.size, 0),
+			       IFNULL(f.price, 0),
+			       IFNULL(f.fee, 0),
+			       IFNULL(f.closed_pnl, 0),
+			       IFNULL(f.fill_hash, ''),
+			       IFNULL(f.start_position, 0),
+			       IFNULL(f.direction, ''),
+			       IFNULL(f.created_at, '')
+			FROM agent_fills f
+			LEFT JOIN agent_accounts a ON lower(a.public_key) = lower(f.public_key)
+			ON CONFLICT(id) DO UPDATE SET
+				vault_address = excluded.vault_address,
+				agent_vault_user = excluded.agent_vault_user,
+				fill_time = excluded.fill_time,
+				coin = excluded.coin,
+				side = excluded.side,
+				size = excluded.size,
+				price = excluded.price,
+				fee = excluded.fee,
+				closed_pnl = excluded.closed_pnl,
+				fill_hash = excluded.fill_hash,
+				start_position = excluded.start_position,
+				direction = excluded.direction`); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.Exec(`DROP TABLE agent_fills`); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	logInfo("db", "migrated agent_fills -> agent_vault_orders and dropped legacy table")
 	return nil
 }
 
@@ -376,16 +1411,7 @@ func (s *Store) consumeOAuthState(provider string, state string, ttl time.Durati
 
 func (s *Store) getUserByXID(xID string) (User, error) {
 	xID = strings.ToLower(strings.TrimSpace(xID))
-	var payload string
-	err := s.db.QueryRow(`SELECT data_json FROM users WHERE x_id = ?`, xID).Scan(&payload)
-	if err != nil {
-		return User{}, err
-	}
-	var user User
-	if err := json.Unmarshal([]byte(payload), &user); err != nil {
-		return User{}, err
-	}
-	return user, nil
+	return s.getUserByWhereClause(`x_id = ?`, xID)
 }
 
 func (s *Store) getOrCreateUserByXID(xID string) (User, error) {
@@ -418,25 +1444,38 @@ func (s *Store) saveUser(user User) error {
 	if user.CreatedAt == "" {
 		user.CreatedAt = nowISO()
 	}
-	payload, err := json.Marshal(user)
-	if err != nil {
-		return err
-	}
+	user.XID = strings.ToLower(strings.TrimSpace(user.XID))
+	user.AgentPublicKey = strings.ToLower(strings.TrimSpace(user.AgentPublicKey))
 	t := nowISO()
-	_, err = s.db.Exec(`
-		INSERT INTO users(id, x_id, email, name, data_json, created_at, updated_at)
-		VALUES(?, ?, ?, ?, ?, ?, ?)
+	_, err := s.db.Exec(`
+		INSERT INTO users(
+			id, x_id, email, name,
+			x_username, avatar, show_x_on_leaderboard,
+			invite_code_used, agent_public_key, agent_assigned_at,
+			created_at, updated_at
+		)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			x_id = excluded.x_id,
 			email = excluded.email,
 			name = excluded.name,
-			data_json = excluded.data_json,
+			x_username = excluded.x_username,
+			avatar = excluded.avatar,
+			show_x_on_leaderboard = excluded.show_x_on_leaderboard,
+			invite_code_used = excluded.invite_code_used,
+			agent_public_key = excluded.agent_public_key,
+			agent_assigned_at = excluded.agent_assigned_at,
 			updated_at = excluded.updated_at`,
 		user.ID,
-		strings.ToLower(user.XID),
+		user.XID,
 		user.Email,
 		user.Name,
-		string(payload),
+		user.XUsername,
+		user.Avatar,
+		boolToInt(user.ShowXOnLeaderboard),
+		user.InviteCodeUsed,
+		user.AgentPublicKey,
+		user.AgentAssignedAt,
 		t,
 		t,
 	)
@@ -444,33 +1483,27 @@ func (s *Store) saveUser(user User) error {
 }
 
 func (s *Store) getUserByID(id string) (User, error) {
-	var payload string
-	err := s.db.QueryRow(`SELECT data_json FROM users WHERE id = ?`, id).Scan(&payload)
-	if err != nil {
-		return User{}, err
-	}
-	var user User
-	if err := json.Unmarshal([]byte(payload), &user); err != nil {
-		return User{}, err
-	}
-	return user, nil
+	return s.getUserByWhereClause(`id = ?`, id)
 }
 
 func (s *Store) getUserByName(name string) (User, error) {
-	var payload string
-	err := s.db.QueryRow(`SELECT data_json FROM users WHERE lower(name) = lower(?)`, strings.TrimSpace(name)).Scan(&payload)
-	if err != nil {
-		return User{}, err
-	}
-	var user User
-	if err := json.Unmarshal([]byte(payload), &user); err != nil {
-		return User{}, err
-	}
-	return user, nil
+	return s.getUserByWhereClause(`lower(name) = lower(?)`, strings.TrimSpace(name))
 }
 
 func (s *Store) listUsers(search string) ([]User, error) {
-	query := `SELECT data_json FROM users`
+	query := `SELECT
+		id,
+		IFNULL(email, ''),
+		IFNULL(name, ''),
+		IFNULL(x_id, ''),
+		IFNULL(x_username, ''),
+		IFNULL(avatar, ''),
+		IFNULL(show_x_on_leaderboard, 0),
+		IFNULL(invite_code_used, ''),
+		IFNULL(agent_public_key, ''),
+		IFNULL(agent_assigned_at, ''),
+		created_at
+	FROM users`
 	args := make([]any, 0)
 	if strings.TrimSpace(search) != "" {
 		query += ` WHERE lower(name) LIKE ? OR lower(email) LIKE ? OR lower(x_id) LIKE ?`
@@ -487,17 +1520,62 @@ func (s *Store) listUsers(search string) ([]User, error) {
 
 	users := make([]User, 0)
 	for rows.Next() {
-		var payload string
-		if err := rows.Scan(&payload); err != nil {
-			return nil, err
-		}
-		var u User
-		if err := json.Unmarshal([]byte(payload), &u); err != nil {
+		u, err := scanUserRow(rows)
+		if err != nil {
 			return nil, err
 		}
 		users = append(users, u)
 	}
 	return users, rows.Err()
+}
+
+func (s *Store) getUserByWhereClause(whereClause string, arg any) (User, error) {
+	query := `SELECT
+		id,
+		IFNULL(email, ''),
+		IFNULL(name, ''),
+		IFNULL(x_id, ''),
+		IFNULL(x_username, ''),
+		IFNULL(avatar, ''),
+		IFNULL(show_x_on_leaderboard, 0),
+		IFNULL(invite_code_used, ''),
+		IFNULL(agent_public_key, ''),
+		IFNULL(agent_assigned_at, ''),
+		created_at
+	FROM users WHERE ` + whereClause + ` LIMIT 1`
+	row := s.db.QueryRow(query, arg)
+	return scanUserRow(row)
+}
+
+type userRowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanUserRow(scanner userRowScanner) (User, error) {
+	var (
+		user     User
+		showXInt int
+	)
+	err := scanner.Scan(
+		&user.ID,
+		&user.Email,
+		&user.Name,
+		&user.XID,
+		&user.XUsername,
+		&user.Avatar,
+		&showXInt,
+		&user.InviteCodeUsed,
+		&user.AgentPublicKey,
+		&user.AgentAssignedAt,
+		&user.CreatedAt,
+	)
+	if err != nil {
+		return User{}, err
+	}
+	user.ShowXOnLeaderboard = showXInt != 0
+	user.XID = strings.ToLower(strings.TrimSpace(user.XID))
+	user.AgentPublicKey = strings.ToLower(strings.TrimSpace(user.AgentPublicKey))
+	return user, nil
 }
 
 func (s *Store) listInviteCodes() ([]InviteCode, error) {

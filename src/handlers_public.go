@@ -88,7 +88,7 @@ func (e *xLoginError) Error() string {
 	return e.Code
 }
 
-func (s *Server) loginWithXIdentity(xID string, xUsername string, avatar string, inviteCode string) (string, User, *xLoginError) {
+func (s *Server) loginWithXIdentity(xID string, xName string, xUsername string, avatar string, inviteCode string) (string, User, *xLoginError) {
 	xID = strings.TrimSpace(xID)
 	if xID == "" {
 		return "", User{}, &xLoginError{Status: http.StatusBadRequest, Code: "x_id_required"}
@@ -104,6 +104,10 @@ func (s *Server) loginWithXIdentity(xID string, xUsername string, avatar string,
 	if user.XUsername != "" && !strings.HasPrefix(user.XUsername, "@") {
 		user.XUsername = "@" + user.XUsername
 	}
+	xName = strings.TrimSpace(xName)
+	if xName != "" {
+		user.Name = xName
+	}
 	if strings.TrimSpace(avatar) != "" {
 		user.Avatar = strings.TrimSpace(avatar)
 	}
@@ -111,7 +115,7 @@ func (s *Server) loginWithXIdentity(xID string, xUsername string, avatar string,
 		user.Email = xID + "@x.local"
 	}
 	displayName := strings.TrimPrefix(user.XUsername, "@")
-	if displayName != "" && (user.Name == "" || strings.HasPrefix(user.Name, "User ")) {
+	if xName == "" && displayName != "" {
 		user.Name = displayName
 	}
 
@@ -172,6 +176,7 @@ func (s *Server) loginWithXIdentity(xID string, xUsername string, avatar string,
 func (s *Server) handleXLogin(c echo.Context) error {
 	req := struct {
 		XID        string `json:"xId"`
+		Name       string `json:"name"`
 		XUsername  string `json:"xUsername"`
 		Avatar     string `json:"avatar"`
 		InviteCode string `json:"inviteCode"`
@@ -179,7 +184,7 @@ func (s *Server) handleXLogin(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
 	}
-	token, user, loginErr := s.loginWithXIdentity(req.XID, req.XUsername, req.Avatar, req.InviteCode)
+	token, user, loginErr := s.loginWithXIdentity(req.XID, req.Name, req.XUsername, req.Avatar, req.InviteCode)
 	if loginErr != nil {
 		return c.JSON(loginErr.Status, echo.Map{"error": loginErr.Code})
 	}
@@ -256,7 +261,7 @@ func (s *Server) handleXOAuthCallback(c echo.Context) error {
 		return redirectFailure("x_oauth_userinfo_failed", oauthState.NextURL)
 	}
 
-	token, _, loginErr := s.loginWithXIdentity(xUser.ID, xUser.Username, xUser.ProfileImageURL, oauthState.InviteCode)
+	token, _, loginErr := s.loginWithXIdentity(xUser.ID, xUser.Name, xUser.Username, xUser.ProfileImageURL, oauthState.InviteCode)
 	if loginErr != nil {
 		logError("oauth", "x oauth login failed: xid=%s username=%s code=%s", xUser.ID, xUser.Username, loginErr.Code)
 		return redirectFailure(loginErr.Code, oauthState.NextURL)
@@ -420,7 +425,7 @@ func (s *Server) handleAgentMarketDetail(c echo.Context) error {
 	}
 
 	positions := make([]VaultPosition, 0)
-	recentFills, err := s.store.listAgentFills(publicKey, 50)
+	recentFills, err := s.store.listAgentVaultOrders(publicKey, 50)
 	if err != nil {
 		recentFills = make([]VaultFill, 0)
 	}
@@ -461,7 +466,7 @@ func (s *Server) handleUserAgentHistory(c echo.Context) error {
 	for _, item := range snapshots {
 		history = append(history, item.AccountValue)
 	}
-	trades, err := s.store.listAgentFills(user.AgentPublicKey, 50)
+	trades, err := s.store.listAgentVaultOrders(user.AgentPublicKey, 50)
 	if err != nil {
 		trades = []VaultFill{}
 	}
@@ -532,7 +537,7 @@ func (s *Server) handleVaultOverview(c echo.Context) error {
 
 	// Positions are not persisted yet; keep empty in synced-data-only mode.
 	// Use persisted fills from sync rounds to avoid heavy online fan-out calls.
-	fills, fillErr := s.store.listRecentFillsForActiveAgents(50)
+	fills, fillErr := s.store.listRecentVaultOrdersForActiveAgents(50)
 	if fillErr == nil {
 		overview.RecentFills = fills
 	}
@@ -585,7 +590,7 @@ func (s *Server) handleUserAgentStats(c echo.Context) error {
 		}
 	}
 
-	fills, err := s.store.listAgentFills(pk, 30)
+	fills, err := s.store.listAgentVaultOrders(pk, 30)
 	if err == nil {
 		result["recentFills"] = fills
 	}
@@ -724,7 +729,7 @@ func (s *Server) handlePlatformStats(c echo.Context) error {
 		var userCount, totalAgentCount, totalTrades int
 		_ = s.store.db.QueryRow(`SELECT COUNT(1) FROM users`).Scan(&userCount)
 		_ = s.store.db.QueryRow(`SELECT COUNT(1) FROM agent_accounts`).Scan(&totalAgentCount)
-		_ = s.store.db.QueryRow(`SELECT COUNT(1) FROM agent_fills`).Scan(&totalTrades)
+		_ = s.store.db.QueryRow(`SELECT COUNT(1) FROM agent_vault_orders`).Scan(&totalTrades)
 
 		return c.JSON(http.StatusOK, echo.Map{
 			"totalTvl":        totalTvl + pOffset,

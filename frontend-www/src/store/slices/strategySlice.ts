@@ -57,6 +57,8 @@ function mapAgentToStrategy(agent: AgentMarketItem): Strategy {
     vaultAddress: agent.vaultAddress,
     evmBalance: agent.evmBalance,
     agentStatus: agent.agentStatus,
+    initialCapital: agent.initialCapital,
+    lastSyncedAt: agent.lastSyncedAt,
   };
 }
 
@@ -98,14 +100,6 @@ export const fetchStrategyById = createAsyncThunk(
   }
 );
 
-export const submitStrategy = createAsyncThunk(
-  'strategies/submitStrategy',
-  async (strategyData: Partial<Strategy>) => {
-    // Placeholder - not implemented with real API yet
-    return strategyData as Strategy;
-  }
-);
-
 const strategySlice = createSlice({
   name: 'strategies',
   initialState,
@@ -139,9 +133,6 @@ const strategySlice = createSlice({
       .addCase(fetchStrategyById.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error.message || 'Failed to fetch strategy';
-      })
-      .addCase(submitStrategy.fulfilled, (state, action) => {
-        state.items.push(action.payload);
       });
   },
 });

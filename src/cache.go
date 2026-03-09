@@ -106,7 +106,7 @@ func (s *Server) refreshPublicCache() {
 		overview.TotalInitialCapital += item.InitialCapital
 		overview.AgentCount++
 	}
-	if fills, err := s.store.listRecentFillsForActiveAgents(50); err == nil {
+	if fills, err := s.store.listRecentVaultOrdersForActiveAgents(50); err == nil {
 		overview.RecentFills = fills
 	}
 	overview.TotalTvl += tvlOffset
@@ -137,7 +137,7 @@ func (s *Server) refreshPublicCache() {
 		for _, snap := range snapshots {
 			history = append(history, snap.AccountValue)
 		}
-		recentFills, err := s.store.listAgentFills(pk, 50)
+		recentFills, err := s.store.listAgentVaultOrders(pk, 50)
 		if err != nil {
 			recentFills = make([]VaultFill, 0)
 		}

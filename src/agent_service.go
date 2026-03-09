@@ -179,13 +179,16 @@ func (s *Server) runSyncRound() {
 						fill := fills[i]
 						raw, marshalErr := json.Marshal(fill)
 						if marshalErr != nil {
+							logError("sync", "hl: marshal fill failed (user=%s, i=%d): %v", t.userAddress, i, marshalErr)
 							continue
 						}
 						fillID := strings.TrimSpace(fill.Hash)
 						if fillID == "" {
 							fillID = fmt.Sprintf("%s_%d_%d", t.userAddress, fill.Time, i)
 						}
-						_ = s.store.upsertAgentFill(t.userAddress, fillID, fill.Time, string(raw))
+						if err := s.store.upsertAgentVaultOrder(t.vaultAddress, t.userAddress, fillID, fill.Time, string(raw)); err != nil {
+							logError("sync", "hl: upsertAgentVaultOrder failed (user=%s, fill=%s): %v", t.userAddress, fillID, err)
+						}
 					}
 				}
 			}(task)
@@ -397,7 +400,7 @@ func (s *Server) collectPlatformSnapshot(records []VaultRecord, activeCount int,
 	var userCount, totalAgentCount, totalTrades int
 	s.store.db.QueryRow(`SELECT COUNT(1) FROM users`).Scan(&userCount)
 	s.store.db.QueryRow(`SELECT COUNT(1) FROM agent_accounts`).Scan(&totalAgentCount)
-	s.store.db.QueryRow(`SELECT COUNT(1) FROM agent_fills`).Scan(&totalTrades)
+	s.store.db.QueryRow(`SELECT COUNT(1) FROM agent_vault_orders`).Scan(&totalTrades)
 
 	snap := PlatformSnapshot{
 		TotalTVL:         totalTVL,

@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
 import { fetchStrategies } from "../store/slices/strategySlice";
 import { Search, TrendingUp } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
+import type { Strategy } from "../types";
 
 const tierColor = (category: string) => {
   switch (category?.toLowerCase()) {
@@ -33,147 +34,84 @@ const tierColor = (category: string) => {
   }
 };
 
-// Mock data for leaderboard
-const generateMockChartData = (
-  points: number,
-  start: number,
-  trend: "up" | "down",
-) => {
-  const data = [start];
-  let current = start;
-  for (let i = 1; i < points; i++) {
-    const change = (Math.random() - (trend === "up" ? 0.3 : 0.7)) * 10;
-    current += change;
-    data.push(current);
+const formatMoney = (value: number) => {
+  if (!Number.isFinite(value)) return "$0";
+  if (Math.abs(value) >= 1_000_000) {
+    return `$${(value / 1_000_000).toFixed(2)}M`;
   }
-  return data;
+  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 };
 
-const mockLeaderboardData = [
-  {
-    id: "1",
-    agentName: "Alphatron-X",
-    ownerTwitter: "@defi_god",
-    rank: 1,
-    roi: 142.5,
-    equity: 1542000,
-    category: "intern",
-    uptime: "124d 14h",
-    chartData: generateMockChartData(20, 100, "up"),
-  },
-  {
-    id: "2",
-    agentName: "YieldSniper_v4",
-    ownerTwitter: "@quant_ninja",
-    rank: 2,
-    roi: 87.2,
-    equity: 890500,
-    category: "intern",
-    uptime: "98d 02h",
-    chartData: generateMockChartData(20, 80, "up"),
-  },
-  {
-    id: "3",
-    agentName: "ArbBot_ETH",
-    ownerTwitter: "@arb_king",
-    rank: 3,
-    roi: 64.8,
-    equity: 620000,
-    category: "intern",
-    uptime: "85d 11h",
-    chartData: generateMockChartData(20, 60, "up"),
-  },
-  {
-    id: "4",
-    agentName: "TrendFollower_Z",
-    ownerTwitter: "@trader_z",
-    rank: 4,
-    roi: 45.1,
-    equity: 450000,
-    category: "intern",
-    uptime: "64d 21h",
-    chartData: generateMockChartData(20, 50, "up"),
-  },
-  {
-    id: "5",
-    agentName: "MeanRev_Pro",
-    ownerTwitter: "@stat_arb",
-    rank: 5,
-    roi: 32.4,
-    equity: 310000,
-    category: "intern",
-    uptime: "42d 08h",
-    chartData: generateMockChartData(20, 40, "up"),
-  },
-  {
-    id: "6",
-    agentName: "Grid_Master",
-    ownerTwitter: "@grid_bot",
-    rank: 6,
-    roi: 21.9,
-    equity: 180000,
-    category: "intern",
-    uptime: "31d 15h",
-    chartData: generateMockChartData(20, 30, "up"),
-  },
-  {
-    id: "7",
-    agentName: "DeltaNeutral_x",
-    ownerTwitter: "@delta_neutral",
-    rank: 7,
-    roi: 18.5,
-    equity: 150000,
-    category: "intern",
-    uptime: "28d 04h",
-    chartData: generateMockChartData(20, 25, "up"),
-  },
-  {
-    id: "8",
-    agentName: "Scalp_Algo",
-    ownerTwitter: "@algo_scalper",
-    rank: 8,
-    roi: 15.2,
-    equity: 120000,
-    category: "intern",
-    uptime: "19d 12h",
-    chartData: generateMockChartData(20, 20, "up"),
-  },
-  {
-    id: "9",
-    agentName: "Momentum_Catch",
-    ownerTwitter: "@momentum_guy",
-    rank: 9,
-    roi: 12.8,
-    equity: 95000,
-    category: "intern",
-    uptime: "14d 06h",
-    chartData: generateMockChartData(20, 15, "up"),
-  },
-  {
-    id: "10",
-    agentName: "Steady_Yield",
-    ownerTwitter: "@steady_hands",
-    rank: 10,
-    roi: 8.5,
-    equity: 50000,
-    category: "intern",
-    uptime: "5d 22h",
-    chartData: generateMockChartData(20, 10, "up"),
-  },
-];
+const hoursSince = (ts?: string): number | null => {
+  if (!ts) return null;
+  const t = new Date(ts).getTime();
+  if (!Number.isFinite(t) || t <= 0) return null;
+  const diffMs = Date.now() - t;
+  if (diffMs < 0) return 0;
+  return Math.floor(diffMs / 3600000);
+};
 
-const mockEliminatedData = Array.from({ length: 50 })
-  .map((_, i) => {
-    const hoursAgo = Math.floor(Math.random() * 6) + i * 2 + 1;
-    return {
-      id: `elim-1000${i}`,
-      agentName: `Agent_${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
-      category: "intern",
-      uptime: `${Math.floor(Math.random() * 10)}d ${Math.floor(Math.random() * 24)}h`,
-      eliminatedHoursAgo: hoursAgo,
-    };
-  })
-  .sort((a, b) => a.eliminatedHoursAgo - b.eliminatedHoursAgo);
+const formatUptime = (days?: number, ts?: string): string => {
+  if (days && days > 0) {
+    const d = Math.floor(days);
+    return `${d}d`;
+  }
+  const h = hoursSince(ts);
+  if (h === null) return "--";
+  const d = Math.floor(h / 24);
+  const hr = h % 24;
+  if (d > 0) return `${d}d ${hr}h`;
+  return `${hr}h`;
+};
+
+const formatOwner = (creator?: string): string => {
+  const v = (creator || "").trim();
+  if (!v) return "未公开";
+  if (v.startsWith("@")) return v;
+  if (v.includes(" ")) return v;
+  return `@${v}`;
+};
+
+const calcROI = (s: Strategy): number => {
+  const pnl = Number(s.pnlContribution || 0);
+  const baseFromInitial = Number(s.initialCapital || 0);
+  if (baseFromInitial > 0) {
+    return (pnl / baseFromInitial) * 100;
+  }
+  const tvl = Number(s.currentTvl || 0);
+  if (tvl <= 0) return 0;
+  return (pnl / tvl) * 100;
+};
+
+const buildChartData = (s: Strategy): number[] => {
+  const daily = Array.isArray(s.performance?.daily)
+    ? s.performance.daily.filter((x) => Number.isFinite(x))
+    : [];
+  if (daily.length >= 2) {
+    return daily.slice(-20);
+  }
+  return [];
+};
+
+type LeaderboardItem = {
+  id: string;
+  agentName: string;
+  owner: string;
+  rank: number;
+  roi: number;
+  equity: number;
+  category: string;
+  uptime: string;
+  chartData: number[];
+};
+
+type EliminatedItem = {
+  id: string;
+  agentName: string;
+  category: string;
+  uptime: string;
+  eliminatedHoursAgo: number | null;
+};
 
 const MiniChart = ({
   data,
@@ -182,7 +120,7 @@ const MiniChart = ({
   data: number[];
   positive: boolean;
 }) => {
-  if (!data || data.length === 0) return null;
+  if (!data || data.length < 2) return null;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const width = 60;
@@ -208,13 +146,6 @@ const MiniChart = ({
       viewBox={`0 0 ${width} ${height}`}
       className="overflow-visible"
     >
-      {/* Gradient definition for fill */}
-      <defs>
-        <linearGradient id={`gradient-${data[0]}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.2" />
-          <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
-        </linearGradient>
-      </defs>
       <polyline
         fill="none"
         stroke={strokeColor}
@@ -223,75 +154,23 @@ const MiniChart = ({
         strokeLinejoin="round"
         points={points}
       />
-      <polygon
-        fill={`url(#gradient-${data[0]})`}
-        points={`${points} ${width},${height} 0,${height}`}
-      />
     </svg>
   );
 };
 
-const LeaderboardRow = ({
-  item,
-}: {
-  item: (typeof mockLeaderboardData)[0];
-}) => {
-  let rankStyle: React.CSSProperties = { color: "var(--text-secondary)" };
-  let rowStyle: React.CSSProperties = {
-    borderBottom: "1px solid var(--border)",
-  };
-
-  if (item.rank === 1) {
-    rankStyle = {
-      color: "#FFD700",
-      textShadow: "0 0 10px rgba(255,215,0,0.5)",
-    }; // Gold
-    rowStyle = {
-      ...rowStyle,
-      background:
-        "linear-gradient(90deg, rgba(255,215,0,0.05) 0%, transparent 100%)",
-      borderLeft: "2px solid #FFD700",
-    };
-  } else if (item.rank === 2) {
-    rankStyle = {
-      color: "#C0C0C0",
-      textShadow: "0 0 10px rgba(192,192,192,0.5)",
-    }; // Silver
-    rowStyle = {
-      ...rowStyle,
-      background:
-        "linear-gradient(90deg, rgba(192,192,192,0.05) 0%, transparent 100%)",
-      borderLeft: "2px solid #C0C0C0",
-    };
-  } else if (item.rank === 3) {
-    rankStyle = {
-      color: "#CD7F32",
-      textShadow: "0 0 10px rgba(205,127,50,0.5)",
-    }; // Bronze
-    rowStyle = {
-      ...rowStyle,
-      background:
-        "linear-gradient(90deg, rgba(205,127,50,0.05) 0%, transparent 100%)",
-      borderLeft: "2px solid #CD7F32",
-    };
-  }
-
+const LeaderboardRow = ({ item }: { item: LeaderboardItem }) => {
   const tier = tierColor(item.category);
+  const roiColor = item.roi >= 0 ? "var(--green)" : "var(--red)";
+  const roiPrefix = item.roi >= 0 ? "+" : "";
 
   return (
     <div
       className="grid grid-cols-12 gap-4 py-3 px-4 hover:bg-[var(--bg-card-hover)] transition-colors items-center text-sm font-mono"
-      style={rowStyle}
+      style={{ borderBottom: "1px solid var(--border)" }}
     >
-      <div
-        className="col-span-1 text-center font-bold text-lg"
-        style={rankStyle}
-      >
-        #{item.rank}
-      </div>
+      <div className="col-span-1 text-center font-bold text-lg">#{item.rank}</div>
       <div className="col-span-3 flex items-center gap-3">
         <div className="w-8 h-8 rounded shrink-0 bg-[#0a0a0c] border border-[var(--border)] flex items-center justify-center relative overflow-hidden">
-          {/* Simple identicon placeholder */}
           <div
             className="absolute inset-0 opacity-30"
             style={{
@@ -303,12 +182,8 @@ const LeaderboardRow = ({
           </span>
         </div>
         <div>
-          <div className="font-bold text-[var(--text-primary)]">
-            {item.agentName}
-          </div>
-          <div className="text-xs text-[var(--text-tertiary)]">
-            {item.ownerTwitter}
-          </div>
+          <div className="font-bold text-[var(--text-primary)]">{item.agentName}</div>
+          <div className="text-xs text-[var(--text-tertiary)]">{item.owner}</div>
         </div>
       </div>
       <div className="col-span-1 flex items-center">
@@ -323,116 +198,24 @@ const LeaderboardRow = ({
           {item.category}
         </span>
       </div>
-      <div className="col-span-2 text-right text-[var(--text-tertiary)]">
-        {item.uptime}
-      </div>
-      <div
-        className="col-span-2 text-right font-bold whitespace-nowrap"
-        style={{ color: "var(--green)" }}
-      >
-        +{item.roi.toFixed(1)}%
+      <div className="col-span-2 text-right text-[var(--text-tertiary)]">{item.uptime}</div>
+      <div className="col-span-2 text-right font-bold whitespace-nowrap" style={{ color: roiColor }}>
+        {roiPrefix}
+        {item.roi.toFixed(1)}%
       </div>
       <div className="col-span-3 text-right text-[var(--text-primary)] flex items-center justify-end gap-4 pl-2 whitespace-nowrap">
-        <div className="shrink-0 w-[60px] hidden sm:flex items-center">
+        <div className="shrink-0 w-[60px] hidden sm:flex items-center justify-end">
           <MiniChart data={item.chartData} positive={item.roi >= 0} />
         </div>
-        <span>${item.equity.toLocaleString()}</span>
+        <span>{formatMoney(item.equity)}</span>
       </div>
-    </div>
-  );
-};
-
-const FloatingEmojis = ({
-  emojis,
-  intervalRange,
-  direction,
-}: {
-  emojis: string[];
-  intervalRange: [number, number];
-  direction: "down-left" | "down-right";
-}) => {
-  const [activeEmojis, setActiveEmojis] = useState<
-    {
-      id: number;
-      emoji: string;
-      offset: number;
-      duration: number;
-      scale: number;
-    }[]
-  >([]);
-
-  useEffect(() => {
-    let idCounter = 0;
-    let timeoutId: NodeJS.Timeout;
-
-    const spawnEmoji = () => {
-      const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-      const offset = Math.random() * 100; // offset for randomizing path
-      const duration = 6 + Math.random() * 6; // 6-12s duration
-      const scale = 0.8 + Math.random() * 0.8; // 0.8 to 1.6 rem
-      const id = idCounter++;
-
-      setActiveEmojis((prev) => [
-        ...prev,
-        { id, emoji, offset, duration, scale },
-      ]);
-
-      setTimeout(() => {
-        setActiveEmojis((prev) => prev.filter((e) => e.id !== id));
-      }, duration * 1000);
-
-      const nextInterval =
-        intervalRange[0] +
-        Math.random() * (intervalRange[1] - intervalRange[0]);
-      timeoutId = setTimeout(spawnEmoji, nextInterval);
-    };
-
-    timeoutId = setTimeout(spawnEmoji, Math.random() * 2000);
-    return () => clearTimeout(timeoutId);
-  }, [emojis, intervalRange]);
-
-  const animationName =
-    direction === "down-left" ? "slideDownLeft" : "slideDownRight";
-
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-      <style>{`
-        @keyframes slideDownLeft {
-          0% { left: 110%; top: -20%; opacity: 0; transform: rotate(15deg); }
-          10% { opacity: 0.5; }
-          90% { opacity: 0.5; }
-          100% { left: -10%; top: 120%; opacity: 0; transform: rotate(-15deg); }
-        }
-        @keyframes slideDownRight {
-          0% { left: -10%; top: -20%; opacity: 0; transform: rotate(-15deg); }
-          10% { opacity: 0.5; }
-          90% { opacity: 0.5; }
-          100% { left: 110%; top: 120%; opacity: 0; transform: rotate(15deg); }
-        }
-      `}</style>
-      {activeEmojis.map((item) => (
-        <span
-          key={item.id}
-          className="absolute whitespace-nowrap"
-          style={{
-            marginLeft:
-              direction === "down-left" ? "0" : `${item.offset - 50}px`,
-            marginTop:
-              direction === "down-left" ? `${item.offset - 50}px` : "0",
-            fontSize: `${item.scale}rem`,
-            animation: `${animationName} ${item.duration}s linear forwards`,
-          }}
-        >
-          {item.emoji}
-        </span>
-      ))}
     </div>
   );
 };
 
 const Strategies = () => {
   const dispatch = useAppDispatch();
-  useAppSelector((state) => state.strategies);
+  const { items, loading } = useAppSelector((state) => state.strategies);
   const [searchTerm, setSearchTerm] = useState("");
   const { t } = useLanguage();
 
@@ -440,7 +223,58 @@ const Strategies = () => {
     dispatch(fetchStrategies());
   }, [dispatch]);
 
-  const isMarketEnabled = true; // import.meta.env.VITE_ENABLE_STRATEGIES === 'true';
+  const { leaderboard, eliminated } = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    const filtered = items.filter((s) => {
+      if (!q) return true;
+      return (
+        s.name.toLowerCase().includes(q) ||
+        s.id.toLowerCase().includes(q) ||
+        (s.creator || "").toLowerCase().includes(q)
+      );
+    });
+
+    const active = filtered
+      .filter((s) => s.agentStatus === "active")
+      .sort((a, b) => calcROI(b) - calcROI(a));
+
+    const leaderboardRows: LeaderboardItem[] = active.map((s, idx) => ({
+      id: s.id,
+      agentName: s.name || `${s.id.slice(0, 8)}...`,
+      owner: formatOwner(s.creator),
+      rank: idx + 1,
+      roi: calcROI(s),
+      equity: Number(s.currentTvl || 0),
+      category: s.category || "intern",
+      uptime: formatUptime(s.runningDays, s.lastSyncedAt),
+      chartData: buildChartData(s),
+    }));
+
+    const eliminatedRows: EliminatedItem[] = filtered
+      .filter((s) => s.agentStatus !== "active")
+      .sort((a, b) => {
+        const ah = hoursSince(a.lastSyncedAt);
+        const bh = hoursSince(b.lastSyncedAt);
+        if (ah === null && bh === null) return 0;
+        if (ah === null) return 1;
+        if (bh === null) return -1;
+        return ah - bh;
+      })
+      .map((s) => ({
+        id: s.id,
+        agentName: s.name || `${s.id.slice(0, 8)}...`,
+        category: s.category || "intern",
+        uptime: formatUptime(s.runningDays, s.lastSyncedAt),
+        eliminatedHoursAgo: hoursSince(s.lastSyncedAt),
+      }));
+
+    return {
+      leaderboard: leaderboardRows,
+      eliminated: eliminatedRows,
+    };
+  }, [items, searchTerm]);
+
+  const isMarketEnabled = true;
 
   if (!isMarketEnabled) {
     return (
@@ -472,7 +306,6 @@ const Strategies = () => {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Header */}
       <div
         className="flex flex-col justify-between gap-4 md:flex-row md:items-center pb-6"
         style={{ borderBottom: "1px solid var(--border)" }}
@@ -484,16 +317,12 @@ const Strategies = () => {
           >
             {t("strategies.title")}
           </h1>
-          <p
-            className="mt-1 text-sm"
-            style={{ color: "var(--text-secondary)" }}
-          >
+          <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
             {t("strategies.subtitle")}
           </p>
         </div>
 
         <div className="flex flex-wrap gap-3 items-center">
-          {/* Search */}
           <div className="relative">
             <Search
               className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
@@ -526,63 +355,40 @@ const Strategies = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up">
-        {/* Main Leaderboard */}
         <div className="lg:col-span-2 rounded border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden flex flex-col">
           <div className="overflow-x-auto custom-scrollbar">
             <div className="min-w-[850px]">
-              {/* Table Header */}
-              <div className="grid grid-cols-12 gap-4 py-5 px-4 border-b border-[var(--border)] bg-[rgba(0,0,0,0.2)] text-xs font-mono font-bold text-[var(--text-tertiary)] uppercase tracking-wider relative overflow-hidden items-center min-h-[56px]">
-                <FloatingEmojis
-                  emojis={["💰", "💵", "🤑", "🚀", "🔥"]}
-                  intervalRange={[2000, 6000]}
-                  direction="down-left"
-                />
-                <div className="col-span-1 text-center relative z-10">
-                  {t("strategies.leaderboard.rank")}
-                </div>
-                <div className="col-span-3 relative z-10">
-                  {t("strategies.leaderboard.agentOwner")}
-                </div>
-                <div className="col-span-1 relative z-10">
-                  {t("strategies.leaderboard.tier")}
-                </div>
-                <div className="col-span-2 text-right relative z-10">
-                  {t("strategies.leaderboard.uptime")}
-                </div>
-                <div className="col-span-2 text-right relative z-10">
-                  {t("strategies.leaderboard.roi30d")}
-                </div>
-                <div className="col-span-3 text-right relative z-10">
-                  {t("strategies.leaderboard.accountValue")}
-                </div>
+              <div className="grid grid-cols-12 gap-4 py-5 px-4 border-b border-[var(--border)] bg-[rgba(0,0,0,0.2)] text-xs font-mono font-bold text-[var(--text-tertiary)] uppercase tracking-wider items-center min-h-[56px]">
+                <div className="col-span-1 text-center">{t("strategies.leaderboard.rank")}</div>
+                <div className="col-span-3">{t("strategies.leaderboard.agentOwner")}</div>
+                <div className="col-span-1">{t("strategies.leaderboard.tier")}</div>
+                <div className="col-span-2 text-right">{t("strategies.leaderboard.uptime")}</div>
+                <div className="col-span-2 text-right">{t("strategies.leaderboard.roi30d")}</div>
+                <div className="col-span-3 text-right">{t("strategies.leaderboard.accountValue")}</div>
               </div>
 
-              {/* Table Body */}
               <div className="flex flex-col">
-                {mockLeaderboardData.map((item) => (
+                {leaderboard.map((item) => (
                   <LeaderboardRow key={item.id} item={item} />
                 ))}
+                {leaderboard.length === 0 && (
+                  <div className="py-10 text-center text-sm font-mono" style={{ color: "var(--text-tertiary)" }}>
+                    {loading ? "Loading..." : "No active agents"}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Eliminated List */}
         <div className="lg:col-span-1 rounded border border-[#3C161D] bg-[#12070A] overflow-hidden flex flex-col">
-          <div className="py-5 px-4 border-b border-[#3C161D] bg-[#1A0A0E] text-xs font-mono font-bold text-[#FF4B4B] uppercase tracking-wider flex items-center gap-2 relative overflow-hidden min-h-[56px]">
-            <FloatingEmojis
-              emojis={["💣", "💀", "📉", "🩸", "😭"]}
-              intervalRange={[3000, 7000]}
-              direction="down-right"
-            />
-            <span className="w-2 h-2 rounded-full bg-[#FF4B4B] animate-pulse relative z-10"></span>
-            <span className="relative z-10">
-              {t("strategies.leaderboard.eliminatedList")}
-            </span>
+          <div className="py-5 px-4 border-b border-[#3C161D] bg-[#1A0A0E] text-xs font-mono font-bold text-[#FF4B4B] uppercase tracking-wider flex items-center gap-2 min-h-[56px]">
+            <span className="w-2 h-2 rounded-full bg-[#FF4B4B] animate-pulse"></span>
+            <span>{t("strategies.leaderboard.eliminatedList")}</span>
           </div>
 
           <div className="flex flex-col overflow-y-auto max-h-[700px] custom-scrollbar">
-            {mockEliminatedData.map((item) => (
+            {eliminated.map((item) => (
               <div
                 key={item.id}
                 className="py-2.5 px-4 border-b border-[#2A0F14] hover:bg-[#1A0A0E] transition-colors flex justify-between items-center text-sm font-mono text-[#D4C3C6]"
@@ -595,10 +401,12 @@ const Strategies = () => {
                     {item.agentName}
                   </span>
                   <span className="text-[10px] text-[#FF4B4B] opacity-80 uppercase">
-                    {t("strategies.leaderboard.hoursAgo").replace(
-                      "{h}",
-                      item.eliminatedHoursAgo.toString(),
-                    )}
+                    {item.eliminatedHoursAgo === null
+                      ? "--"
+                      : t("strategies.leaderboard.hoursAgo").replace(
+                          "{h}",
+                          item.eliminatedHoursAgo.toString(),
+                        )}
                   </span>
                 </div>
                 <div className="flex flex-col items-end gap-1">
@@ -611,6 +419,11 @@ const Strategies = () => {
                 </div>
               </div>
             ))}
+            {eliminated.length === 0 && (
+              <div className="py-10 text-center text-xs font-mono text-[#8f6f73]">
+                No eliminated agents
+              </div>
+            )}
           </div>
         </div>
       </div>
