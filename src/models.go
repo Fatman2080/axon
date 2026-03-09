@@ -66,6 +66,7 @@ type AgentMarketItem struct {
 	AgentStatus    string  `json:"agentStatus,omitempty"` // "inactive", "active"
 	TVL            float64 `json:"tvl,omitempty"`
 	LastSyncedAt   string  `json:"lastSyncedAt,omitempty"`
+	StartedAt      string  `json:"startedAt,omitempty"`
 	PerformanceFee float64 `json:"performanceFee"`
 	InitialCapital float64 `json:"initialCapital,omitempty"`
 }

@@ -24,6 +24,15 @@ const initialState: StrategyState = {
   error: null,
 };
 
+function calcRunningDays(startedAt?: string): number {
+  if (!startedAt) return 0;
+  const ts = new Date(startedAt).getTime();
+  if (!Number.isFinite(ts) || ts <= 0) return 0;
+  const diff = Date.now() - ts;
+  if (diff <= 0) return 0;
+  return Math.floor(diff / 86400000);
+}
+
 function mapAgentToStrategy(agent: AgentMarketItem): Strategy {
   const name = agent.name || agent.userName || (agent.publicKey ? agent.publicKey.slice(0, 10) + '...' : 'Unknown');
 
@@ -35,7 +44,7 @@ function mapAgentToStrategy(agent: AgentMarketItem): Strategy {
     minInvestment: 0,
     riskLevel: 'medium',
     expectedReturn: 0,
-    runningDays: 0,
+    runningDays: calcRunningDays(agent.startedAt),
     userCount: 0,
     creator: agent.userName || '',
     currentTvl: agent.tvl || agent.accountValue || 0,
@@ -59,6 +68,7 @@ function mapAgentToStrategy(agent: AgentMarketItem): Strategy {
     agentStatus: agent.agentStatus,
     initialCapital: agent.initialCapital,
     lastSyncedAt: agent.lastSyncedAt,
+    startedAt: agent.startedAt,
   };
 }
 

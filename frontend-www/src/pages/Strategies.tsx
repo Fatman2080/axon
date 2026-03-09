@@ -51,12 +51,12 @@ const hoursSince = (ts?: string): number | null => {
   return Math.floor(diffMs / 3600000);
 };
 
-const formatUptime = (days?: number, ts?: string): string => {
+const formatUptime = (days?: number, startedAt?: string): string => {
   if (days && days > 0) {
     const d = Math.floor(days);
     return `${d}d`;
   }
-  const h = hoursSince(ts);
+  const h = hoursSince(startedAt);
   if (h === null) return "--";
   const d = Math.floor(h / 24);
   const hr = h % 24;
@@ -64,9 +64,9 @@ const formatUptime = (days?: number, ts?: string): string => {
   return `${hr}h`;
 };
 
-const formatOwner = (creator?: string): string => {
+const formatOwner = (creator: string | undefined, notPublicLabel: string): string => {
   const v = (creator || "").trim();
-  if (!v) return "未公开";
+  if (!v) return notPublicLabel;
   if (v.startsWith("@")) return v;
   if (v.includes(" ")) return v;
   return `@${v}`;
@@ -241,12 +241,12 @@ const Strategies = () => {
     const leaderboardRows: LeaderboardItem[] = active.map((s, idx) => ({
       id: s.id,
       agentName: s.name || `${s.id.slice(0, 8)}...`,
-      owner: formatOwner(s.creator),
+      owner: formatOwner(s.creator, t("strategies.leaderboard.notPublic")),
       rank: idx + 1,
       roi: calcROI(s),
       equity: Number(s.currentTvl || 0),
       category: s.category || "intern",
-      uptime: formatUptime(s.runningDays, s.lastSyncedAt),
+      uptime: formatUptime(s.runningDays, s.startedAt),
       chartData: buildChartData(s),
     }));
 
@@ -264,7 +264,7 @@ const Strategies = () => {
         id: s.id,
         agentName: s.name || `${s.id.slice(0, 8)}...`,
         category: s.category || "intern",
-        uptime: formatUptime(s.runningDays, s.lastSyncedAt),
+        uptime: formatUptime(s.runningDays, s.startedAt),
         eliminatedHoursAgo: hoursSince(s.lastSyncedAt),
       }));
 
@@ -272,7 +272,7 @@ const Strategies = () => {
       leaderboard: leaderboardRows,
       eliminated: eliminatedRows,
     };
-  }, [items, searchTerm]);
+  }, [items, searchTerm, t]);
 
   const isMarketEnabled = true;
 

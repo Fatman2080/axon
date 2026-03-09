@@ -511,7 +511,8 @@ func (s *Store) listAgentStats(search string) ([]AgentMarketItem, error) {
 		       IFNULL(a.evm_balance, 0),
 		       IFNULL(a.agent_status, 'inactive'),
 		       IFNULL(a.performance_fee, 0.2),
-		       IFNULL(a.initial_capital, 0)
+		       IFNULL(a.initial_capital, 0),
+		       IFNULL(a.assigned_at, '')
 		FROM agent_accounts a
 		LEFT JOIN users u ON u.id = a.assigned_user_id
 		LEFT JOIN (
@@ -561,6 +562,7 @@ func (s *Store) listAgentStats(search string) ([]AgentMarketItem, error) {
 			&item.AgentStatus,
 			&item.PerformanceFee,
 			&item.InitialCapital,
+			&item.StartedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -594,7 +596,8 @@ func (s *Store) getAgentStats(publicKey string) (AgentMarketItem, error) {
 		       IFNULL(a.evm_balance, 0),
 		       IFNULL(a.agent_status, 'inactive'),
 		       IFNULL(a.performance_fee, 0.2),
-		       IFNULL(a.initial_capital, 0)
+		       IFNULL(a.initial_capital, 0),
+		       IFNULL(a.assigned_at, '')
 		FROM agent_accounts a
 		LEFT JOIN users u ON u.id = a.assigned_user_id
 		LEFT JOIN (
@@ -628,6 +631,7 @@ func (s *Store) getAgentStats(publicKey string) (AgentMarketItem, error) {
 		&item.AgentStatus,
 		&item.PerformanceFee,
 		&item.InitialCapital,
+		&item.StartedAt,
 	)
 	if err != nil {
 		return AgentMarketItem{}, err
@@ -848,7 +852,7 @@ func (s *Store) listRecentVaultOrdersForActiveAgents(limit int) ([]VaultFill, er
 func (s *Store) getAgentCreatedAt(publicKey string) string {
 	publicKey = strings.ToLower(strings.TrimSpace(publicKey))
 	var createdAt string
-	s.db.QueryRow(`SELECT created_at FROM agent_accounts WHERE public_key = ?`, publicKey).Scan(&createdAt)
+	s.db.QueryRow(`SELECT IFNULL(assigned_at, '') FROM agent_accounts WHERE public_key = ?`, publicKey).Scan(&createdAt)
 	return createdAt
 }
 

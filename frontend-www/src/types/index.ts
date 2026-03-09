@@ -59,6 +59,7 @@ export interface Strategy {
   agentStatus?: 'inactive' | 'active' | 'revoked';
   initialCapital?: number;
   lastSyncedAt?: string;
+  startedAt?: string;
 }
 
 export interface Review {
@@ -150,6 +151,7 @@ export interface AgentMarketItem {
   agentStatus?: 'inactive' | 'active' | 'revoked';
   tvl?: number;
   lastSyncedAt?: string;
+  startedAt?: string;
   performanceFee?: number;
   initialCapital?: number;
 }
