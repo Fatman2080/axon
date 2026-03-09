@@ -1,0 +1,37 @@
+# Build
+build/
+dist/
+
+# Go
+vendor/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Chain data
+~/.axon/
+
+# Test
+coverage.out
+coverage.html
+
+# Protobuf generated
+*.pb.go
+*.pb.gw.go
+
+# Environment
+.env
+.env.local

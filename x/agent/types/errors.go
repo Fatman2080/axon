@@ -1,0 +1,17 @@
+package types
+
+import "cosmossdk.io/errors"
+
+var (
+	ErrAgentAlreadyRegistered = errors.Register(ModuleName, 1100, "agent already registered")
+	ErrAgentNotFound          = errors.Register(ModuleName, 1101, "agent not found")
+	ErrInsufficientStake      = errors.Register(ModuleName, 1102, "insufficient stake amount")
+	ErrAgentSuspended         = errors.Register(ModuleName, 1103, "agent is suspended")
+	ErrHeartbeatTooFrequent   = errors.Register(ModuleName, 1104, "heartbeat sent too frequently")
+	ErrChallengeNotActive     = errors.Register(ModuleName, 1105, "no active AI challenge")
+	ErrChallengeExpired       = errors.Register(ModuleName, 1106, "AI challenge submission window expired")
+	ErrAlreadySubmitted       = errors.Register(ModuleName, 1107, "already submitted response for this epoch")
+	ErrInvalidReveal          = errors.Register(ModuleName, 1108, "reveal does not match commit hash")
+	ErrReputationTooLow       = errors.Register(ModuleName, 1109, "reputation below minimum threshold")
+	ErrDeregisterCooldown     = errors.Register(ModuleName, 1110, "agent in deregister cooldown period")
+)
