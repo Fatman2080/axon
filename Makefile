@@ -112,3 +112,37 @@ docker-build:
 
 docker-run:
 	@docker run -it --rm -p 26656:26656 -p 26657:26657 -p 8545:8545 axon-chain/axon:$(VERSION)
+
+###############################################################################
+###                          Public Testnet                                 ###
+###############################################################################
+
+testnet-up:
+	@echo "Starting Axon public testnet (Docker)..."
+	@docker compose -f testnet/docker-compose.yml up -d --build
+	@echo ""
+	@echo "  JSON-RPC: http://localhost:8545"
+	@echo "  Faucet:   http://localhost:8080"
+	@echo "  Explorer: http://localhost:4000"
+	@echo "  CometBFT: http://localhost:26657"
+
+testnet-down:
+	@docker compose -f testnet/docker-compose.yml down
+
+testnet-reset:
+	@docker compose -f testnet/docker-compose.yml down -v
+	@echo "Testnet data cleared."
+
+testnet-logs:
+	@docker compose -f testnet/docker-compose.yml logs -f
+
+testnet-status:
+	@docker compose -f testnet/docker-compose.yml ps
+
+monitoring-up:
+	@docker compose -f testnet/monitoring/docker-compose.yml up -d
+	@echo "  Grafana:    http://localhost:3000 (admin/axon)"
+	@echo "  Prometheus: http://localhost:9091"
+
+monitoring-down:
+	@docker compose -f testnet/monitoring/docker-compose.yml down

@@ -38,24 +38,29 @@ axond (single binary)
 
 ## Quick Start
 
-### Build
+### Option 1: Docker (recommended)
+
+```bash
+# Start full testnet (4 validators + faucet + explorer)
+docker compose -f testnet/docker-compose.yml up -d
+
+# JSON-RPC: http://localhost:8545
+# Faucet:   http://localhost:8080
+# Explorer: http://localhost:4000
+```
+
+### Option 2: Build from source
 
 ```bash
 make build
-```
-
-### Local Single Node
-
-```bash
 bash scripts/local_node.sh
 ./build/axond start --home ~/.axond --chain-id axon_9001-1 --json-rpc.enable
 ```
 
-### Local 4-Node Testnet
+### Option 3: Cloud deployment
 
 ```bash
-bash scripts/localnet.sh
-~/.axon-localnet/start_all.sh
+curl -sSL https://raw.githubusercontent.com/Fatman2080/axon/main/testnet/deploy-node.sh | bash
 ```
 
 ### Run Tests
@@ -120,6 +125,12 @@ axon/
 ├── contracts/              # Solidity interfaces & examples
 ├── proto/                  # Protobuf definitions
 ├── sdk/python/             # Python Agent SDK
+├── testnet/                # Public testnet deployment
+│   ├── docker-compose.yml  # Full testnet stack
+│   ├── faucet/             # Go faucet API server
+│   ├── monitoring/         # Prometheus + Grafana
+│   ├── deploy-node.sh      # Cloud one-click deploy
+│   └── init-testnet.sh     # Genesis initializer
 ├── explorer/               # Blockscout block explorer (Docker)
 ├── scripts/                # Node init & testnet scripts
 ├── docs/                   # Whitepaper & documentation

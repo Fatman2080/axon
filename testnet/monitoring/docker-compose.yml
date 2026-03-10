@@ -1,0 +1,58 @@
+version: "3.8"
+
+# ============================================================
+# Axon Testnet Monitoring Stack
+#
+# Usage (run from testnet/ directory):
+#   docker compose -f monitoring/docker-compose.yml up -d
+#
+# Endpoints:
+#   Prometheus:  http://localhost:9091
+#   Grafana:     http://localhost:3000 (admin/axon)
+# ============================================================
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: axon-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9091:9090"
+    networks:
+      - axon-testnet
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: axon-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: axon
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/default.yml:ro
+      - ./grafana-dashboard.json:/var/lib/grafana/dashboards/axon.json:ro
+      - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/default.yml:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - axon-testnet
+
+networks:
+  axon-testnet:
+    external: true
+    name: testnet_axon-testnet
+
+volumes:
+  prometheus-data:
+  grafana-data:

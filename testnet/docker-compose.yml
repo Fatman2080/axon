@@ -1,0 +1,228 @@
+version: "3.8"
+
+# ============================================================
+# Axon Public Testnet — Docker Compose
+#
+# Usage:
+#   docker compose -f testnet/docker-compose.yml up -d
+#
+# Services:
+#   4 validator nodes, faucet API, block explorer (Blockscout)
+# ============================================================
+
+x-axon-node: &axon-node
+  build:
+    context: ..
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  networks:
+    - axon-testnet
+
+services:
+  # ── Init container: generates genesis & config ────────────
+  init:
+    <<: *axon-node
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        if [ -f /data/axon-testnet/network-info.json ]; then
+          echo "Testnet already initialized, skipping."
+          exit 0
+        fi
+        bash /scripts/init-testnet.sh
+    environment:
+      CHAIN_ID: axon_9001-1
+      NUM_VALIDATORS: "4"
+      BASE_DIR: /data/axon-testnet
+      BINARY: axond
+    volumes:
+      - testnet-data:/data
+      - ./init-testnet.sh:/scripts/init-testnet.sh:ro
+      - ./genesis-patch.py:/scripts/genesis-patch.py:ro
+
+  # ── Validator Node 0 (seed node + RPC gateway) ───────────
+  axon-node-0:
+    <<: *axon-node
+    container_name: axon-node-0
+    hostname: axon-node-0
+    command:
+      - start
+      - --home=/data/axon-testnet/node0
+      - --chain-id=axon_9001-1
+      - --json-rpc.enable
+      - --json-rpc.address=0.0.0.0:8545
+      - --json-rpc.ws-address=0.0.0.0:8546
+      - --json-rpc.api=eth,txpool,personal,net,debug,web3
+      - --api.enable
+      - --api.address=tcp://0.0.0.0:1317
+      - --grpc.address=0.0.0.0:9090
+    ports:
+      - "26656:26656"    # P2P
+      - "26657:26657"    # CometBFT RPC
+      - "8545:8545"      # JSON-RPC
+      - "8546:8546"      # WebSocket
+      - "1317:1317"      # REST API
+      - "9090:9090"      # gRPC
+    volumes:
+      - testnet-data:/data
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:26657/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── Validator Node 1 ─────────────────────────────────────
+  axon-node-1:
+    <<: *axon-node
+    container_name: axon-node-1
+    hostname: axon-node-1
+    command:
+      - start
+      - --home=/data/axon-testnet/node1
+      - --chain-id=axon_9001-1
+      - --json-rpc.enable
+      - --json-rpc.address=0.0.0.0:8545
+      - --json-rpc.ws-address=0.0.0.0:8546
+    volumes:
+      - testnet-data:/data
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  # ── Validator Node 2 ─────────────────────────────────────
+  axon-node-2:
+    <<: *axon-node
+    container_name: axon-node-2
+    hostname: axon-node-2
+    command:
+      - start
+      - --home=/data/axon-testnet/node2
+      - --chain-id=axon_9001-1
+      - --json-rpc.enable
+      - --json-rpc.address=0.0.0.0:8545
+      - --json-rpc.ws-address=0.0.0.0:8546
+    volumes:
+      - testnet-data:/data
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  # ── Validator Node 3 ─────────────────────────────────────
+  axon-node-3:
+    <<: *axon-node
+    container_name: axon-node-3
+    hostname: axon-node-3
+    command:
+      - start
+      - --home=/data/axon-testnet/node3
+      - --chain-id=axon_9001-1
+      - --json-rpc.enable
+      - --json-rpc.address=0.0.0.0:8545
+      - --json-rpc.ws-address=0.0.0.0:8546
+    volumes:
+      - testnet-data:/data
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  # ── Faucet API ───────────────────────────────────────────
+  faucet:
+    build:
+      context: ..
+      dockerfile: testnet/faucet/Dockerfile
+    container_name: axon-faucet
+    restart: unless-stopped
+    environment:
+      RPC_URL: http://axon-node-0:8545
+      CHAIN_ID: "9001"
+      FAUCET_PRIVATE_KEY_FILE: /data/axon-testnet/faucet_private_key.txt
+      DRIP_AMOUNT: "10"
+      COOLDOWN_SECONDS: "86400"
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    volumes:
+      - testnet-data:/data:ro
+    depends_on:
+      axon-node-0:
+        condition: service_healthy
+    networks:
+      - axon-testnet
+
+  # ── Block Explorer (Blockscout) ──────────────────────────
+  explorer-db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: blockscout
+      POSTGRES_USER: blockscout
+      POSTGRES_DB: blockscout
+    volumes:
+      - explorer-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blockscout"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - axon-testnet
+
+  explorer-redis:
+    image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - axon-testnet
+
+  explorer:
+    image: blockscout/blockscout:latest
+    container_name: axon-explorer
+    restart: always
+    depends_on:
+      explorer-db:
+        condition: service_healthy
+      explorer-redis:
+        condition: service_healthy
+      axon-node-0:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://blockscout:blockscout@explorer-db:5432/blockscout
+      ETHEREUM_JSONRPC_VARIANT: geth
+      ETHEREUM_JSONRPC_HTTP_URL: http://axon-node-0:8545
+      ETHEREUM_JSONRPC_WS_URL: ws://axon-node-0:8546
+      CHAIN_ID: "9001"
+      COIN: AXON
+      COIN_NAME: Axon
+      NETWORK: "Axon Testnet"
+      SUBNETWORK: "Axon Public Testnet"
+      BLOCKSCOUT_HOST: localhost
+      BLOCKSCOUT_PROTOCOL: http
+      INDEXER_DISABLE_INTERNAL_TRANSACTIONS_FETCHER: "true"
+      INDEXER_DISABLE_PENDING_TRANSACTIONS_FETCHER: "true"
+      FETCH_REWARDS_WAY: manual
+      POOL_SIZE: "50"
+      POOL_SIZE_API: "10"
+      ECTO_USE_SSL: "false"
+      ACCOUNT_REDIS_URL: redis://explorer-redis:6379
+      SECRET_KEY_BASE: "change_me_in_production_axon_testnet_secret_key_base_at_least_64_chars_long_1234567890"
+    ports:
+      - "4000:4000"
+    networks:
+      - axon-testnet
+
+networks:
+  axon-testnet:
+    driver: bridge
+
+volumes:
+  testnet-data:
+  explorer-db:
