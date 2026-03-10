@@ -4,6 +4,7 @@ import (
 	"context"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
 type BankKeeper interface {
@@ -13,5 +14,5 @@ type BankKeeper interface {
 }
 
 type StakingKeeper interface {
-	GetValidator(ctx context.Context, addr sdk.ValAddress) (validator interface{}, err error)
+	GetValidator(ctx context.Context, addr sdk.ValAddress) (stakingtypes.Validator, error)
 }

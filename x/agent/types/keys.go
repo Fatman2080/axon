@@ -1,40 +1,73 @@
 package types
 
+import "encoding/binary"
+
 const (
 	ModuleName = "agent"
 	StoreKey   = ModuleName
 	RouterKey  = ModuleName
 
-	// KV store prefixes
-	AgentKeyPrefix        = "Agent/value/"
-	AgentCountKey         = "Agent/count"
-	ParamsKey             = "Params"
-	ChallengeKeyPrefix    = "Challenge/value/"
-	AIResponseKeyPrefix   = "AIResponse/value/"
-	ContributionKeyPrefix = "Contribution/value/"
+	ParamsKey = "Params"
+
+	AgentKeyPrefix            = "Agent/value/"
+	AgentCountKey             = "Agent/count"
+	DeregisterQueueKeyPrefix  = "Deregister/queue/"
+	ChallengeKeyPrefix        = "Challenge/value/"
+	ChallengePoolKeyPrefix    = "Challenge/pool/"
+	AIResponseKeyPrefix       = "AIResponse/value/"
+	ContributionKeyPrefix     = "Contribution/value/"
+	EpochActivityKeyPrefix    = "EpochActivity/"
+	AIBonusKeyPrefix          = "AIBonus/"
+	RewardPoolKey             = "RewardPool"
 )
 
 func KeyAgent(address string) []byte {
 	return []byte(AgentKeyPrefix + address)
 }
 
+func KeyDeregisterQueue(address string) []byte {
+	return []byte(DeregisterQueueKeyPrefix + address)
+}
+
 func KeyChallenge(epoch uint64) []byte {
-	return append([]byte(ChallengeKeyPrefix), sdk_Uint64ToBytes(epoch)...)
+	return append([]byte(ChallengeKeyPrefix), Uint64ToBytes(epoch)...)
+}
+
+func KeyChallengePool(index uint64) []byte {
+	return append([]byte(ChallengePoolKeyPrefix), Uint64ToBytes(index)...)
 }
 
 func KeyAIResponse(epoch uint64, validator string) []byte {
-	return append([]byte(AIResponseKeyPrefix), []byte(validator+"/"+string(sdk_Uint64ToBytes(epoch)))...)
+	key := []byte(AIResponseKeyPrefix)
+	key = append(key, Uint64ToBytes(epoch)...)
+	key = append(key, []byte("/"+validator)...)
+	return key
 }
 
-func sdk_Uint64ToBytes(v uint64) []byte {
+func KeyAIResponsePrefix(epoch uint64) []byte {
+	key := []byte(AIResponseKeyPrefix)
+	key = append(key, Uint64ToBytes(epoch)...)
+	key = append(key, '/')
+	return key
+}
+
+func KeyEpochActivity(epoch uint64, address string) []byte {
+	key := []byte(EpochActivityKeyPrefix)
+	key = append(key, Uint64ToBytes(epoch)...)
+	key = append(key, []byte("/"+address)...)
+	return key
+}
+
+func KeyAIBonus(address string) []byte {
+	return []byte(AIBonusKeyPrefix + address)
+}
+
+func Uint64ToBytes(v uint64) []byte {
 	b := make([]byte, 8)
-	b[0] = byte(v >> 56)
-	b[1] = byte(v >> 48)
-	b[2] = byte(v >> 40)
-	b[3] = byte(v >> 32)
-	b[4] = byte(v >> 24)
-	b[5] = byte(v >> 16)
-	b[6] = byte(v >> 8)
-	b[7] = byte(v)
+	binary.BigEndian.PutUint64(b, v)
 	return b
+}
+
+func BytesToUint64(b []byte) uint64 {
+	return binary.BigEndian.Uint64(b)
 }

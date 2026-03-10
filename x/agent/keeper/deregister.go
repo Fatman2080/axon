@@ -1,0 +1,101 @@
+package keeper
+
+import (
+	"fmt"
+
+	storetypes "cosmossdk.io/store/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	"github.com/axon-chain/axon/x/agent/types"
+)
+
+func (k Keeper) SetDeregisterRequest(ctx sdk.Context, address string, blockHeight int64) {
+	store := ctx.KVStore(k.storeKey)
+	store.Set(types.KeyDeregisterQueue(address), types.Uint64ToBytes(uint64(blockHeight)))
+}
+
+func (k Keeper) HasDeregisterRequest(ctx sdk.Context, address string) bool {
+	store := ctx.KVStore(k.storeKey)
+	return store.Has(types.KeyDeregisterQueue(address))
+}
+
+func (k Keeper) GetDeregisterRequest(ctx sdk.Context, address string) (int64, bool) {
+	store := ctx.KVStore(k.storeKey)
+	bz := store.Get(types.KeyDeregisterQueue(address))
+	if bz == nil {
+		return 0, false
+	}
+	return int64(types.BytesToUint64(bz)), true
+}
+
+func (k Keeper) DeleteDeregisterRequest(ctx sdk.Context, address string) {
+	store := ctx.KVStore(k.storeKey)
+	store.Delete(types.KeyDeregisterQueue(address))
+}
+
+// ProcessDeregisterQueue processes all deregister requests whose cooldown has expired.
+func (k Keeper) ProcessDeregisterQueue(ctx sdk.Context) {
+	store := ctx.KVStore(k.storeKey)
+	iterator := storetypes.KVStorePrefixIterator(store, []byte(types.DeregisterQueueKeyPrefix))
+	defer iterator.Close()
+
+	currentBlock := ctx.BlockHeight()
+	params := k.GetParams(ctx)
+
+	var toProcess []string
+
+	for ; iterator.Valid(); iterator.Next() {
+		requestBlock := int64(types.BytesToUint64(iterator.Value()))
+		if currentBlock-requestBlock >= types.DeregisterCooldownBlocks {
+			address := string(iterator.Key()[len(types.DeregisterQueueKeyPrefix):])
+			toProcess = append(toProcess, address)
+		}
+	}
+
+	for _, address := range toProcess {
+		k.executeDeregister(ctx, address, params)
+	}
+}
+
+func (k Keeper) executeDeregister(ctx sdk.Context, address string, params types.Params) {
+	agent, found := k.GetAgent(ctx, address)
+	if !found {
+		k.DeleteDeregisterRequest(ctx, address)
+		return
+	}
+
+	recipientAddr, err := sdk.AccAddressFromBech32(address)
+	if err != nil {
+		k.Logger(ctx).Error("invalid address in deregister queue", "address", address, "error", err)
+		k.DeleteDeregisterRequest(ctx, address)
+		return
+	}
+
+	burnedAmount := sdk.NewInt64Coin("aaxon", int64(params.RegisterBurnAmount)*1e18)
+	moduleHeld := agent.StakeAmount.Sub(burnedAmount)
+
+	if agent.Reputation == 0 && moduleHeld.IsPositive() {
+		// Reputation zero → burn all remaining stake, no refund
+		if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, sdk.NewCoins(moduleHeld)); err != nil {
+			k.Logger(ctx).Error("failed to burn remaining stake", "address", address, "error", err)
+		}
+	} else if moduleHeld.IsPositive() {
+		refundCoins := sdk.NewCoins(moduleHeld)
+		if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, recipientAddr, refundCoins); err != nil {
+			k.Logger(ctx).Error("failed to refund stake", "address", address, "error", err)
+			return
+		}
+	}
+
+	k.DeleteAgent(ctx, address)
+	k.DeleteDeregisterRequest(ctx, address)
+	k.DeleteAIBonus(ctx, address)
+
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		"agent_deregistered",
+		sdk.NewAttribute("address", address),
+		sdk.NewAttribute("module_held", fmt.Sprintf("%s", moduleHeld)),
+	))
+
+	k.Logger(ctx).Info("agent deregistered after cooldown", "address", address)
+}

@@ -28,9 +28,9 @@ vendor/
 coverage.out
 coverage.html
 
-# Protobuf generated
-*.pb.go
-*.pb.gw.go
+# Protobuf generated (keep committed - needed for build)
+# *.pb.go
+# *.pb.gw.go
 
 # Environment
 .env

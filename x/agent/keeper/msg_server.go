@@ -53,6 +53,9 @@ func (k msgServer) Register(goCtx context.Context, msg *types.MsgRegister) (*typ
 	}
 
 	capabilities := strings.Split(msg.Capabilities, ",")
+	for i := range capabilities {
+		capabilities[i] = strings.TrimSpace(capabilities[i])
+	}
 
 	agent := types.Agent{
 		Address:       msg.Sender,
@@ -72,6 +75,8 @@ func (k msgServer) Register(goCtx context.Context, msg *types.MsgRegister) (*typ
 		"agent_registered",
 		sdk.NewAttribute("address", msg.Sender),
 		sdk.NewAttribute("agent_id", agent.AgentId),
+		sdk.NewAttribute("stake", msg.Stake.String()),
+		sdk.NewAttribute("burned", burnAmount.String()),
 		sdk.NewAttribute("reputation", fmt.Sprintf("%d", agent.Reputation)),
 	))
 
@@ -87,7 +92,11 @@ func (k msgServer) UpdateAgent(goCtx context.Context, msg *types.MsgUpdateAgent)
 	}
 
 	if msg.Capabilities != "" {
-		agent.Capabilities = strings.Split(msg.Capabilities, ",")
+		caps := strings.Split(msg.Capabilities, ",")
+		for i := range caps {
+			caps[i] = strings.TrimSpace(caps[i])
+		}
+		agent.Capabilities = caps
 	}
 	if msg.Model != "" {
 		agent.Model = msg.Model
@@ -106,6 +115,10 @@ func (k msgServer) Heartbeat(goCtx context.Context, msg *types.MsgHeartbeat) (*t
 		return nil, types.ErrAgentNotFound
 	}
 
+	if agent.Status == types.AgentStatus_AGENT_STATUS_SUSPENDED {
+		return nil, types.ErrAgentSuspended
+	}
+
 	if ctx.BlockHeight()-agent.LastHeartbeat < params.HeartbeatInterval {
 		return nil, types.ErrHeartbeatTooFrequent
 	}
@@ -113,6 +126,8 @@ func (k msgServer) Heartbeat(goCtx context.Context, msg *types.MsgHeartbeat) (*t
 	agent.LastHeartbeat = ctx.BlockHeight()
 	agent.Status = types.AgentStatus_AGENT_STATUS_ONLINE
 	k.SetAgent(ctx, agent)
+
+	k.IncrementEpochActivity(ctx, msg.Sender)
 
 	return &types.MsgHeartbeatResponse{}, nil
 }
@@ -125,21 +140,20 @@ func (k msgServer) Deregister(goCtx context.Context, msg *types.MsgDeregister) (
 		return nil, types.ErrAgentNotFound
 	}
 
-	recipientAddr, err := sdk.AccAddressFromBech32(msg.Sender)
-	if err != nil {
-		return nil, err
+	if k.HasDeregisterRequest(ctx, msg.Sender) {
+		return nil, types.ErrDeregisterAlreadyQueued
 	}
 
-	refundCoins := sdk.NewCoins(agent.StakeAmount)
-	if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, recipientAddr, refundCoins); err != nil {
-		return nil, err
-	}
+	k.SetDeregisterRequest(ctx, msg.Sender, ctx.BlockHeight())
 
-	k.DeleteAgent(ctx, msg.Sender)
+	agent.Status = types.AgentStatus_AGENT_STATUS_SUSPENDED
+	k.SetAgent(ctx, agent)
 
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
-		"agent_deregistered",
+		"agent_deregister_requested",
 		sdk.NewAttribute("address", msg.Sender),
+		sdk.NewAttribute("cooldown_blocks", fmt.Sprintf("%d", types.DeregisterCooldownBlocks)),
+		sdk.NewAttribute("refund_at_block", fmt.Sprintf("%d", ctx.BlockHeight()+types.DeregisterCooldownBlocks)),
 	))
 
 	return &types.MsgDeregisterResponse{}, nil
@@ -150,6 +164,15 @@ func (k msgServer) SubmitAIChallengeResponse(goCtx context.Context, msg *types.M
 
 	if !k.IsAgent(ctx, msg.Sender) {
 		return nil, types.ErrAgentNotFound
+	}
+
+	challenge, found := k.GetChallenge(ctx, msg.Epoch)
+	if !found {
+		return nil, types.ErrChallengeNotActive
+	}
+
+	if ctx.BlockHeight() > challenge.DeadlineBlock {
+		return nil, types.ErrChallengeWindowClosed
 	}
 
 	store := ctx.KVStore(k.storeKey)
@@ -167,6 +190,8 @@ func (k msgServer) SubmitAIChallengeResponse(goCtx context.Context, msg *types.M
 
 	bz := k.cdc.MustMarshal(&response)
 	store.Set(key, bz)
+
+	k.IncrementEpochActivity(ctx, msg.Sender)
 
 	return &types.MsgSubmitAIChallengeResponseResponse{}, nil
 }
