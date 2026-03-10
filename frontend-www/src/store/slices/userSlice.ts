@@ -41,6 +41,18 @@ export const logoutUser = createAsyncThunk(
   }
 );
 
+export const updateUserPreferences = createAsyncThunk(
+  'user/updatePreferences',
+  async (payload: { showXOnLeaderboard?: boolean }, { rejectWithValue }) => {
+    try {
+      const response = await authApi.updatePreferences(payload);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error?.response?.data?.error || 'Failed to update preferences');
+    }
+  }
+);
+
 const userSlice = createSlice({
   name: 'user',
   initialState,
@@ -61,6 +73,9 @@ const userSlice = createSlice({
       })
       .addCase(logoutUser.fulfilled, (state) => {
         state.currentUser = null;
+      })
+      .addCase(updateUserPreferences.fulfilled, (state, action) => {
+        state.currentUser = action.payload;
       });
   },
 });

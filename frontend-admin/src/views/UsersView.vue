@@ -46,6 +46,7 @@ const showPasswordModal = ref(false);
 const passwordInput = ref("");
 const passwordError = ref("");
 const revokingUser = ref<string | null>(null);
+const privacyUpdatingUser = ref<string | null>(null);
 
 const flash = (msg: string) => {
   success.value = msg;
@@ -174,6 +175,20 @@ const revokeUserInvite = async (userId: string) => {
   }
 };
 
+const toggleShowXOnLeaderboard = async (user: User) => {
+  const nextValue = !Boolean(user.showXOnLeaderboard);
+  privacyUpdatingUser.value = user.id;
+  try {
+    await adminApi.updateUserPrivacy(user.id, { showXOnLeaderboard: nextValue });
+    user.showXOnLeaderboard = nextValue;
+    flash(nextValue ? "已开启 X 展示" : "已关闭 X 展示");
+  } catch (err: any) {
+    error.value = err?.response?.data?.error || "更新用户隐私失败";
+  } finally {
+    privacyUpdatingUser.value = null;
+  }
+};
+
 onMounted(() => {
   load();
   loadVaults();
@@ -224,6 +239,7 @@ onMounted(() => {
               <tr>
                 <th style="width: 36px"></th>
                 <th>用户名</th>
+                <th>X 标识</th>
                 <th>邮箱</th>
                 <th>AgentVault 账户</th>
                 <th>Vault 合约</th>
@@ -236,6 +252,17 @@ onMounted(() => {
               <tr v-for="user in pagedItems" :key="user.id">
                 <td><input type="checkbox" :value="user.id" v-model="selectedIds" /></td>
                 <td>{{ user.name || "-" }}</td>
+                <td>
+                  <div class="small monospace">{{ user.xUsername || "-" }}</div>
+                  <button
+                    class="btn btn-sm"
+                    style="margin-top:6px"
+                    @click="toggleShowXOnLeaderboard(user)"
+                    :disabled="privacyUpdatingUser === user.id"
+                  >
+                    {{ privacyUpdatingUser === user.id ? '...' : (user.showXOnLeaderboard ? '已公开' : '已隐藏') }}
+                  </button>
+                </td>
                 <td>{{ user.email || "-" }}</td>
                 <td class="small monospace addr-cell" :title="user.agentPublicKey || ''" @click="copyAddr(user.agentPublicKey || '')">
                   {{ user.agentPublicKey ? shortAddr(user.agentPublicKey) : "-" }}

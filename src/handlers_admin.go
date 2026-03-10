@@ -30,6 +30,7 @@ func (s *Server) registerAdminRoutes(g *echo.Group) {
 	secured.GET("/agents/leaderboard", s.handleAdminAgentLeaderboard)
 
 	secured.GET("/users", s.handleAdminListUsers)
+	secured.PATCH("/users/:id/privacy", s.handleAdminUpdateUserPrivacy)
 	secured.DELETE("/users", s.handleAdminBatchDeleteUsers)
 	secured.GET("/invite-codes", s.handleAdminListInviteCodes)
 	secured.POST("/invite-codes", s.handleAdminCreateInviteCode)
@@ -262,6 +263,31 @@ func (s *Server) handleAdminListUsers(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_list_users"})
 	}
 	return c.JSON(http.StatusOK, items)
+}
+
+func (s *Server) handleAdminUpdateUserPrivacy(c echo.Context) error {
+	userID := strings.TrimSpace(c.Param("id"))
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id_required"})
+	}
+	req := struct {
+		ShowXOnLeaderboard *bool `json:"showXOnLeaderboard"`
+	}{}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
+	}
+	if req.ShowXOnLeaderboard == nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "show_x_on_leaderboard_required"})
+	}
+	if err := s.store.updateUserShowXOnLeaderboard(userID, *req.ShowXOnLeaderboard); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.JSON(http.StatusNotFound, echo.Map{"error": "user_not_found"})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_update_user_privacy"})
+	}
+	adminID := c.Get("subject").(string)
+	logInfo("audit", "admin %s: updated show_x_on_leaderboard=%t for user %s", adminID, *req.ShowXOnLeaderboard, userID)
+	return c.JSON(http.StatusOK, echo.Map{"success": true})
 }
 
 func (s *Server) handleAdminListInviteCodes(c echo.Context) error {

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { AgentMarketItem, AgentMarketDetail, VaultStats, DailySlotsResponse, VaultOverview, UserAgentStats, TreasurySnapshot, PlatformStats, PlatformSnapshot } from '../types';
+import type { AgentMarketItem, AgentMarketDetail, VaultStats, DailySlotsResponse, VaultOverview, UserAgentStats, TreasurySnapshot, PlatformStats, PlatformSnapshot, PublicUserProfile, User } from '../types';
 
 const API_URL = '';
 
@@ -35,6 +35,16 @@ export const authApi = {
 
   getMe: async () => {
     const response = await api.get('/user/me');
+    return response.data;
+  },
+
+  updatePreferences: async (payload: { showXOnLeaderboard?: boolean }): Promise<User> => {
+    const response = await api.patch('/user/preferences', payload);
+    return response.data;
+  },
+
+  getPublicProfile: async (id: string): Promise<PublicUserProfile> => {
+    const response = await api.get(`/public/profiles/${id}`);
     return response.data;
   },
 

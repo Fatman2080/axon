@@ -43,7 +43,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user }) => {
   const chartValues = historyData;
 
   const chartData = {
-    labels: chartValues.map((_, i) => `Point ${i + 1}`),
+    labels: chartValues.map((_, i) => `${t('common.point')} ${i + 1}`),
     datasets: [
       {
         label: t('profile.portfolio'),
@@ -90,7 +90,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
-            {`${t('dashboard.welcome')} ${user.name || 'Trader'}`}
+            {t('dashboard.welcome').replace('{name}', user.name || t('dashboard.defaultUserName'))}
           </h1>
           <p className="text-zinc-500 mt-1">
             {t('dashboard.overview')}
@@ -121,7 +121,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user }) => {
               <div className={`flex items-center gap-1 text-sm font-medium mt-1 ${totalPnl >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 {totalPnl >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                 {totalPnl >= 0 ? '+' : ''}${totalPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                <span className="text-zinc-400 font-normal ml-1">(All Time)</span>
+                <span className="text-zinc-400 font-normal ml-1">({t('dashboard.allTime')})</span>
               </div>
             </div>
             <div className="hidden sm:block">
@@ -141,9 +141,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user }) => {
           </div>
           <div className="h-[200px] w-full">
             {historyLoading ? (
-              <div className="h-full flex items-center justify-center text-zinc-400 text-sm">Loading chart...</div>
+              <div className="h-full flex items-center justify-center text-zinc-400 text-sm">{t('dashboard.loadingChart')}</div>
             ) : chartValues.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-zinc-400 text-sm">No history data</div>
+              <div className="h-full flex items-center justify-center text-zinc-400 text-sm">{t('dashboard.noHistoryData')}</div>
             ) : (
               <Line data={chartData} options={chartOptions} />
             )}
@@ -162,7 +162,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user }) => {
               {activeAgents.length}
             </div>
             <div className="text-xs text-zinc-400">
-              {agentCount} total deployed
+              {agentCount} {t('dashboard.totalDeployed')}
             </div>
           </div>
 
@@ -174,10 +174,10 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user }) => {
               <span className="text-sm font-medium text-zinc-400">{t('dashboard.riskScore')}</span>
             </div>
             <div className="text-3xl font-bold font-mono mb-1">
-              Low
+              {t('dashboard.riskLow')}
             </div>
             <div className="text-xs text-zinc-500">
-              Conservative portfolio
+              {t('dashboard.conservativePortfolio')}
             </div>
           </div>
         </div>
@@ -200,7 +200,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user }) => {
                   <div>
                     <h3 className="font-bold text-zinc-900">{agent.name}</h3>
                     <div className="text-xs text-zinc-500 font-mono mt-1">
-                      Started {new Date(agent.createdAt).toLocaleDateString()}
+                      {t('dashboard.started')} {new Date(agent.createdAt).toLocaleDateString()}
                     </div>
                   </div>
                   <span className="flex h-2 w-2 relative">
@@ -211,11 +211,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user }) => {
 
                 <div className="space-y-3 mb-4">
                   <div className="flex justify-between text-sm">
-                    <span className="text-zinc-500">TVL</span>
+                    <span className="text-zinc-500">{t('dashboard.tvl')}</span>
                     <span className="font-mono font-medium">${agent.currentValue.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-zinc-500">PnL (24h)</span>
+                    <span className="text-zinc-500">{t('dashboard.pnl24h')}</span>
                     <span className={`font-mono font-medium ${agent.todayProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {agent.todayProfit >= 0 ? '+' : ''}{agent.todayProfit}%
                     </span>
@@ -224,10 +224,10 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user }) => {
 
                 <div className="pt-4 border-t border-zinc-100 flex gap-2">
                   <button className="flex-1 rounded-md bg-zinc-50 py-2 text-xs font-bold text-zinc-600 hover:bg-zinc-100 transition-colors">
-                    Settings
+                    {t('dashboard.settings')}
                   </button>
                   <button className="flex-1 rounded-md bg-zinc-50 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">
-                    Stop
+                    {t('dashboard.stop')}
                   </button>
                 </div>
               </div>

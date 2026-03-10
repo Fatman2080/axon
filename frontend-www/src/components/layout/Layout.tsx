@@ -122,7 +122,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 {item.name}
                 {item.href === '/submit-agent' && (
                   <span className="ml-1 px-1 py-0.5 text-[8px] font-bold bg-melt-red text-white leading-none rounded animate-pulse">
-                    HOT
+                    {t('nav.hotTag')}
                   </span>
                 )}
               </NavLink>
@@ -140,7 +140,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               <Target size={14} className="group-hover:rotate-90 transition-transform duration-500" />
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold font-mono tracking-widest leading-none uppercase">{t('nav.points')}</span>
-                <span className="text-xs font-bold font-mono leading-none mt-0.5" style={{ color: 'var(--text-primary)' }}>0 Pts</span>
+                <span className="text-xs font-bold font-mono leading-none mt-0.5" style={{ color: 'var(--text-primary)' }}>0 {t('nav.pointsUnit')}</span>
               </div>
             </Link>
 
@@ -260,7 +260,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                       onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
                     >
                       <LogOut size={14} />
-                      Logout
+                      {t('nav.logout')}
                     </button>
                   </div>
                 )}
@@ -319,7 +319,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                   {item.name}
                   {item.href === '/submit-agent' && (
                     <span className="ml-auto px-1 py-0.5 text-[8px] font-bold bg-melt-red text-white leading-none rounded animate-pulse">
-                      HOT
+                      {t('nav.hotTag')}
                     </span>
                   )}
                 </NavLink>
@@ -386,7 +386,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     style={{ color: 'var(--red)' }}
                   >
                     <LogOut size={14} />
-                    Logout
+                    {t('nav.logout')}
                   </button>
                 </>
               ) : (
@@ -444,15 +444,15 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 <li><Link to="/docs" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.documentation')}</Link></li>
                 <li><a href="https://github.com/binance/binance-skills-hub" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.binanceSkills')}</a></li>
                 <li><a href="https://github.com/okx/onchainos-skills" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.okxSkills')}</a></li>
-                <li><a href="https://www.npmjs.com/package/clawfi-hyperliquid-skill" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>NPM Package</a></li>
+                <li><a href="https://www.npmjs.com/package/clawfi-hyperliquid-skill" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.npmPackage')}</a></li>
               </ul>
             </div>
             {/* Community */}
             <div>
               <h4 className="text-xs font-bold font-mono uppercase tracking-widest mb-4" style={{ color: 'var(--text-secondary)' }}>{t('footer.community')}</h4>
               <ul className="space-y-2.5">
-                <li><a href="https://x.com/Clawfi2026" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>X (Twitter)</a></li>
-                <li><a href="https://t.me/+n5SRX51xPYk5OWU1" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>Telegram</a></li>
+                <li><a href="https://x.com/Clawfi2026" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.xTwitter')}</a></li>
+                <li><a href="https://t.me/+n5SRX51xPYk5OWU1" target="_blank" rel="noreferrer" className="text-sm hover:text-white transition-colors" style={{ color: 'var(--text-tertiary)' }}>{t('footer.telegram')}</a></li>
               </ul>
             </div>
           </div>

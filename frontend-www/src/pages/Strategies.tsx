@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
 import { fetchStrategies } from "../store/slices/strategySlice";
 import { Search, TrendingUp } from "lucide-react";
@@ -97,6 +98,7 @@ type LeaderboardItem = {
   id: string;
   agentName: string;
   owner: string;
+  ownerUserId?: string;
   rank: number;
   roi: number;
   equity: number;
@@ -163,11 +165,14 @@ const LeaderboardRow = ({ item }: { item: LeaderboardItem }) => {
   const roiColor = item.roi >= 0 ? "var(--green)" : "var(--red)";
   const roiPrefix = item.roi >= 0 ? "+" : "";
 
-  return (
-    <div
-      className="grid grid-cols-12 gap-4 py-3 px-4 hover:bg-[var(--bg-card-hover)] transition-colors items-center text-sm font-mono"
-      style={{ borderBottom: "1px solid var(--border)" }}
-    >
+  const rowClassName = [
+    "grid grid-cols-12 gap-4 py-3 px-4 items-center text-sm font-mono",
+    item.ownerUserId ? "hover:bg-[var(--bg-card-hover)] transition-colors cursor-pointer" : "",
+  ]
+    .join(" ")
+    .trim();
+  const rowChildren = (
+    <>
       <div className="col-span-1 text-center font-bold text-lg">#{item.rank}</div>
       <div className="col-span-3 flex items-center gap-3">
         <div className="w-8 h-8 rounded shrink-0 bg-[#0a0a0c] border border-[var(--border)] flex items-center justify-center relative overflow-hidden">
@@ -209,7 +214,23 @@ const LeaderboardRow = ({ item }: { item: LeaderboardItem }) => {
         </div>
         <span>{formatMoney(item.equity)}</span>
       </div>
-    </div>
+    </>
+  );
+
+  if (!item.ownerUserId) {
+    return (
+      <div className={rowClassName} style={{ borderBottom: "1px solid var(--border)" }}>
+        {rowChildren}
+      </div>
+    );
+  }
+
+  return (
+    <Link to={`/profile/${item.ownerUserId}`} className="block">
+      <div className={rowClassName} style={{ borderBottom: "1px solid var(--border)" }}>
+        {rowChildren}
+      </div>
+    </Link>
   );
 };
 
@@ -242,6 +263,7 @@ const Strategies = () => {
       id: s.id,
       agentName: s.name || `${s.id.slice(0, 8)}...`,
       owner: formatOwner(s.creator, t("strategies.leaderboard.notPublic")),
+      ownerUserId: s.ownerUserId,
       rank: idx + 1,
       roi: calcROI(s),
       equity: Number(s.currentTvl || 0),
@@ -373,7 +395,7 @@ const Strategies = () => {
                 ))}
                 {leaderboard.length === 0 && (
                   <div className="py-10 text-center text-sm font-mono" style={{ color: "var(--text-tertiary)" }}>
-                    {loading ? "Loading..." : "No active agents"}
+                    {loading ? t("strategies.leaderboard.loading") : t("strategies.leaderboard.noActiveAgents")}
                   </div>
                 )}
               </div>
@@ -421,7 +443,7 @@ const Strategies = () => {
             ))}
             {eliminated.length === 0 && (
               <div className="py-10 text-center text-xs font-mono text-[#8f6f73]">
-                No eliminated agents
+                {t("strategies.leaderboard.noEliminatedAgents")}
               </div>
             )}
           </div>

@@ -16,6 +16,17 @@ type User struct {
 	CreatedAt          string `json:"createdAt"`
 }
 
+type PublicUserProfile struct {
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	XUsername          string `json:"xUsername,omitempty"`
+	Avatar             string `json:"avatar,omitempty"`
+	ShowXOnLeaderboard bool   `json:"showXOnLeaderboard"`
+	MaskedIdentity     bool   `json:"maskedIdentity"`
+	AgentPublicKey     string `json:"agentPublicKey,omitempty"`
+	JoinedAt           string `json:"joinedAt"`
+}
+
 type InviteCode struct {
 	ID          string           `json:"id"`
 	Code        string           `json:"code"`

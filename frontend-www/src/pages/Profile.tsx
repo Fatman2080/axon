@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
 import { fetchStrategies } from "../store/slices/strategySlice";
 import {
@@ -19,7 +20,7 @@ import {
 } from "lucide-react";
 import { Line } from "react-chartjs-2";
 import { useLanguage } from "../context/LanguageContext";
-import { authApi } from "../services/api";
+import { authApi, marketApi } from "../services/api";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -31,7 +32,23 @@ import {
   Legend,
   Filler,
 } from "chart.js";
-import { logoutUser } from "../store/slices/userSlice";
+import { logoutUser, updateUserPreferences } from "../store/slices/userSlice";
+import type { PublicUserProfile } from "../types";
+
+const resolveProfileError = (
+  code: string | undefined,
+  t: (key: string) => string,
+): string => {
+  if (!code) {
+    return t("profile.errors.unexpected");
+  }
+  const key = `profile.errors.${code}`;
+  const translated = t(key);
+  if (translated !== key) {
+    return translated;
+  }
+  return t("profile.errors.unexpected");
+};
 
 ChartJS.register(
   CategoryScale,
@@ -44,9 +61,8 @@ ChartJS.register(
   Filler,
 );
 
-const SHOW_X_ON_LEADERBOARD_KEY = "profile.showXOnLeaderboard";
-
 const Profile = () => {
+  const { profileId } = useParams<{ profileId: string }>();
   const dispatch = useAppDispatch();
   const { currentUser: user, loading: userLoading } = useAppSelector(
     (state) => state.user,
@@ -62,7 +78,15 @@ const Profile = () => {
     initialCapital: number;
   } | null>(null);
   const [showXOnLeaderboard, setShowXOnLeaderboard] = useState(false);
+  const [updatingPreference, setUpdatingPreference] = useState(false);
+  const [visitorProfile, setVisitorProfile] = useState<PublicUserProfile | null>(
+    null,
+  );
+  const [visitorLoading, setVisitorLoading] = useState(false);
+  const [visitorError, setVisitorError] = useState("");
   const { t } = useLanguage();
+  const targetProfileId = (profileId || "").trim();
+  const isVisitorView = !!targetProfileId && (!user || user.id !== targetProfileId);
 
   // Local state for fake editing
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -74,7 +98,7 @@ const Profile = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    if (!user) return;
+    if (isVisitorView || !user) return;
     authApi
       .getAgentStats()
       .then((stats) => {
@@ -85,19 +109,37 @@ const Profile = () => {
         });
       })
       .catch(() => {});
-  }, [user]);
+  }, [isVisitorView, user]);
 
   useEffect(() => {
-    const saved = localStorage.getItem(SHOW_X_ON_LEADERBOARD_KEY);
-    setShowXOnLeaderboard(saved === "true");
-  }, []);
+    if (!isVisitorView) return;
+    setAgentStats(null);
+    setAgentHistory([]);
+  }, [isVisitorView]);
 
   useEffect(() => {
-    localStorage.setItem(
-      SHOW_X_ON_LEADERBOARD_KEY,
-      String(showXOnLeaderboard),
-    );
-  }, [showXOnLeaderboard]);
+    if (!isVisitorView || !targetProfileId) {
+      setVisitorProfile(null);
+      setVisitorError("");
+      setVisitorLoading(false);
+      return;
+    }
+    setVisitorLoading(true);
+    setVisitorError("");
+    authApi
+      .getPublicProfile(targetProfileId)
+      .then((profile) => setVisitorProfile(profile))
+      .catch((err: any) => {
+        setVisitorProfile(null);
+        setVisitorError(err?.response?.data?.error || "failed_to_load_profile");
+      })
+      .finally(() => setVisitorLoading(false));
+  }, [isVisitorView, targetProfileId]);
+
+  useEffect(() => {
+    if (isVisitorView || !user) return;
+    setShowXOnLeaderboard(Boolean(user.showXOnLeaderboard));
+  }, [isVisitorView, user]);
 
   const periodToApi = (period: string) => {
     switch (period) {
@@ -115,7 +157,7 @@ const Profile = () => {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (isVisitorView || !user) return;
     const loadData = async () => {
       try {
         const historyData = await authApi.getAgentHistory(
@@ -189,9 +231,52 @@ const Profile = () => {
       }
     };
     loadData();
-  }, [user]);
+  }, [isVisitorView, user]);
 
-  const loading = userLoading || strategiesLoading;
+  useEffect(() => {
+    if (!isVisitorView) return;
+    const publicKey = (visitorProfile?.agentPublicKey || "").trim();
+    if (!publicKey) {
+      setAgentHistory([]);
+      return;
+    }
+
+    const loadVisitorHistory = async () => {
+      try {
+        const detail = await marketApi.getAgentDetail(
+          publicKey,
+          periodToApi(chartPeriod),
+        );
+        if (!Array.isArray(detail.history)) {
+          setAgentHistory([]);
+          return;
+        }
+
+        const hist = detail.history;
+        const dts = Array.from({ length: hist.length }, (_, i) => {
+          const d = new Date();
+          const reverseIndex = hist.length - 1 - i;
+          d.setMinutes(
+            d.getMinutes() -
+              Math.round(
+                reverseIndex * ((24 * 60) / Math.max(hist.length - 1, 1)),
+              ),
+          );
+          return d.toISOString();
+        });
+
+        const finalHist = hist as any;
+        finalHist.dates = dts;
+        setAgentHistory(finalHist);
+      } catch {
+        setAgentHistory([]);
+      }
+    };
+
+    loadVisitorHistory();
+  }, [isVisitorView, visitorProfile?.agentPublicKey]);
+
+  const loading = strategiesLoading || (isVisitorView ? visitorLoading : userLoading);
 
   if (loading) {
     return (
@@ -207,7 +292,7 @@ const Profile = () => {
     );
   }
 
-  if (!user) {
+  if (!isVisitorView && !user) {
     return (
       <div className="mx-auto max-w-md py-24 text-center animate-fade-in-up">
         <div
@@ -223,11 +308,10 @@ const Profile = () => {
           className="text-xl font-bold mb-2"
           style={{ color: "var(--text-primary)" }}
         >
-          {t("profile.loginRequired") || "Login Required"}
+          {t("profile.loginRequired")}
         </h2>
         <p className="text-sm mb-8" style={{ color: "var(--text-secondary)" }}>
-          {t("profile.loginDesc") ||
-            "Please login with X to view your profile."}
+          {t("profile.loginDesc")}
         </p>
         <button
           onClick={() => {
@@ -240,22 +324,52 @@ const Profile = () => {
           className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded"
           style={{ background: "var(--text-primary)", color: "#000" }}
         >
-          {t("nav.connectWallet") || "Login with X"}
+          {t("nav.connectWallet")}
         </button>
       </div>
     );
   }
 
+  if (isVisitorView && visitorError) {
+    return (
+      <div className="mx-auto max-w-md py-24 text-center animate-fade-in-up">
+        <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+          {t("profile.notAvailableTitle")}
+        </h2>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          {resolveProfileError(visitorError, t)}
+        </p>
+      </div>
+    );
+  }
+
+  const activeProfile = isVisitorView ? visitorProfile : user;
+  const profileAgentPublicKey = activeProfile?.agentPublicKey || "";
+  const profileName = activeProfile?.name || t("profile.anonymous");
+  const profileAvatar = activeProfile?.avatar || "";
+  const profileJoinedAt = (isVisitorView
+    ? visitorProfile?.joinedAt
+    : (user as any)?.createdAt || user?.joinedAt) || "";
+
   const mySubmissions = strategies.filter((s) =>
-    user.agentPublicKey ? s.id === user.agentPublicKey : false,
+    profileAgentPublicKey ? s.id === profileAgentPublicKey : false,
   );
-  const initialCapital = agentStats?.initialCapital ?? 0;
-  const accountValue = agentStats?.accountValue ?? user.totalInvestment ?? 0;
-  const totalPnl = agentStats?.totalPnl ?? user.totalProfit ?? 0;
+  const primarySubmission = mySubmissions[0];
+  const initialCapital = isVisitorView
+    ? Number(primarySubmission?.initialCapital || 0)
+    : agentStats?.initialCapital ?? 0;
+  const accountValue = isVisitorView
+    ? Number(primarySubmission?.currentTvl || 0)
+    : agentStats?.accountValue ?? user?.totalInvestment ?? 0;
+  const totalPnl = isVisitorView
+    ? initialCapital > 0
+      ? accountValue - initialCapital
+      : Number(primarySubmission?.pnlContribution || 0)
+    : agentStats?.totalPnl ?? user?.totalProfit ?? 0;
   const totalInvestment = initialCapital > 0 ? initialCapital : accountValue;
   const totalProfit = totalPnl;
   const roi = initialCapital > 0 ? (totalPnl / initialCapital) * 100 : 0;
-  const agentCount = user.agentPublicKey ? 1 : (user.agentCount ?? 0);
+  const agentCount = profileAgentPublicKey ? 1 : (user?.agentCount ?? 0);
 
   const chartSeries = agentHistory.length > 0 ? agentHistory : [];
 
@@ -289,7 +403,7 @@ const Profile = () => {
           })
         : Array.from(
             { length: chartSeries.length },
-            (_, i) => `Point ${i + 1}`,
+            (_, i) => `${t("common.point")} ${i + 1}`,
           ),
     datasets: [
       {
@@ -344,7 +458,7 @@ const Profile = () => {
     {
       label:
         initialCapital > 0
-          ? t("profile.initialCapital") || "Initial Capital"
+          ? t("profile.initialCapital")
           : t("profile.totalEquity"),
       value: `$${totalInvestment.toLocaleString()}`,
       icon: Wallet,
@@ -357,7 +471,7 @@ const Profile = () => {
       color: totalProfit >= 0 ? "var(--green)" : "var(--red)",
     },
     {
-      label: "ROI",
+      label: t("profile.roi"),
       value:
         initialCapital > 0 ? `${roi >= 0 ? "+" : ""}${roi.toFixed(2)}%` : "--",
       icon: DollarSign,
@@ -370,6 +484,28 @@ const Profile = () => {
       color: "var(--tier-manager)",
     },
   ];
+
+  const handleToggleShowXOnLeaderboard = async () => {
+    if (isVisitorView || !user || updatingPreference) return;
+    const nextValue = !showXOnLeaderboard;
+    setShowXOnLeaderboard(nextValue);
+    setUpdatingPreference(true);
+    try {
+      await dispatch(
+        updateUserPreferences({ showXOnLeaderboard: nextValue }),
+      ).unwrap();
+    } catch {
+      setShowXOnLeaderboard(!nextValue);
+    } finally {
+      setUpdatingPreference(false);
+    }
+  };
+  const canEditAgentName = !isVisitorView;
+  const resolveStrategyStatusLabel = (status: string) => {
+    const key = `profile.status.${status}`;
+    const translated = t(key);
+    return translated === key ? status : translated;
+  };
 
   return (
     <div className="mx-auto max-w-5xl pb-20 animate-fade-in-up">
@@ -387,10 +523,10 @@ const Profile = () => {
               className="h-16 w-16 overflow-hidden rounded"
               style={{ border: "2px solid var(--border)" }}
             >
-              {user.avatar ? (
+              {profileAvatar ? (
                 <img
-                  src={user.avatar}
-                  alt={user.name}
+                  src={profileAvatar}
+                  alt={profileName}
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -416,83 +552,94 @@ const Profile = () => {
                 className="text-xl font-bold"
                 style={{ color: "var(--text-primary)" }}
               >
-                {user.name}
+                {profileName}
               </h1>
+            </div>
+            <div
+              className="mb-1.5 text-xs font-mono"
+              style={{ color: "var(--text-tertiary)" }}
+            >
+              {isVisitorView
+                ? visitorProfile?.maskedIdentity
+                  ? t("profile.hiddenHandle")
+                  : visitorProfile?.xUsername || t("profile.unknownHandle")
+                : user?.xUsername || t("profile.unknownHandle")}
             </div>
             <div
               className="flex items-center gap-4 text-xs font-mono"
               style={{ color: "var(--text-tertiary)" }}
             >
-              <button
-                type="button"
-                onClick={() => setShowXOnLeaderboard((value) => !value)}
-                className="flex items-center gap-2 rounded-full px-2.5 py-1 transition-colors"
-                style={{
-                  border: "1px solid var(--border)",
-                  background: showXOnLeaderboard
-                    ? "rgba(0,255,102,0.08)"
-                    : "rgba(255,255,255,0.03)",
-                  color: showXOnLeaderboard
-                    ? "var(--green)"
-                    : "var(--text-tertiary)",
-                }}
-                aria-pressed={showXOnLeaderboard}
-                aria-label={t("profile.showXOnLeaderboard")}
-              >
-                <Twitter size={12} />
-                <span>{t("profile.showXOnLeaderboard")}</span>
-                <span
-                  className="relative inline-flex h-4 w-7 items-center rounded-full transition-colors"
+              {!isVisitorView && (
+                <button
+                  type="button"
+                  onClick={handleToggleShowXOnLeaderboard}
+                  disabled={updatingPreference}
+                  className="flex items-center gap-2 rounded-full px-2.5 py-1 transition-colors disabled:opacity-60"
                   style={{
+                    border: "1px solid var(--border)",
                     background: showXOnLeaderboard
-                      ? "rgba(0,255,102,0.25)"
-                      : "rgba(255,255,255,0.1)",
+                      ? "rgba(0,255,102,0.08)"
+                      : "rgba(255,255,255,0.03)",
+                    color: showXOnLeaderboard
+                      ? "var(--green)"
+                      : "var(--text-tertiary)",
                   }}
+                  aria-pressed={showXOnLeaderboard}
+                  aria-label={t("profile.showXOnLeaderboard")}
                 >
+                  <Twitter size={12} />
+                  <span>{t("profile.showXOnLeaderboard")}</span>
                   <span
-                    className="absolute h-3 w-3 rounded-full transition-all"
+                    className="relative inline-flex h-4 w-7 items-center rounded-full transition-colors"
                     style={{
-                      left: showXOnLeaderboard ? "14px" : "2px",
                       background: showXOnLeaderboard
-                        ? "var(--green)"
-                        : "var(--text-secondary)",
+                        ? "rgba(0,255,102,0.25)"
+                        : "rgba(255,255,255,0.1)",
                     }}
-                  />
-                </span>
-              </button>
+                  >
+                    <span
+                      className="absolute h-3 w-3 rounded-full transition-all"
+                      style={{
+                        left: showXOnLeaderboard ? "14px" : "2px",
+                        background: showXOnLeaderboard
+                          ? "var(--green)"
+                          : "var(--text-secondary)",
+                      }}
+                    />
+                  </span>
+                </button>
+              )}
               <span className="flex items-center gap-1.5">
                 <Calendar size={12} />
                 {t("profile.joined")}{" "}
-                {(user as any).createdAt
-                  ? new Date((user as any).createdAt).toLocaleDateString()
-                    : user.joinedAt
-                      ? new Date(user.joinedAt).toLocaleDateString()
-                      : "-"}
+                {profileJoinedAt ? new Date(profileJoinedAt).toLocaleDateString() : "-"}
               </span>
             </div>
           </div>
         </div>
 
-        <button
-          onClick={() => dispatch(logoutUser())}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded self-start"
-          style={{
-            background: "var(--red-dim)",
-            color: "var(--red)",
-            border: "1px solid rgba(255,42,42,0.2)",
-          }}
-          onMouseEnter={(e) =>
-            ((e.currentTarget as HTMLElement).style.background =
-              "rgba(255,42,42,0.15)")
-          }
-          onMouseLeave={(e) =>
-            ((e.currentTarget as HTMLElement).style.background =
-              "var(--red-dim)")
-          }
-        >
-          <LogOut size={14} />
-          Logout
-        </button>
+        {!isVisitorView && (
+          <button
+            onClick={() => dispatch(logoutUser())}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded self-start"
+            style={{
+              background: "var(--red-dim)",
+              color: "var(--red)",
+              border: "1px solid rgba(255,42,42,0.2)",
+            }}
+            onMouseEnter={(e) =>
+              ((e.currentTarget as HTMLElement).style.background =
+                "rgba(255,42,42,0.15)")
+            }
+            onMouseLeave={(e) =>
+              ((e.currentTarget as HTMLElement).style.background =
+                "var(--red-dim)")
+            }
+          >
+            <LogOut size={14} />
+            {t("nav.logout")}
+          </button>
+        )}
       </div>
 
       {/* Summary Stats */}
@@ -573,7 +720,9 @@ const Profile = () => {
             className="h-[240px] w-full flex items-center justify-center text-sm font-mono"
             style={{ color: "var(--text-tertiary)" }}
           >
-            // NO_HISTORY — agent not yet connected
+            {isVisitorView
+              ? t("profile.noPublicHistory")
+              : t("profile.noHistoryConnected")}
           </div>
         )}
       </div>
@@ -659,7 +808,7 @@ const Profile = () => {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      {editingId === strategy.id ? (
+                      {canEditAgentName && editingId === strategy.id ? (
                         <div className="flex items-center gap-2">
                           <input
                             type="text"
@@ -713,28 +862,30 @@ const Profile = () => {
                             style={{ color: "var(--text-primary)" }}
                           >
                             {localNames[strategy.id] ||
-                              (strategy.name === user.name
+                              (strategy.name === profileName
                                 ? strategy.id.slice(0, 8) +
                                   "..." +
                                   strategy.id.slice(-6)
                                 : strategy.name || strategy.id)}
                           </h3>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingId(strategy.id);
-                              setTempName(
-                                localNames[strategy.id] ||
-                                  (strategy.name === user.name
-                                    ? ""
-                                    : strategy.name || ""),
-                              );
-                            }}
-                            className="opacity-0 group-hover/name:opacity-100 p-1 hover:bg-white/5 rounded transition-all"
-                            style={{ color: "var(--text-tertiary)" }}
-                          >
-                            <Edit2 size={12} />
-                          </button>
+                          {canEditAgentName && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingId(strategy.id);
+                                setTempName(
+                                  localNames[strategy.id] ||
+                                    (strategy.name === profileName
+                                      ? ""
+                                      : strategy.name || ""),
+                                );
+                              }}
+                              className="opacity-0 group-hover/name:opacity-100 p-1 hover:bg-white/5 rounded transition-all"
+                              style={{ color: "var(--text-tertiary)" }}
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                          )}
                           <span
                             className="text-[9px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
                             style={{
@@ -752,7 +903,7 @@ const Profile = () => {
                                     : "var(--text-tertiary)",
                             }}
                           >
-                            {strategy.status}
+                            {resolveStrategyStatusLabel(strategy.status)}
                           </span>
                         </div>
                       )}

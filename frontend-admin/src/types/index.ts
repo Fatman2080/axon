@@ -51,6 +51,8 @@ export interface User {
   email?: string;
   walletAddress?: string;
   name?: string;
+  xUsername?: string;
+  showXOnLeaderboard?: boolean;
   agentPublicKey?: string;
   inviteCodeUsed?: string;
   createdAt: string;

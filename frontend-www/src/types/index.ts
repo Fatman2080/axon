@@ -26,6 +26,7 @@ export interface Strategy {
   runningDays: number;
   userCount: number; // 支持者数量 (Stakers/Voters)
   creator: string;
+  ownerUserId?: string;
   // Agent TVL管理
   currentTvl: number; // 从大池子分配到的管理资金
   maxTvl: number; // 最大资金管理上限
@@ -109,6 +110,7 @@ export interface User {
   xId?: string;
   xUsername?: string;
   avatar?: string;
+  showXOnLeaderboard?: boolean;
   level: 'basic' | 'premium' | 'vip';
   // LP 相关
   lpShares: number; // 持有的 HLP 份额
@@ -117,6 +119,7 @@ export interface User {
   totalProfit: number; // 总收益 (LP分红)
   agentCount: number; // 拥有的 Agent (作为开发者)
   joinedAt: string; // Changed to string for serialization
+  createdAt?: string;
   inviteCodeUsed?: string;
   agentPublicKey?: string;
   agentAssignedAt?: string;
@@ -127,6 +130,17 @@ export interface User {
   };
   agents?: Agent[]; // Fetched from backend
   strategies?: Strategy[]; // Fetched from backend
+}
+
+export interface PublicUserProfile {
+  id: string;
+  name: string;
+  xUsername?: string;
+  avatar?: string;
+  showXOnLeaderboard: boolean;
+  maskedIdentity: boolean;
+  agentPublicKey?: string;
+  joinedAt: string;
 }
 
 export interface ProfitStats {

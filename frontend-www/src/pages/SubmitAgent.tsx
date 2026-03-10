@@ -6,6 +6,18 @@ import { authApi } from '../services/api';
 import { fetchUser } from '../store/slices/userSlice';
 import { useLogin } from '../hooks/useLogin';
 
+const resolveSubmitAgentError = (code: string | undefined, t: (key: string) => string): string => {
+  if (!code) {
+    return t('submitAgent.errors.unexpected');
+  }
+  const key = `submitAgent.errors.${code}`;
+  const translated = t(key);
+  if (translated !== key) {
+    return translated;
+  }
+  return `${t('submitAgent.errors.unexpected')} (${code})`;
+};
+
 const SubmitAgent = () => {
   const dispatch = useAppDispatch();
   const { currentUser, loading } = useAppSelector((state) => state.user);
@@ -38,7 +50,7 @@ const SubmitAgent = () => {
       localStorage.setItem('agent_deploy_access', 'true');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } } };
-      setError(err?.response?.data?.error || t('submitAgent.access.invalid'));
+      setError(resolveSubmitAgentError(err?.response?.data?.error, t));
     } finally {
       setIsVerifying(false);
     }
@@ -62,7 +74,7 @@ const SubmitAgent = () => {
             border: '1px solid rgba(0,240,255,0.2)',
           }}
         >
-          Agent Deployment Portal
+          {t('submitAgent.headerBadge')}
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-3" style={{ color: 'var(--text-primary)' }}>
           {t('submitAgent.title')}
@@ -217,7 +229,7 @@ const SubmitAgent = () => {
             </div>
             <div className="mt-4 flex items-start gap-2 text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>
               <Shield size={12} className="mt-0.5 shrink-0" />
-              This command will install the local CLI tool and authenticate your session.
+              {t('submitAgent.command.note')}
             </div>
           </div>
 
@@ -228,7 +240,7 @@ const SubmitAgent = () => {
                 style={{ background: 'rgba(10,10,12,0.9)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
               >
                 <Lock size={12} />
-                ACCESS_LOCKED
+                {t('submitAgent.access.locked')}
               </div>
             </div>
           )}

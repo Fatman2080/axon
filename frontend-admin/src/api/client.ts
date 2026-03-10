@@ -56,6 +56,11 @@ export const adminApi = {
     return data;
   },
 
+  async updateUserPrivacy(userId: string, payload: { showXOnLeaderboard: boolean }): Promise<{ success: boolean }> {
+    const { data } = await http.patch(`/admin/api/users/${userId}/privacy`, payload);
+    return data;
+  },
+
   async listAgentAccounts(status = ''): Promise<AgentAccount[]> {
     const { data } = await http.get('/admin/api/agent-accounts', { params: { status } });
     return data;

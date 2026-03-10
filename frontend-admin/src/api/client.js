@@ -43,6 +43,10 @@ export const adminApi = {
         const { data } = await http.get('/admin/api/users', { params: { search } });
         return data;
     },
+    async updateUserPrivacy(userId, payload) {
+        const { data } = await http.patch(`/admin/api/users/${userId}/privacy`, payload);
+        return data;
+    },
     async listAgentAccounts(status = '') {
         const { data } = await http.get('/admin/api/agent-accounts', { params: { status } });
         return data;

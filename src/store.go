@@ -1486,6 +1486,32 @@ func (s *Store) getUserByID(id string) (User, error) {
 	return s.getUserByWhereClause(`id = ?`, id)
 }
 
+func (s *Store) updateUserShowXOnLeaderboard(id string, enabled bool) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return sql.ErrNoRows
+	}
+	res, err := s.db.Exec(`
+		UPDATE users
+		SET show_x_on_leaderboard = ?, updated_at = ?
+		WHERE id = ?`,
+		boolToInt(enabled),
+		nowISO(),
+		id,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (s *Store) getUserByName(name string) (User, error) {
 	return s.getUserByWhereClause(`lower(name) = lower(?)`, strings.TrimSpace(name))
 }

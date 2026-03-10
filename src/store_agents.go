@@ -9,6 +9,74 @@ import (
 	"strings"
 )
 
+func (s *Store) pickUnusedAgentAccountTx(tx *sql.Tx) (AgentAccount, error) {
+	item := AgentAccount{}
+	err := tx.QueryRow(`
+		SELECT id, public_key, status, IFNULL(assigned_user_id, ''), IFNULL(assigned_at, ''), created_at
+		FROM agent_accounts
+		WHERE status = 'unused'
+		ORDER BY
+			CASE
+				WHEN IFNULL(agent_status, 'inactive') = 'active' AND IFNULL(vault_address, '') != '' THEN 0
+				ELSE 1
+			END,
+			created_at ASC
+		LIMIT 1`,
+	).Scan(&item.ID, &item.PublicKey, &item.Status, &item.AssignedUserID, &item.AssignedAt, &item.CreatedAt)
+	if err != nil {
+		return AgentAccount{}, err
+	}
+	return item, nil
+}
+
+func (s *Store) bindUserAgentTx(tx *sql.Tx, userID string, inviteCode *string, publicKey string, assignedAt string) error {
+	if strings.TrimSpace(assignedAt) == "" {
+		assignedAt = nowISO()
+	}
+	var (
+		res sql.Result
+		err error
+	)
+	if inviteCode != nil {
+		res, err = tx.Exec(`
+			UPDATE users
+			SET invite_code_used = ?,
+			    agent_public_key = ?,
+			    agent_assigned_at = ?,
+			    updated_at = ?
+			WHERE id = ?`,
+			strings.ToUpper(strings.TrimSpace(*inviteCode)),
+			strings.ToLower(strings.TrimSpace(publicKey)),
+			assignedAt,
+			nowISO(),
+			strings.TrimSpace(userID),
+		)
+	} else {
+		res, err = tx.Exec(`
+			UPDATE users
+			SET agent_public_key = ?,
+			    agent_assigned_at = ?,
+			    updated_at = ?
+			WHERE id = ?`,
+			strings.ToLower(strings.TrimSpace(publicKey)),
+			assignedAt,
+			nowISO(),
+			strings.TrimSpace(userID),
+		)
+	}
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (s *Store) importAgentPrivateKeys(privateKeys []string, fixedKey string) (AgentImportResult, error) {
 	result := AgentImportResult{PublicKeys: make([]string, 0)}
 	for _, pk := range privateKeys {
@@ -94,20 +162,37 @@ func (s *Store) assignUnusedAgentAccount(userID string) (AgentAccount, error) {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	item := AgentAccount{}
+	// If this user is already bound in agent_accounts (legacy inconsistency),
+	// repair users.agent_public_key instead of assigning a second account.
+	existing := AgentAccount{}
 	err = tx.QueryRow(`
 		SELECT id, public_key, status, IFNULL(assigned_user_id, ''), IFNULL(assigned_at, ''), created_at
 		FROM agent_accounts
-		WHERE status = 'unused'
-		ORDER BY created_at ASC
+		WHERE assigned_user_id = ? AND status = 'assigned'
+		ORDER BY assigned_at DESC
 		LIMIT 1`,
-	).Scan(&item.ID, &item.PublicKey, &item.Status, &item.AssignedUserID, &item.AssignedAt, &item.CreatedAt)
+		strings.TrimSpace(userID),
+	).Scan(&existing.ID, &existing.PublicKey, &existing.Status, &existing.AssignedUserID, &existing.AssignedAt, &existing.CreatedAt)
+	if err == nil {
+		if bindErr := s.bindUserAgentTx(tx, userID, nil, existing.PublicKey, existing.AssignedAt); bindErr != nil {
+			return AgentAccount{}, bindErr
+		}
+		if commitErr := tx.Commit(); commitErr != nil {
+			return AgentAccount{}, commitErr
+		}
+		return existing, nil
+	}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return AgentAccount{}, err
+	}
+
+	item, err := s.pickUnusedAgentAccountTx(tx)
 	if err != nil {
 		return AgentAccount{}, err
 	}
 
 	item.Status = "assigned"
-	item.AssignedUserID = userID
+	item.AssignedUserID = strings.TrimSpace(userID)
 	item.AssignedAt = nowISO()
 	res, err := tx.Exec(`
 		UPDATE agent_accounts
@@ -126,6 +211,9 @@ func (s *Store) assignUnusedAgentAccount(userID string) (AgentAccount, error) {
 	}
 	if affected == 0 {
 		return AgentAccount{}, sql.ErrNoRows
+	}
+	if err := s.bindUserAgentTx(tx, userID, nil, item.PublicKey, item.AssignedAt); err != nil {
+		return AgentAccount{}, err
 	}
 	if err = tx.Commit(); err != nil {
 		return AgentAccount{}, err
@@ -179,14 +267,7 @@ func (s *Store) consumeInviteAndAssignAccount(code string, userID string) (Invit
 		return InviteCode{}, AgentAccount{}, errors.New("user already has agent")
 	}
 
-	account := AgentAccount{}
-	err = tx.QueryRow(`
-		SELECT id, public_key, status, IFNULL(assigned_user_id, ''), IFNULL(assigned_at, ''), created_at
-		FROM agent_accounts
-		WHERE status = 'unused'
-		ORDER BY created_at ASC
-		LIMIT 1`,
-	).Scan(&account.ID, &account.PublicKey, &account.Status, &account.AssignedUserID, &account.AssignedAt, &account.CreatedAt)
+	account, err := s.pickUnusedAgentAccountTx(tx)
 	if err != nil {
 		return InviteCode{}, AgentAccount{}, err
 	}
@@ -245,6 +326,9 @@ func (s *Store) consumeInviteAndAssignAccount(code string, userID string) (Invit
 	}
 	if affected == 0 {
 		return InviteCode{}, AgentAccount{}, sql.ErrNoRows
+	}
+	if err = s.bindUserAgentTx(tx, userID, &invite.Code, account.PublicKey, account.AssignedAt); err != nil {
+		return InviteCode{}, AgentAccount{}, err
 	}
 
 	if err = tx.Commit(); err != nil {

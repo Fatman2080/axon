@@ -24,6 +24,7 @@ function App() {
           <Route path="/vault" element={<Agents />} />
           <Route path="/submit-agent" element={<SubmitAgent />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/profile/:profileId" element={<Profile />} />
           <Route path="/docs" element={<Docs />} />
           <Route path="/points" element={<Points />} />
           <Route path="/terms" element={<Terms />} />

@@ -36,9 +36,9 @@ const StrategyDetail = () => {
   const historyData = currentHistory && currentHistory.length > 0 ? currentHistory : [];
 
   const chartData = {
-    labels: historyData.map((_, i) => `Point ${i + 1}`),
+    labels: historyData.map((_, i) => `${t('common.point')} ${i + 1}`),
     datasets: [{
-      label: 'Account Value',
+      label: t('strategyDetail.accountValue'),
       data: historyData,
       borderColor: '#00FF41',
       backgroundColor: 'rgba(0, 240, 255, 0.05)',
@@ -91,6 +91,11 @@ const StrategyDetail = () => {
     : currentFills.length > 0
       ? [...new Set(currentFills.map(f => f.coin))]
       : [];
+  const resolveAgentStatus = (status: string) => {
+    const key = `strategyDetail.status.${status}`;
+    const translated = t(key);
+    return translated === key ? status.toUpperCase() : translated;
+  };
 
   const pnlPositive = strategy.pnlContribution >= 0;
 
@@ -146,7 +151,7 @@ const StrategyDetail = () => {
                             strategy.agentStatus === 'revoked' ? '1px solid rgba(255,42,42,0.2)' : '1px solid var(--border)',
                         }}
                       >
-                        {strategy.agentStatus}
+                        {resolveAgentStatus(strategy.agentStatus)}
                       </span>
                     )}
                   </div>
@@ -184,7 +189,7 @@ const StrategyDetail = () => {
                 <Line data={chartData} options={chartOptions} />
               ) : (
                 <div className="h-full w-full flex items-center justify-center text-sm font-mono" style={{ color: 'var(--text-tertiary)' }}>
-                  // NO_HISTORY — awaiting agent telemetry
+                  {t('strategyDetail.noHistoryTelemetry')}
                 </div>
               )}
             </div>
@@ -195,7 +200,7 @@ const StrategyDetail = () => {
               style={{ borderTop: '1px solid var(--border)' }}
             >
               {[
-                { label: 'PnL', value: `${pnlPositive ? '+' : ''}$${strategy.pnlContribution.toFixed(2)}`, color: pnlPositive ? 'var(--green)' : 'var(--red)' },
+                { label: t('strategyDetail.pnl'), value: `${pnlPositive ? '+' : ''}$${strategy.pnlContribution.toFixed(2)}`, color: pnlPositive ? 'var(--green)' : 'var(--red)' },
                 { label: t('strategyDetail.sharpe'), value: strategy.backtestMetrics?.sharpeRatio?.toFixed(2) ?? '-', color: 'var(--text-primary)' },
                 { label: t('strategyDetail.drawdown'), value: strategy.backtestMetrics?.maxDrawdown ? `-${strategy.backtestMetrics.maxDrawdown.toFixed(2)}%` : '-', color: 'var(--red)' },
               ].map(m => (
@@ -238,7 +243,7 @@ const StrategyDetail = () => {
                       {t('strategyDetail.description')}
                     </h3>
                     <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                      {strategy.description || 'No description available.'}
+                      {strategy.description || t('strategyDetail.noDescription')}
                     </p>
                   </div>
 
@@ -249,7 +254,7 @@ const StrategyDetail = () => {
                     >
                       <div>
                         <div className="text-xs font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>
-                          Vault Address
+                          {t('strategyDetail.vaultAddress')}
                         </div>
                         <a
                           href={`https://testnet.purrsec.com/address/${strategy.vaultAddress}`}
@@ -263,7 +268,7 @@ const StrategyDetail = () => {
                       </div>
                       <div>
                         <div className="text-xs font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>
-                          EVM Balance (USDC)
+                          {t('strategyDetail.evmBalanceUsdc')}
                         </div>
                         <div className="font-mono text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                           ${(strategy.evmBalance || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
@@ -333,14 +338,18 @@ const StrategyDetail = () => {
                   <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('strategyDetail.riskLevel')}</span>
                   <span className="flex items-center gap-1 text-sm font-mono font-bold" style={{ color: 'var(--tier-partner)' }}>
                     <AlertTriangle size={12} />
-                    {strategy.riskLevel === 'high' ? 'HIGH' : strategy.riskLevel === 'low' ? 'LOW' : 'MEDIUM'}
+                    {strategy.riskLevel === 'high'
+                      ? t('strategyDetail.riskHigh')
+                      : strategy.riskLevel === 'low'
+                        ? t('strategyDetail.riskLow')
+                        : t('strategyDetail.riskMedium')}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('strategyDetail.runningDays')}</span>
                   <span className="flex items-center gap-1 text-sm font-mono font-bold" style={{ color: 'var(--text-primary)' }}>
                     <Clock size={12} />
-                    {runningDays > 0 ? `${runningDays}d` : '-'}
+                    {runningDays > 0 ? `${runningDays}${t('strategyDetail.runningDaysUnit')}` : '-'}
                   </span>
                 </div>
               </div>

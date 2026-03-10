@@ -181,7 +181,7 @@ const Agents = () => {
                   color: 'var(--text-secondary)',
                 }}
               >
-                {agentCount > 0 ? `${agentCount} agents` : 'No agents'}
+                {agentCount > 0 ? `${agentCount} ${t('vault.agentCount')}` : t('vault.noAgents')}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-tertiary)' }}>
@@ -246,7 +246,7 @@ const Agents = () => {
                 <Line data={chartData} options={chartOptions} />
               ) : (
                 <div className="h-full w-full flex items-center justify-center text-sm font-mono" style={{ color: 'var(--text-tertiary)' }}>
-                  // NO_DATA — awaiting agent telemetry
+                  {t('vault.noDataTelemetry')}
                 </div>
               )}
             </div>

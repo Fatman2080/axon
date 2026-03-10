@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAppDispatch } from '../hooks/redux';
 import { fetchUser } from '../store/slices/userSlice';
 import { useLogin } from '../hooks/useLogin';
+import { useLanguage } from '../context/LanguageContext';
 import { AlertCircle, Loader2, ArrowLeft, RefreshCw } from 'lucide-react';
 
 const normalizeNextPath = (raw: string | null): string => {
@@ -11,20 +12,13 @@ const normalizeNextPath = (raw: string | null): string => {
   return raw;
 };
 
-const errorMessages: Record<string, string> = {
-  x_oauth_token_exchange_failed: 'Failed to exchange authorization code. The code may have expired — please try again.',
-  x_oauth_userinfo_failed: 'Logged in successfully, but failed to fetch your X profile. Please try again.',
-  x_oauth_access_denied: 'You denied the authorization request. Please try again if this was a mistake.',
-  x_oauth_not_configured: 'X OAuth is not configured on the server. Please contact the administrator.',
-  invalid_oauth_callback: 'Invalid OAuth callback parameters. Please start the login process again.',
-  invalid_or_expired_oauth_state: 'Your login session has expired. Please try again.',
-  invalid_invite_code: 'The invite code is invalid or has been used.',
-  agent_account_pool_empty: 'No agent accounts are available at this time. Please try again later.',
-  no_slots_remaining: 'Today\'s registration slots are full. Please try again after reset.',
-};
-
-const getErrorMessage = (code: string): string => {
-  return errorMessages[code] || `An unexpected error occurred (${code}). Please try again.`;
+const getErrorMessage = (code: string, t: (key: string) => string): string => {
+  const key = `xAuth.errors.${code}`;
+  const translated = t(key);
+  if (translated !== key) {
+    return translated;
+  }
+  return `${t('xAuth.errors.unexpected')} (${code})`;
 };
 
 type Status = 'loading' | 'error' | 'profile_error';
@@ -35,6 +29,7 @@ const XAuthCallback = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { login } = useLogin();
+  const { t } = useLanguage();
 
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
 
@@ -75,7 +70,7 @@ const XAuthCallback = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
-        <p className="text-zinc-500 font-medium">Completing login...</p>
+        <p className="text-zinc-500 font-medium">{t('xAuth.loading')}</p>
       </div>
     );
   }
@@ -87,9 +82,9 @@ const XAuthCallback = () => {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
             <AlertCircle className="h-6 w-6 text-amber-600" />
           </div>
-          <h1 className="text-xl font-bold text-zinc-900 mb-2">Profile Load Failed</h1>
+          <h1 className="text-xl font-bold text-zinc-900 mb-2">{t('xAuth.profileLoadFailedTitle')}</h1>
           <p className="text-sm text-zinc-600 mb-6">
-            You were logged in successfully, but we couldn't load your profile. This is usually temporary.
+            {t('xAuth.profileLoadFailedDesc')}
           </p>
           <div className="flex flex-col gap-3">
             <button
@@ -97,14 +92,14 @@ const XAuthCallback = () => {
               className="inline-flex items-center justify-center gap-2 h-10 rounded-full bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 transition-colors"
             >
               <RefreshCw className="h-4 w-4" />
-              Retry
+              {t('xAuth.retry')}
             </button>
             <Link
               to="/"
               className="inline-flex items-center justify-center gap-2 h-10 rounded-full border border-zinc-200 text-zinc-700 text-sm font-medium hover:bg-zinc-50 transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Home
+              {t('xAuth.backHome')}
             </Link>
           </div>
         </div>
@@ -118,9 +113,9 @@ const XAuthCallback = () => {
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
           <AlertCircle className="h-6 w-6 text-red-600" />
         </div>
-        <h1 className="text-xl font-bold text-zinc-900 mb-2">Login Failed</h1>
+        <h1 className="text-xl font-bold text-zinc-900 mb-2">{t('xAuth.loginFailedTitle')}</h1>
         <p className="text-sm text-zinc-600 mb-6">
-          {getErrorMessage(errorCode)}
+          {getErrorMessage(errorCode, t)}
         </p>
         <div className="flex flex-col gap-3">
           <button
@@ -128,14 +123,14 @@ const XAuthCallback = () => {
             className="inline-flex items-center justify-center gap-2 h-10 rounded-full bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 transition-colors"
           >
             <RefreshCw className="h-4 w-4" />
-            Try Again
+            {t('xAuth.tryAgain')}
           </button>
           <Link
             to="/"
             className="inline-flex items-center justify-center gap-2 h-10 rounded-full border border-zinc-200 text-zinc-700 text-sm font-medium hover:bg-zinc-50 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Home
+            {t('xAuth.backHome')}
           </Link>
         </div>
       </div>

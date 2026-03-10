@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -63,10 +64,12 @@ func (s *Server) registerPublicRoutes(g *echo.Group) {
 
 	g.GET("/platform/stats", s.handlePlatformStats)
 	g.GET("/platform/history", s.handlePlatformHistory)
+	g.GET("/public/profiles/:id", s.handlePublicProfile)
 
 	g.GET("/invite-codes/verify", s.handleVerifyInviteCode)
 	g.POST("/invite-codes/consume", s.handleConsumeInviteCode, s.requireRole("user"))
 	g.GET("/user/me", s.handleGetMe, s.requireRole("user"))
+	g.PATCH("/user/preferences", s.handleUpdateUserPreferences, s.requireRole("user"))
 	g.GET("/user/agent/history", s.handleUserAgentHistory, s.requireRole("user"))
 	g.GET("/user/agent/stats", s.handleUserAgentStats, s.requireRole("user"))
 	g.GET("/user/agent/deploy-command", s.handleUserDeployCommand, s.requireRole("user"))
@@ -130,7 +133,7 @@ func (s *Server) loginWithXIdentity(xID string, xName string, xUsername string, 
 				if latest, getErr := s.store.getUserByID(user.ID); getErr == nil {
 					user = latest
 				}
-				if user.InviteCodeUsed != "" {
+				if user.InviteCodeUsed != "" || user.AgentPublicKey != "" {
 					needSaveUser = false
 					resolved = true
 				}
@@ -301,6 +304,79 @@ func (s *Server) handleGetMe(c echo.Context) error {
 	return c.JSON(http.StatusOK, user)
 }
 
+func (s *Server) handleUpdateUserPreferences(c echo.Context) error {
+	userID := c.Get("subject").(string)
+	req := struct {
+		ShowXOnLeaderboard *bool `json:"showXOnLeaderboard"`
+	}{}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid_payload"})
+	}
+	if req.ShowXOnLeaderboard == nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "show_x_on_leaderboard_required"})
+	}
+	if err := s.store.updateUserShowXOnLeaderboard(userID, *req.ShowXOnLeaderboard); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.JSON(http.StatusNotFound, echo.Map{"error": "user_not_found"})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_update_preferences"})
+	}
+	user, err := s.store.getUserByID(userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_get_user"})
+	}
+	// Refresh agent_market cache immediately so privacy toggle is reflected
+	// without waiting for the next sync round.
+	if items, listErr := s.store.listAgentStats(""); listErr == nil {
+		if data, marshalErr := json.Marshal(items); marshalErr == nil {
+			s.cache.set("agent_market", data)
+		}
+	}
+	return c.JSON(http.StatusOK, user)
+}
+
+func (s *Server) handlePublicProfile(c echo.Context) error {
+	profileID := strings.TrimSpace(c.Param("id"))
+	if profileID == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "profile_id_required"})
+	}
+	user, err := s.store.getUserByID(profileID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.JSON(http.StatusNotFound, echo.Map{"error": "profile_not_found"})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_get_profile"})
+	}
+
+	profile := PublicUserProfile{
+		ID:                 user.ID,
+		ShowXOnLeaderboard: user.ShowXOnLeaderboard,
+		AgentPublicKey:     user.AgentPublicKey,
+		JoinedAt:           user.CreatedAt,
+	}
+
+	if user.ShowXOnLeaderboard {
+		profile.Name = strings.TrimSpace(user.Name)
+		profile.XUsername = strings.TrimSpace(user.XUsername)
+		profile.Avatar = strings.TrimSpace(user.Avatar)
+		profile.MaskedIdentity = false
+	} else {
+		profile.Name = "Anonymous"
+		profile.XUsername = ""
+		profile.Avatar = ""
+		profile.MaskedIdentity = true
+	}
+	if profile.Name == "" {
+		if profile.XUsername != "" {
+			profile.Name = strings.TrimPrefix(profile.XUsername, "@")
+		} else {
+			profile.Name = "Anonymous"
+		}
+	}
+
+	return c.JSON(http.StatusOK, profile)
+}
+
 func (s *Server) handleVerifyInviteCode(c echo.Context) error {
 	code := c.QueryParam("code")
 	if strings.TrimSpace(code) == "" {
@@ -332,7 +408,7 @@ func (s *Server) handleConsumeInviteCode(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, echo.Map{"error": "user_not_found"})
 	}
-	if user.InviteCodeUsed != "" {
+	if user.InviteCodeUsed != "" || user.AgentPublicKey != "" {
 		return c.JSON(http.StatusOK, echo.Map{
 			"success":    true,
 			"inviteCode": user.InviteCodeUsed,
@@ -344,7 +420,7 @@ func (s *Server) handleConsumeInviteCode(c echo.Context) error {
 	if err != nil {
 		if strings.Contains(err.Error(), "user already used invite code") || strings.Contains(err.Error(), "user already has agent") {
 			latest, getErr := s.store.getUserByID(userID)
-			if getErr == nil && latest.InviteCodeUsed != "" {
+			if getErr == nil && (latest.InviteCodeUsed != "" || latest.AgentPublicKey != "") {
 				return c.JSON(http.StatusOK, echo.Map{
 					"success":    true,
 					"inviteCode": latest.InviteCodeUsed,
@@ -367,8 +443,9 @@ func (s *Server) handleConsumeInviteCode(c echo.Context) error {
 	user.InviteCodeUsed = invite.Code
 	user.AgentPublicKey = account.PublicKey
 	user.AgentAssignedAt = account.AssignedAt
-	if err := s.store.saveUser(user); err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_save_user"})
+	latest, getErr := s.store.getUserByID(userID)
+	if getErr == nil {
+		user = latest
 	}
 
 	return c.JSON(http.StatusOK, echo.Map{

@@ -9,7 +9,7 @@ import { NAV as NAV_EN, sections as sections_EN } from './DocsEN';
 import { NAV_ZH, sections_ZH } from './DocsZH';
 
 const Docs = () => {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const NAV = language === 'zh' ? NAV_ZH : NAV_EN;
   const sections = language === 'zh' ? sections_ZH : sections_EN;
 
@@ -61,9 +61,9 @@ const Docs = () => {
         <div className="px-5 py-4 shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2 mb-1">
             <BookOpen size={13} style={{ color: 'var(--neon-green)' }} />
-            <span className="text-xs font-bold font-mono uppercase tracking-widest" style={{ color: 'var(--neon-green)' }}>{language === 'zh' ? '开发文档' : 'Documentation'}</span>
+            <span className="text-xs font-bold font-mono uppercase tracking-widest" style={{ color: 'var(--neon-green)' }}>{t('docsPage.title')}</span>
           </div>
-          <div className="text-[10px] font-mono" style={{ color: 'var(--text-tertiary)' }}>ClawFi Terminal v1.0.0</div>
+          <div className="text-[10px] font-mono" style={{ color: 'var(--text-tertiary)' }}>{t('docsPage.terminalVersion')}</div>
         </div>
 
         {/* Nav items */}
@@ -110,7 +110,7 @@ const Docs = () => {
             className="flex items-center gap-2 w-full px-3 py-2 rounded text-xs font-bold font-mono justify-center transition-all"
             style={{ background: 'rgba(0,255,65,0.1)', color: 'var(--neon-green)', border: '1px solid rgba(0,255,65,0.2)' }}
           >
-            <Play size={11} /> {language === 'zh' ? '指派 Agent' : 'Deploy Agent'}
+            <Play size={11} /> {t('docsPage.deployAgent')}
           </Link>
         </div>
       </aside>
@@ -125,7 +125,7 @@ const Docs = () => {
 
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 mb-6 text-[11px] font-mono" style={{ color: 'var(--text-tertiary)' }}>
-            <span>ClawFi {language === 'zh' ? '文档' : 'Docs'}</span>
+            <span>{t('docsPage.breadcrumb')}</span>
             <ChevronRight size={10} />
             <span>{activeGroup?.label}</span>
             <ChevronRight size={10} />
@@ -134,7 +134,7 @@ const Docs = () => {
 
           {/* Section content */}
           <div key={activeId} style={{ animation: 'fade-in-up 0.18s ease both' }}>
-            {sections[activeId] ?? <p style={{ color: 'var(--text-tertiary)' }}>{language === 'zh' ? '章节不存在。' : 'Section not found.'}</p>}
+            {sections[activeId] ?? <p style={{ color: 'var(--text-tertiary)' }}>{t('docsPage.sectionNotFound')}</p>}
           </div>
 
           {/* Prev / Next navigation */}
@@ -146,7 +146,7 @@ const Docs = () => {
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(0,255,65,0.25)'}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
               >
-                <span className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>← {language === 'zh' ? '上一节' : 'Previous'}</span>
+                <span className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>← {t('docsPage.previous')}</span>
                 <span className="text-xs font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{prevItem.label}</span>
               </button>
             ) : <div className="flex-1" />}
@@ -157,7 +157,7 @@ const Docs = () => {
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(0,255,65,0.25)'}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
               >
-                <span className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>{language === 'zh' ? '下一节' : 'Next'} →</span>
+                <span className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: 'var(--text-tertiary)' }}>{t('docsPage.next')} →</span>
                 <span className="text-xs font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{nextItem.label}</span>
               </button>
             ) : <div className="flex-1" />}
