@@ -18,9 +18,9 @@ import (
 
 const (
 	// DeployBurnAmount is 10 AXON = 10 * 10^18 aaxon
-	DeployBurnDenom  = "aaxon"
-	DeployBurnAxon   = 10
-	DeployBurnExp    = 18
+	DeployBurnDenom = "aaxon"
+	DeployBurnAxon  = 10
+	DeployBurnExp   = 18
 )
 
 var _ evmtypes.EvmHooks = DeployBurnHook{}

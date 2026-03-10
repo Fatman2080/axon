@@ -31,12 +31,12 @@ const (
 	HeartbeatMethod   = "heartbeat"
 	DeregisterMethod  = "deregister"
 
-	GasIsAgent     = 200
-	GasGetAgent    = 1000
-	GasRegister    = 50000
-	GasUpdate      = 10000
-	GasHeartbeat   = 5000
-	GasDeregister  = 20000
+	GasIsAgent    = 200
+	GasGetAgent   = 1000
+	GasRegister   = 50000
+	GasUpdate     = 10000
+	GasHeartbeat  = 5000
+	GasDeregister = 20000
 )
 
 type Precompile struct {

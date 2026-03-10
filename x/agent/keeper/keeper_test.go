@@ -162,8 +162,8 @@ func TestNormalizeAnswer(t *testing.T) {
 
 func TestScoreResponse(t *testing.T) {
 	tests := []struct {
-		reveal  string
-		answer  string
+		reveal   string
+		answer   string
 		minScore int
 		maxScore int
 	}{

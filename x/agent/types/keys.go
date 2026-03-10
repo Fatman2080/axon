@@ -9,19 +9,19 @@ const (
 
 	ParamsKey = "Params"
 
-	AgentKeyPrefix            = "Agent/value/"
-	AgentCountKey             = "Agent/count"
-	DeregisterQueueKeyPrefix  = "Deregister/queue/"
-	ChallengeKeyPrefix        = "Challenge/value/"
-	ChallengePoolKeyPrefix    = "Challenge/pool/"
-	AIResponseKeyPrefix       = "AIResponse/value/"
-	ContributionKeyPrefix     = "Contribution/value/"
-	ContributionPoolKey       = "ContributionPool"
-	EpochActivityKeyPrefix    = "EpochActivity/"
-	AIBonusKeyPrefix          = "AIBonus/"
-	RewardPoolKey             = "RewardPool"
-	DeployCountKeyPrefix      = "DeployCount/"
-	ContractCallKeyPrefix     = "ContractCall/"
+	AgentKeyPrefix           = "Agent/value/"
+	AgentCountKey            = "Agent/count"
+	DeregisterQueueKeyPrefix = "Deregister/queue/"
+	ChallengeKeyPrefix       = "Challenge/value/"
+	ChallengePoolKeyPrefix   = "Challenge/pool/"
+	AIResponseKeyPrefix      = "AIResponse/value/"
+	ContributionKeyPrefix    = "Contribution/value/"
+	ContributionPoolKey      = "ContributionPool"
+	EpochActivityKeyPrefix   = "EpochActivity/"
+	AIBonusKeyPrefix         = "AIBonus/"
+	RewardPoolKey            = "RewardPool"
+	DeployCountKeyPrefix     = "DeployCount/"
+	ContractCallKeyPrefix    = "ContractCall/"
 )
 
 func KeyAgent(address string) []byte {

@@ -20,9 +20,9 @@ import (
 )
 
 var (
-	_ module.AppModuleBasic  = AgentAppModule{}
-	_ module.HasABCIGenesis  = AgentAppModule{}
-	_ module.HasName         = AgentAppModule{}
+	_ module.AppModuleBasic = AgentAppModule{}
+	_ module.HasABCIGenesis = AgentAppModule{}
+	_ module.HasName        = AgentAppModule{}
 )
 
 type AgentAppModule struct {

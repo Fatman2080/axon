@@ -29,10 +29,10 @@ const (
 	MinRegistrationBlocks int64 = 120960
 
 	// Contribution weights
-	WeightDeployContract  int64 = 50
-	WeightContractCalled  int64 = 30
-	WeightTxActivity      int64 = 10
-	WeightHighReputation  int64 = 10
+	WeightDeployContract int64 = 50
+	WeightContractCalled int64 = 30
+	WeightTxActivity     int64 = 10
+	WeightHighReputation int64 = 10
 )
 
 // MintContributionRewards mints tokens for the contribution pool each block.

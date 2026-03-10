@@ -22,9 +22,9 @@ var (
 )
 
 const (
-	GetReputationMethod    = "getReputation"
-	GetReputationsMethod   = "getReputations"
-	MeetsReputationMethod  = "meetsReputation"
+	GetReputationMethod   = "getReputation"
+	GetReputationsMethod  = "getReputations"
+	MeetsReputationMethod = "meetsReputation"
 
 	GasGetReputation   = 200
 	GasGetReputations  = 500

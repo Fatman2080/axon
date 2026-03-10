@@ -49,10 +49,10 @@ import (
 	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	transferv2 "github.com/cosmos/ibc-go/v10/modules/apps/transfer/v2"
 	ibc "github.com/cosmos/ibc-go/v10/modules/core"
+	channelkeeper "github.com/cosmos/ibc-go/v10/modules/core/04-channel/keeper"
 	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 	ibcapi "github.com/cosmos/ibc-go/v10/modules/core/api"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
-	channelkeeper "github.com/cosmos/ibc-go/v10/modules/core/04-channel/keeper"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
 
@@ -129,11 +129,11 @@ import (
 	upgradetypes "github.com/cosmos/cosmos-sdk/x/upgrade/types"
 
 	axonconfig "github.com/axon-chain/axon/app/config"
-	agentkeeper "github.com/axon-chain/axon/x/agent/keeper"
-	agenttypes "github.com/axon-chain/axon/x/agent/types"
 	registryprecompile "github.com/axon-chain/axon/precompiles/registry"
 	reputationprecompile "github.com/axon-chain/axon/precompiles/reputation"
 	walletprecompile "github.com/axon-chain/axon/precompiles/wallet"
+	agentkeeper "github.com/axon-chain/axon/x/agent/keeper"
+	agenttypes "github.com/axon-chain/axon/x/agent/types"
 )
 
 func init() {
@@ -771,10 +771,10 @@ func (app *AxonApp) LoadHeight(height int64) error {
 
 // --------------- Accessors ---------------
 
-func (app *AxonApp) LegacyAmino() *codec.LegacyAmino          { return app.legacyAmino }
-func (app *AxonApp) AppCodec() codec.Codec                     { return app.appCodec }
+func (app *AxonApp) LegacyAmino() *codec.LegacyAmino            { return app.legacyAmino }
+func (app *AxonApp) AppCodec() codec.Codec                      { return app.appCodec }
 func (app *AxonApp) InterfaceRegistry() types.InterfaceRegistry { return app.interfaceRegistry }
-func (app *AxonApp) TxConfig() client.TxConfig                 { return app.txConfig }
+func (app *AxonApp) TxConfig() client.TxConfig                  { return app.txConfig }
 
 func (app *AxonApp) DefaultGenesis() map[string]json.RawMessage {
 	genesis := app.BasicModuleManager.DefaultGenesis(app.appCodec)
@@ -835,7 +835,7 @@ func (app *AxonApp) RegisterNodeService(clientCtx client.Context, cfg config.Con
 
 // --------------- IBC Testing helpers ---------------
 
-func (app *AxonApp) GetBaseApp() *baseapp.BaseApp           { return app.BaseApp }
+func (app *AxonApp) GetBaseApp() *baseapp.BaseApp            { return app.BaseApp }
 func (app *AxonApp) GetIBCKeeper() *ibckeeper.Keeper         { return app.IBCKeeper }
 func (app *AxonApp) GetEVMKeeper() *evmkeeper.Keeper         { return app.EVMKeeper }
 func (app *AxonApp) GetStakingKeeper() *stakingkeeper.Keeper { return app.StakingKeeper }

@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	AxonDenom    = "aaxon" // atto-AXON (18 decimals)
-	HumanDenom   = "AXON"
-	EVMChainID   = uint64(9001) // Axon default EVM chain ID
+	AxonDenom  = "aaxon" // atto-AXON (18 decimals)
+	HumanDenom = "AXON"
+	EVMChainID = uint64(9001) // Axon default EVM chain ID
 )
 
 func MustGetDefaultNodeHome() string {
