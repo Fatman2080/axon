@@ -22,6 +22,9 @@ const (
 	RewardPoolKey            = "RewardPool"
 	DeployCountKeyPrefix     = "DeployCount/"
 	ContractCallKeyPrefix    = "ContractCall/"
+
+	TotalBlockRewardsMintedKey = "TotalBlockRewardsMinted"
+	TotalContributionMintedKey = "TotalContributionMinted"
 )
 
 func KeyAgent(address string) []byte {

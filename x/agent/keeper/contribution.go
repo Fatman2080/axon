@@ -13,8 +13,11 @@ import (
 
 const (
 	// ContributionBaseYearlyStr = ~35M AXON/year in aaxon for Year 1-4
-	// 35_000_000 * 1e18 = 35e24
 	ContributionBaseYearlyStr = "35000000000000000000000000"
+
+	// MaxContributionSupplyStr: hard cap = 350,000,000 AXON = 350M × 10^18 aaxon
+	// Whitepaper §8.2: Agent 贡献奖励 35% = 350,000,000 AXON
+	MaxContributionSupplyStr = "350000000000000000000000000"
 
 	// ContributionHalvingBlocks = 4 years
 	ContributionHalvingBlocks int64 = BlocksPerYear * 4
@@ -36,7 +39,7 @@ const (
 )
 
 // MintContributionRewards mints tokens for the contribution pool each block.
-// Year 1-4: ~35M/year, halving every 4 years.
+// Hard-capped at 350M AXON total (whitepaper §8.2).
 func (k Keeper) MintContributionRewards(ctx sdk.Context) {
 	blockHeight := ctx.BlockHeight()
 	if blockHeight <= 1 {
@@ -48,13 +51,47 @@ func (k Keeper) MintContributionRewards(ctx sdk.Context) {
 		return
 	}
 
+	// Enforce 350M hard cap
+	maxSupply, _ := new(big.Int).SetString(MaxContributionSupplyStr, 10)
+	totalMinted := k.GetTotalContributionMinted(ctx)
+	remaining := sdkmath.NewIntFromBigInt(new(big.Int).Sub(maxSupply, totalMinted.BigInt()))
+	if !remaining.IsPositive() {
+		return
+	}
+	if perBlock.GT(remaining) {
+		perBlock = remaining
+	}
+
 	coin := sdk.NewCoin("aaxon", perBlock)
 	if err := k.bankKeeper.MintCoins(ctx, types.ModuleName, sdk.NewCoins(coin)); err != nil {
 		k.Logger(ctx).Error("failed to mint contribution rewards", "error", err)
 		return
 	}
 
+	k.addTotalContributionMinted(ctx, perBlock)
 	k.addToContributionPool(ctx, coin)
+}
+
+// --- Supply cap tracking ---
+
+func (k Keeper) GetTotalContributionMinted(ctx sdk.Context) sdkmath.Int {
+	store := ctx.KVStore(k.storeKey)
+	bz := store.Get([]byte(types.TotalContributionMintedKey))
+	if bz == nil {
+		return sdkmath.ZeroInt()
+	}
+	var amount sdkmath.Int
+	if err := amount.Unmarshal(bz); err != nil {
+		return sdkmath.ZeroInt()
+	}
+	return amount
+}
+
+func (k Keeper) addTotalContributionMinted(ctx sdk.Context, amount sdkmath.Int) {
+	total := k.GetTotalContributionMinted(ctx).Add(amount)
+	bz, _ := total.Marshal()
+	store := ctx.KVStore(k.storeKey)
+	store.Set([]byte(types.TotalContributionMintedKey), bz)
 }
 
 func calculateContributionPerBlock(blockHeight int64) sdkmath.Int {

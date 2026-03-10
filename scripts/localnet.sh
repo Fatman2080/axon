@@ -124,10 +124,10 @@ PYEOF
 echo ""
 echo "==> Step 3: Adding genesis accounts..."
 
-# 1B AXON each = 1e27 aaxon
-BALANCE="1000000000000000000000000000${DENOM}"
-# 10M AXON stake = 1e25 aaxon
-STAKE="10000000000000000000000000${DENOM}"
+# Whitepaper: 0% pre-allocation. Each genesis validator receives only
+# the minimum stake + gas buffer. All other tokens come from mining.
+BALANCE="11000000000000000000000${DENOM}"     # 11,000 AXON = 10,000 stake + 1,000 gas
+STAKE="10000000000000000000000${DENOM}"        # 10,000 AXON minimum validator stake
 
 for i in $(seq 0 $((NUM_NODES-1))); do
     NODE_DIR="$BASE_DIR/node$i"

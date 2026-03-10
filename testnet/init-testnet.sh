@@ -16,9 +16,12 @@ BASE_DIR="${BASE_DIR:-/data/axon-testnet}"
 BINARY="${BINARY:-axond}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-BALANCE="1000000000000000000000000000${DENOM}"  # 1B AXON
-STAKE="10000000000000000000000000${DENOM}"       # 10M AXON
-FAUCET_BALANCE="100000000000000000000000000${DENOM}" # 100M AXON
+# Whitepaper: 0% pre-allocation. Genesis validators only receive
+# the minimum stake + gas buffer. Faucet gets a small bootstrap
+# that counts toward the block reward budget.
+BALANCE="11000000000000000000000${DENOM}"         # 11,000 AXON per validator
+STAKE="10000000000000000000000${DENOM}"            # 10,000 AXON stake
+FAUCET_BALANCE="100000000000000000000000${DENOM}"  # 100,000 AXON for testnet faucet
 
 echo "============================================"
 echo "  Axon Testnet Initializer"

@@ -93,12 +93,19 @@ with open(genesis_path, "w") as f:
 print("    Genesis patched successfully")
 PYEOF
 
-echo "==> Adding genesis account (1B AXON = 1e27 aaxon)..."
-$BINARY genesis add-genesis-account "$VALIDATOR_ADDR" "1000000000000000000000000000${DENOM}" \
+# Whitepaper: 0% pre-allocation. Genesis validators only receive
+# the minimum amount needed to stake and cover initial gas.
+# Minimum validator stake = 10,000 AXON, plus 1,000 AXON for gas.
+# All other tokens enter circulation through block mining rewards.
+GENESIS_BALANCE="11000000000000000000000${DENOM}"  # 11,000 AXON = 11e21 aaxon
+STAKE_AMOUNT="10000000000000000000000${DENOM}"      # 10,000 AXON = 1e22 aaxon
+
+echo "==> Adding genesis account (11,000 AXON: 10,000 stake + 1,000 gas)..."
+$BINARY genesis add-genesis-account "$VALIDATOR_ADDR" "$GENESIS_BALANCE" \
     --keyring-backend $KEYRING --home "$HOME_DIR"
 
-echo "==> Creating genesis transaction (10M AXON stake)..."
-$BINARY genesis gentx $KEY_NAME "10000000000000000000000000${DENOM}" \
+echo "==> Creating genesis transaction (10,000 AXON stake)..."
+$BINARY genesis gentx $KEY_NAME "$STAKE_AMOUNT" \
     --chain-id $CHAIN_ID \
     --moniker $MONIKER \
     --keyring-backend $KEYRING \
