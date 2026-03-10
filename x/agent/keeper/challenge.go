@@ -129,7 +129,14 @@ func (k Keeper) GetEpochResponses(ctx sdk.Context, epoch uint64) []types.AIRespo
 	return responses
 }
 
-// EvaluateEpochChallenges scores all responses for a completed epoch.
+// CheatPenaltyReputation is the reputation penalty for cheating.
+const CheatPenaltyReputation = -20
+
+// CheatPenaltyStakePercent is the percentage of stake slashed for cheating.
+const CheatPenaltyStakePercent = 20
+
+// EvaluateEpochChallenges scores responses and detects cheating (whitepaper §8.6 path 5).
+// Cheating = multiple validators submit identical commit hashes (collusion/copying).
 func (k Keeper) EvaluateEpochChallenges(ctx sdk.Context, epoch uint64) {
 	challenge, found := k.GetChallenge(ctx, epoch)
 	if !found {
@@ -139,27 +146,33 @@ func (k Keeper) EvaluateEpochChallenges(ctx sdk.Context, epoch uint64) {
 	correctAnswer := getChallengeAnswer(challenge)
 	responses := k.GetEpochResponses(ctx, epoch)
 	respondents := make(map[string]bool)
+	cheaters := k.detectCheaters(responses)
 
 	for _, resp := range responses {
 		respondents[resp.ValidatorAddress] = true
-		score := scoreResponse(resp, correctAnswer)
-		bonus := calculateAIBonus(score)
-		k.SetAIBonus(ctx, resp.ValidatorAddress, bonus)
 
-		if score >= 80 {
-			k.UpdateReputation(ctx, resp.ValidatorAddress, 2)
-		} else if score >= 50 {
-			k.UpdateReputation(ctx, resp.ValidatorAddress, 1)
+		if cheaters[resp.ValidatorAddress] {
+			k.penalizeCheater(ctx, resp.ValidatorAddress)
+			resp.Score = -1
+		} else {
+			score := scoreResponse(resp, correctAnswer)
+			bonus := calculateAIBonus(score)
+			k.SetAIBonus(ctx, resp.ValidatorAddress, bonus)
+
+			if score >= 80 {
+				k.UpdateReputation(ctx, resp.ValidatorAddress, 2)
+			} else if score >= 50 {
+				k.UpdateReputation(ctx, resp.ValidatorAddress, 1)
+			}
+			resp.Score = int64(score)
 		}
 
 		store := ctx.KVStore(k.storeKey)
 		resp.Evaluated = true
-		resp.Score = int64(score)
 		bz := k.cdc.MustMarshal(&resp)
 		store.Set(types.KeyAIResponse(epoch, resp.ValidatorAddress), bz)
 	}
 
-	// Non-participants get 0 bonus
 	k.IterateAgents(ctx, func(agent types.Agent) bool {
 		if agent.Status == types.AgentStatus_AGENT_STATUS_ONLINE && !respondents[agent.Address] {
 			k.SetAIBonus(ctx, agent.Address, 0)
@@ -171,6 +184,58 @@ func (k Keeper) EvaluateEpochChallenges(ctx sdk.Context, epoch uint64) {
 		"ai_challenge_evaluated",
 		sdk.NewAttribute("epoch", fmt.Sprintf("%d", epoch)),
 		sdk.NewAttribute("responses_count", fmt.Sprintf("%d", len(responses))),
+		sdk.NewAttribute("cheaters_count", fmt.Sprintf("%d", len(cheaters))),
+	))
+}
+
+// detectCheaters finds validators that submitted identical commit hashes (collusion).
+// If 2+ validators share the same commit hash they are all flagged.
+func (k Keeper) detectCheaters(responses []types.AIResponse) map[string]bool {
+	commitCounts := make(map[string][]string) // commitHash → list of addresses
+	for _, resp := range responses {
+		if resp.CommitHash == "" {
+			continue
+		}
+		commitCounts[resp.CommitHash] = append(commitCounts[resp.CommitHash], resp.ValidatorAddress)
+	}
+
+	cheaters := make(map[string]bool)
+	for _, addrs := range commitCounts {
+		if len(addrs) > 1 {
+			for _, addr := range addrs {
+				cheaters[addr] = true
+			}
+		}
+	}
+	return cheaters
+}
+
+// penalizeCheater slashes 20% of stake, reputation -20, AIBonus = -5.
+func (k Keeper) penalizeCheater(ctx sdk.Context, address string) {
+	k.SetAIBonus(ctx, address, -5)
+	k.UpdateReputation(ctx, address, CheatPenaltyReputation)
+
+	agent, found := k.GetAgent(ctx, address)
+	if !found {
+		return
+	}
+
+	slashAmount := agent.StakeAmount.Amount.MulRaw(CheatPenaltyStakePercent).QuoRaw(100)
+	if slashAmount.IsPositive() {
+		slashCoin := sdk.NewCoin("aaxon", slashAmount)
+		if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, sdk.NewCoins(slashCoin)); err != nil {
+			k.Logger(ctx).Error("failed to slash cheater stake", "address", address, "error", err)
+			return
+		}
+		agent.StakeAmount = agent.StakeAmount.Sub(slashCoin)
+		k.SetAgent(ctx, agent)
+	}
+
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		"ai_challenge_cheat_detected",
+		sdk.NewAttribute("address", address),
+		sdk.NewAttribute("slashed", slashAmount.String()),
+		sdk.NewAttribute("reputation_penalty", fmt.Sprintf("%d", CheatPenaltyReputation)),
 	))
 }
 

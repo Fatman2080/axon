@@ -29,3 +29,11 @@ func ExportCalculateBlockReward(blockHeight int64) sdkmath.Int {
 func ExportCalculateContributionPerBlock(blockHeight int64) sdkmath.Int {
 	return calculateContributionPerBlock(blockHeight)
 }
+
+func ReputationBonusPercentForTest(reputation uint64) int64 {
+	return reputationBonusPercent(reputation)
+}
+
+func DetectCheatersForTest(k Keeper, responses []types.AIResponse) map[string]bool {
+	return k.detectCheaters(responses)
+}

@@ -33,7 +33,7 @@ func (k Keeper) DistributeEpochRewards(ctx sdk.Context, epoch uint64) {
 
 		stakeAmount := agent.StakeAmount.Amount.BigInt()
 
-		repBonus := int64(agent.Reputation)
+		repBonus := reputationBonusPercent(agent.Reputation)
 		aiBonus := k.GetAIBonus(ctx, agent.Address)
 		multiplier := int64(100) + repBonus + aiBonus
 		if multiplier < 10 {

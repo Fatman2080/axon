@@ -10,19 +10,25 @@
 ```
 ✅ 已完成                              ⚠️ 部分完成                    ❌ 未实现
 ─────────────────────────────────────────────────────────────────────────
-✅ 链骨架 (Cosmos SDK + EVM)           ⚠️ Python SDK（骨架）          ❌ 合约部署销毁
-✅ x/agent 模块（注册/心跳/信誉）       ⚠️ 单元测试（覆盖率低）        ❌ Gas Base Fee 销毁
-✅ AI 挑战（commit/reveal/评估）        ⚠️ AI 题库（30 道，目标 100+） ❌ 信誉归零→质押销毁
-✅ 预编译 IAgentRegistry               ⚠️ 接入文档（无）              ❌ AI 作弊惩罚销毁
-✅ 预编译 IAgentReputation                                           ❌ 出块权重动态调整
-✅ 预编译 IAgentWallet + 信任通道                                     ❌ 公网多节点部署
-✅ 区块奖励（650M 硬顶 + 4 年减半）                                   ❌ 链升级机制
-✅ 贡献奖励（350M 硬顶 + 防刷）                                       ❌ 治理模块集成
-✅ 零预分配代币经济                                                   ❌ IBC 跨链
-✅ Blockscout 区块浏览器                                              ❌ 以太坊桥
-✅ 水龙头                                                            ❌ 安全审计
+✅ 链骨架 (Cosmos SDK + EVM)           ⚠️ Python SDK（骨架）          ❌ 公网多节点部署
+✅ x/agent 模块（注册/心跳/信誉）       ⚠️ 单元测试（覆盖率低）        ❌ 链升级机制
+✅ AI 挑战（commit/reveal/评估）        ⚠️ AI 题库（30 道，目标 100+） ❌ 治理模块集成
+✅ 预编译 IAgentRegistry               ⚠️ 接入文档（无）              ❌ IBC 跨链
+✅ 预编译 IAgentReputation                                           ❌ 以太坊桥
+✅ 预编译 IAgentWallet + 信任通道                                     ❌ 安全审计
+✅ 区块奖励（650M 硬顶 + 4 年减半）
+✅ 贡献奖励（350M 硬顶 + 防刷）
+✅ 零预分配代币经济
+✅ Blockscout 区块浏览器
+✅ 水龙头
 ✅ CI (GitHub Actions)
 ✅ 信任通道安全体系
+✅ Gas Base Fee 智能销毁（80%/50%）
+✅ 合约部署销毁 10 AXON
+✅ 信誉归零→质押全额销毁
+✅ AI 作弊检测与惩罚销毁
+✅ 出块权重动态调整（ReputationBonus 分级）
+✅ IAgentWallet Solidity 接口同步
 ```
 
 ---
@@ -536,4 +542,16 @@ Sprint 4（主网）
 
 每次开发时打开本文档，告诉 AI 执行对应任务编号即可。
 
-**下一步：执行 Sprint 1，从任务 1.1（Gas 销毁）开始。**
+### Sprint 1 进度
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| 1.1 Gas Base Fee 销毁 | ✅ 完成 | BeginBlocker 顺序修复 + 智能比例(80%/50%) |
+| 1.2 合约部署销毁 10 AXON | ✅ 已有 | `app/evm_hooks.go` |
+| 1.3 信誉归零→质押销毁 | ✅ 已有 | `x/agent/keeper/reputation.go` |
+| 1.4 AI 作弊检测与惩罚 | ✅ 完成 | 重复 commit hash 检测 + 20%质押销毁 + 信誉-20 |
+| 1.5 出块权重动态调整 | ✅ 完成 | ReputationBonus 5级分层(0/5/10/15/20%) |
+| 1.6 IAgentWallet 接口同步 | ✅ 完成 | Solidity 接口新增 setTrust/removeTrust/getTrust |
+| 1.7 通缩集成测试 | ⏳ 待做 | |
+
+**下一步：执行任务 1.7（通缩集成测试），然后进入 Sprint 2。**

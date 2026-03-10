@@ -163,9 +163,25 @@ func (k Keeper) distributeProposerReward(ctx sdk.Context, amount sdkmath.Int) {
 	}
 }
 
+// reputationBonusPercent returns the tiered reputation bonus per whitepaper §7.3.
+func reputationBonusPercent(reputation uint64) int64 {
+	switch {
+	case reputation > 90:
+		return 20
+	case reputation > 70:
+		return 15
+	case reputation > 50:
+		return 10
+	case reputation >= 30:
+		return 5
+	default:
+		return 0
+	}
+}
+
 // distributeValidatorRewards distributes 50% to active validators by weight.
-// If registered Agents exist: Weight = AgentStake × (100 + Reputation + AIBonus).
-// If no registered Agents: falls back to staking validators weighted by bonded tokens.
+// Weight = Stake × (100 + ReputationBonus + AIBonus) per whitepaper §7.3.
+// Falls back to staking validators weighted by bonded tokens when no Agents are online.
 func (k Keeper) distributeValidatorRewards(ctx sdk.Context, totalAmount sdkmath.Int) {
 	if totalAmount.IsZero() {
 		return
@@ -179,13 +195,12 @@ func (k Keeper) distributeValidatorRewards(ctx sdk.Context, totalAmount sdkmath.
 	var validators []validatorWeight
 	totalWeight := new(big.Int)
 
-	// Try Agent-based distribution first
 	k.IterateAgents(ctx, func(agent types.Agent) bool {
 		if agent.Status != types.AgentStatus_AGENT_STATUS_ONLINE {
 			return false
 		}
 		stake := agent.StakeAmount.Amount.BigInt()
-		repBonus := int64(agent.Reputation)
+		repBonus := reputationBonusPercent(agent.Reputation)
 		aiBonus := k.GetAIBonus(ctx, agent.Address)
 		multiplier := int64(100) + repBonus + aiBonus
 		if multiplier < 10 {
