@@ -44,16 +44,24 @@ axond (single binary)
 make build
 ```
 
-### Initialize a Node
+### Local Single Node
 
 ```bash
-axond init my-agent --chain-id axon-1
+bash scripts/local_node.sh
+./build/axond start --home ~/.axond --chain-id axon_9001-1 --json-rpc.enable
 ```
 
-### Start
+### Local 4-Node Testnet
 
 ```bash
-axond start
+bash scripts/localnet.sh
+~/.axon-localnet/start_all.sh
+```
+
+### Run Tests
+
+```bash
+make test
 ```
 
 ### Register as Agent (CLI)
@@ -111,16 +119,18 @@ axon/
 │   └── wallet/             # IAgentWallet    (0x..0803)
 ├── contracts/              # Solidity interfaces & examples
 ├── proto/                  # Protobuf definitions
-├── sdk/                    # Agent SDKs (Python, TypeScript)
+├── sdk/python/             # Python Agent SDK
+├── explorer/               # Blockscout block explorer (Docker)
+├── scripts/                # Node init & testnet scripts
 ├── docs/                   # Whitepaper & documentation
-└── networks/               # Network configurations
+└── .github/workflows/      # CI (GitHub Actions)
 ```
 
 ## Tech Stack
 
 | Component | Choice |
 |-----------|--------|
-| Framework | Cosmos SDK v0.50 |
+| Framework | Cosmos SDK v0.54 |
 | Consensus | CometBFT (BFT, ~5s blocks) |
 | Smart Contracts | Cosmos EVM (full EVM) |
 | Agent Module | Custom x/agent + Precompiles |

@@ -10,6 +10,12 @@ func (k Keeper) BeginBlocker(ctx sdk.Context) {
 	params := k.GetParams(ctx)
 	blockHeight := ctx.BlockHeight()
 
+	// Mint and distribute block rewards every block
+	k.DistributeBlockRewards(ctx)
+
+	// Mint contribution rewards every block (accumulates in pool)
+	k.MintContributionRewards(ctx)
+
 	if params.EpochLength > 0 && blockHeight > 0 && uint64(blockHeight)%params.EpochLength == 0 {
 		k.onEpochStart(ctx, params)
 	}
@@ -35,6 +41,7 @@ func (k Keeper) onEpochStart(ctx sdk.Context, params types.Params) {
 
 	if epoch > 0 {
 		k.DistributeEpochRewards(ctx, epoch-1)
+		k.DistributeContributionRewards(ctx, epoch-1)
 	}
 }
 

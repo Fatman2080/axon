@@ -1,0 +1,91 @@
+version: "3.8"
+
+# Blockscout Block Explorer for Axon Chain
+# Usage: cd explorer && docker-compose up -d
+# Access: http://localhost:4000
+
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: blockscout
+      POSTGRES_USER: blockscout
+      POSTGRES_DB: blockscout
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blockscout"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  blockscout:
+    image: blockscout/blockscout:latest
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Database
+      DATABASE_URL: postgresql://blockscout:blockscout@db:5432/blockscout
+
+      # Chain connection - connect to axond JSON-RPC
+      ETHEREUM_JSONRPC_VARIANT: geth
+      ETHEREUM_JSONRPC_HTTP_URL: http://host.docker.internal:8545
+      ETHEREUM_JSONRPC_WS_URL: ws://host.docker.internal:8546
+
+      # Chain info
+      CHAIN_ID: "9001"
+      COIN: AXON
+      COIN_NAME: Axon
+      NETWORK: Axon Testnet
+      SUBNETWORK: Axon Local
+
+      # UI
+      LOGO: /images/blockscout_logo.svg
+      BLOCKSCOUT_HOST: localhost
+      BLOCKSCOUT_PROTOCOL: http
+
+      # Features
+      INDEXER_DISABLE_INTERNAL_TRANSACTIONS_FETCHER: "true"
+      INDEXER_DISABLE_PENDING_TRANSACTIONS_FETCHER: "true"
+      FETCH_REWARDS_WAY: manual
+
+      # Performance
+      POOL_SIZE: 50
+      POOL_SIZE_API: 10
+      ECTO_USE_SSL: "false"
+
+      # Redis
+      ACCOUNT_REDIS_URL: redis://redis:6379
+
+      # Secret
+      SECRET_KEY_BASE: "axon_blockscout_secret_key_base_for_local_testing_only_change_in_production_12345"
+
+    ports:
+      - "4000:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  smart-contract-verifier:
+    image: ghcr.io/blockscout/smart-contract-verifier:latest
+    restart: always
+    environment:
+      SMART_CONTRACT_VERIFIER__SERVER__HTTP__ADDR: 0.0.0.0:8043
+    ports:
+      - "8043:8043"
+
+volumes:
+  postgres-data:

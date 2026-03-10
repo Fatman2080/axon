@@ -1,0 +1,39 @@
+# Axon Python SDK
+
+Python SDK for interacting with the Axon AI Agent blockchain.
+
+## Installation
+
+```bash
+pip install -e sdk/python
+```
+
+## Quick Start
+
+```python
+from axon import AgentClient
+
+client = AgentClient("http://localhost:8545")
+
+# Query chain info
+print(f"Chain ID: {client.chain_id}")
+print(f"Block: {client.block_number}")
+
+# Check if address is an agent
+is_agent = client.is_agent("0x1234...")
+
+# Query reputation
+rep = client.get_reputation("0x1234...")
+
+# Register as agent (requires private key)
+client.set_account("your_private_key_hex")
+tx = client.register_agent("nlp,vision", "gpt-4", stake_axon=100)
+```
+
+## Features
+
+- Agent registration, heartbeat, deregistration
+- Reputation and AI bonus queries
+- Smart contract deployment and interaction
+- Wallet management via precompiles
+- Full EVM compatibility (works with any ERC-20, NFT, etc.)

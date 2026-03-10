@@ -2,7 +2,7 @@
 
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 COMMIT := $(shell git log -1 --format='%H')
-VERSION := v0.1.0-dev
+VERSION := v0.3.0-dev
 
 BUILD_DIR ?= $(CURDIR)/build
 BINARY_NAME := axond
@@ -49,18 +49,30 @@ proto-lint:
 ###############################################################################
 
 test:
-	@echo "Running tests..."
-	@go test -v ./...
+	@echo "Running all tests..."
+	@go test -v -count=1 ./x/agent/...
 
 test-unit:
-	@go test -v -count=1 ./x/...
+	@echo "Running unit tests..."
+	@go test -v -count=1 -run "Test" ./x/agent/keeper/
 
 test-cover:
-	@go test -coverprofile=coverage.out ./...
+	@echo "Running tests with coverage..."
+	@go test -coverprofile=coverage.out -covermode=atomic ./x/agent/keeper/
+	@go tool cover -func=coverage.out | tail -1
 	@go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
+test-economics:
+	@echo "Running economics tests..."
+	@go test -v -run "TestBlockReward|TestContribution|TestMaxShare|TestDeflation" ./x/agent/keeper/
+
+test-agent:
+	@echo "Running agent module tests..."
+	@go test -v -run "TestDefaultParams|TestChallengePool|TestScoreResponse|TestKeyFunctions" ./x/agent/keeper/
 
 benchmark:
-	@go test -bench=. -benchmem ./...
+	@go test -bench=. -benchmem ./x/agent/...
 
 ###############################################################################
 ###                                Linting                                  ###
@@ -74,13 +86,22 @@ lint:
 ###############################################################################
 
 localnet-init:
-	@echo "Initializing local testnet..."
-	@$(BUILD_DIR)/$(BINARY_NAME) init test-node --chain-id axon-local-1
-	@$(BUILD_DIR)/$(BINARY_NAME) genesis add-genesis-account axon1... 1000000000000000000000aaxon
+	@echo "Initializing single-node testnet..."
+	@bash scripts/local_node.sh
 
 localnet-start:
 	@echo "Starting local node..."
-	@$(BUILD_DIR)/$(BINARY_NAME) start
+	@$(BUILD_DIR)/$(BINARY_NAME) start --home $$HOME/.axond --chain-id axon_9001-1 --json-rpc.enable
+
+localnet-4node:
+	@echo "Setting up 4-node localnet..."
+	@bash scripts/localnet.sh
+
+localnet-4node-start:
+	@bash $$HOME/.axon-localnet/start_all.sh
+
+localnet-4node-stop:
+	@bash $$HOME/.axon-localnet/stop_all.sh
 
 ###############################################################################
 ###                              Docker                                     ###

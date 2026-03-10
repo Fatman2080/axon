@@ -13,6 +13,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+
 	agentkeeper "github.com/axon-chain/axon/x/agent/keeper"
 	agenttypes "github.com/axon-chain/axon/x/agent/types"
 )
@@ -24,12 +26,13 @@ var (
 )
 
 type AgentAppModule struct {
-	cdc    codec.Codec
-	keeper agentkeeper.Keeper
+	cdc        codec.Codec
+	keeper     agentkeeper.Keeper
+	bankKeeper bankkeeper.Keeper
 }
 
-func NewAgentAppModule(cdc codec.Codec, keeper agentkeeper.Keeper) AgentAppModule {
-	return AgentAppModule{cdc: cdc, keeper: keeper}
+func NewAgentAppModule(cdc codec.Codec, keeper agentkeeper.Keeper, bankKeeper bankkeeper.Keeper) AgentAppModule {
+	return AgentAppModule{cdc: cdc, keeper: keeper, bankKeeper: bankKeeper}
 }
 
 func (am AgentAppModule) Name() string { return agenttypes.ModuleName }
@@ -85,6 +88,8 @@ func (am AgentAppModule) ConsensusVersion() uint64 { return 1 }
 
 func (am AgentAppModule) BeginBlock(ctx context.Context) error {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	// Burn gas fees before distribution module runs
+	BurnCollectedFees(sdkCtx, am.bankKeeper)
 	am.keeper.BeginBlocker(sdkCtx)
 	return nil
 }

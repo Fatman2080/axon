@@ -46,7 +46,7 @@ func BlockedAddresses() map[string]bool {
 }
 
 var maccPerms = map[string][]string{
-	authtypes.FeeCollectorName:     nil,
+	authtypes.FeeCollectorName:     {authtypes.Burner},
 	distrtypes.ModuleName:          nil,
 	transfertypes.ModuleName:       {authtypes.Minter, authtypes.Burner},
 	minttypes.ModuleName:           {authtypes.Minter},
@@ -60,7 +60,7 @@ var maccPerms = map[string][]string{
 	erc20types.ModuleName:     {authtypes.Minter, authtypes.Burner},
 
 	// Axon custom modules
-	agenttypes.ModuleName: {authtypes.Burner},
+	agenttypes.ModuleName: {authtypes.Minter, authtypes.Burner},
 }
 
 func GetMaccPerms() map[string][]string {

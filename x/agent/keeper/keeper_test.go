@@ -42,10 +42,20 @@ func (m *mockBankKeeper) SendCoinsFromModuleToAccount(_ context.Context, senderM
 	return nil
 }
 
+func (m *mockBankKeeper) MintCoins(_ context.Context, moduleName string, amt sdk.Coins) error {
+	m.module[moduleName] = m.module[moduleName].Add(amt...)
+	return nil
+}
+
 func (m *mockBankKeeper) BurnCoins(_ context.Context, moduleName string, amt sdk.Coins) error {
 	m.module[moduleName] = m.module[moduleName].Sub(amt...)
 	m.burned = m.burned.Add(amt...)
 	return nil
+}
+
+func (m *mockBankKeeper) GetBalance(_ context.Context, addr sdk.AccAddress, denom string) sdk.Coin {
+	coins := m.balances[addr.String()]
+	return sdk.NewCoin(denom, coins.AmountOf(denom))
 }
 
 // mockStakingKeeper is unused but required

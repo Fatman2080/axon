@@ -34,6 +34,10 @@ func NewKeeper(
 	}
 }
 
+func (k Keeper) StoreKey() storetypes.StoreKey {
+	return k.storeKey
+}
+
 func (k Keeper) Logger(ctx sdk.Context) log.Logger {
 	return ctx.Logger().With("module", fmt.Sprintf("x/%s", types.ModuleName))
 }

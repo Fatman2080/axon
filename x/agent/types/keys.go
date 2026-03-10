@@ -16,9 +16,12 @@ const (
 	ChallengePoolKeyPrefix    = "Challenge/pool/"
 	AIResponseKeyPrefix       = "AIResponse/value/"
 	ContributionKeyPrefix     = "Contribution/value/"
+	ContributionPoolKey       = "ContributionPool"
 	EpochActivityKeyPrefix    = "EpochActivity/"
 	AIBonusKeyPrefix          = "AIBonus/"
 	RewardPoolKey             = "RewardPool"
+	DeployCountKeyPrefix      = "DeployCount/"
+	ContractCallKeyPrefix     = "ContractCall/"
 )
 
 func KeyAgent(address string) []byte {
@@ -60,6 +63,20 @@ func KeyEpochActivity(epoch uint64, address string) []byte {
 
 func KeyAIBonus(address string) []byte {
 	return []byte(AIBonusKeyPrefix + address)
+}
+
+func KeyDeployCount(epoch uint64, address string) []byte {
+	key := []byte(DeployCountKeyPrefix)
+	key = append(key, Uint64ToBytes(epoch)...)
+	key = append(key, []byte("/"+address)...)
+	return key
+}
+
+func KeyContractCall(epoch uint64, address string) []byte {
+	key := []byte(ContractCallKeyPrefix)
+	key = append(key, Uint64ToBytes(epoch)...)
+	key = append(key, []byte("/"+address)...)
+	return key
 }
 
 func Uint64ToBytes(v uint64) []byte {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/baseapp/txnrunner"
 	"github.com/ethereum/go-ethereum/common"
+	ethvm "github.com/ethereum/go-ethereum/core/vm"
 
 	_ "github.com/ethereum/go-ethereum/eth/tracers/js"
 	_ "github.com/ethereum/go-ethereum/eth/tracers/native"
@@ -24,6 +25,7 @@ import (
 	antetypes "github.com/cosmos/evm/ante/types"
 	evmencoding "github.com/cosmos/evm/encoding"
 	evmaddress "github.com/cosmos/evm/encoding/address"
+	ibcutils "github.com/cosmos/evm/ibc"
 	evmmempool "github.com/cosmos/evm/mempool"
 	precompiletypes "github.com/cosmos/evm/precompiles/types"
 	cosmosevmserver "github.com/cosmos/evm/server"
@@ -50,6 +52,7 @@ import (
 	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 	ibcapi "github.com/cosmos/ibc-go/v10/modules/core/api"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
+	channelkeeper "github.com/cosmos/ibc-go/v10/modules/core/04-channel/keeper"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
 
@@ -128,6 +131,9 @@ import (
 	axonconfig "github.com/axon-chain/axon/app/config"
 	agentkeeper "github.com/axon-chain/axon/x/agent/keeper"
 	agenttypes "github.com/axon-chain/axon/x/agent/types"
+	registryprecompile "github.com/axon-chain/axon/precompiles/registry"
+	reputationprecompile "github.com/axon-chain/axon/precompiles/reputation"
+	walletprecompile "github.com/axon-chain/axon/precompiles/wallet"
 )
 
 func init() {
@@ -448,7 +454,7 @@ func NewAxonApp(
 		evmChainID,
 		tracer,
 	).WithStaticPrecompiles(
-		precompiletypes.DefaultStaticPrecompiles(
+		axonStaticPrecompiles(
 			*app.StakingKeeper,
 			app.DistrKeeper,
 			app.BankKeeper,
@@ -459,6 +465,7 @@ func NewAxonApp(
 			app.GovKeeper,
 			app.SlashingKeeper,
 			appCodec,
+			app.AgentKeeper,
 		),
 	)
 
@@ -483,6 +490,11 @@ func NewAxonApp(
 		app.BankKeeper,
 		app.StakingKeeper,
 	)
+
+	// ---- EVM Hooks: burn 10 AXON on contract deployment + track contributions ----
+	app.EVMKeeper.SetHooks(evmkeeper.NewMultiEvmHooks(
+		NewDeployBurnHook(app.BankKeeper, app.AgentKeeper),
+	))
 
 	// ---- IBC Transfer Stack ----
 
@@ -520,7 +532,7 @@ func NewAxonApp(
 	transferModule := transfer.NewAppModule(app.TransferKeeper)
 
 	// ---- Axon Agent AppModule (adaptor for new SDK) ----
-	agentAppModule := NewAgentAppModule(appCodec, app.AgentKeeper)
+	agentAppModule := NewAgentAppModule(appCodec, app.AgentKeeper, app.BankKeeper)
 
 	// ---- Module Manager ----
 
@@ -853,6 +865,39 @@ func (app *AxonApp) Close() error {
 		app.Logger().Error(msg, "error", err)
 	}
 	return err
+}
+
+// axonStaticPrecompiles returns the default precompiles plus Axon-specific ones.
+func axonStaticPrecompiles(
+	stakingKeeper stakingkeeper.Keeper,
+	distrKeeper distrkeeper.Keeper,
+	bankKeeper bankkeeper.Keeper,
+	erc20Keeper *erc20keeper.Keeper,
+	transferKeeper *transferkeeper.Keeper,
+	channelKeeper *channelkeeper.Keeper,
+	clientKeeper ibcutils.ClientKeeper,
+	govKeeper govkeeper.Keeper,
+	slashingKeeper slashingkeeper.Keeper,
+	cdc codec.Codec,
+	agentKeeper agentkeeper.Keeper,
+) map[common.Address]ethvm.PrecompiledContract {
+	defaults := precompiletypes.DefaultStaticPrecompiles(
+		stakingKeeper, distrKeeper, bankKeeper, erc20Keeper,
+		transferKeeper, channelKeeper, clientKeeper,
+		govKeeper, slashingKeeper, cdc,
+	)
+
+	if reg, err := registryprecompile.NewPrecompile(agentKeeper); err == nil {
+		defaults[reg.Address()] = reg
+	}
+	if rep, err := reputationprecompile.NewPrecompile(agentKeeper); err == nil {
+		defaults[rep.Address()] = rep
+	}
+	if wal, err := walletprecompile.NewPrecompile(agentKeeper); err == nil {
+		defaults[wal.Address()] = wal
+	}
+
+	return defaults
 }
 
 func (app *AxonApp) AutoCliOpts() autocli.AppOptions {

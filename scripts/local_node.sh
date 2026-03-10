@@ -50,6 +50,18 @@ app["evm"]["params"]["evm_denom"] = denom
 if "extended_denom_options" in app["evm"]["params"]:
     app["evm"]["params"]["extended_denom_options"]["extended_denom"] = denom
 
+# Activate Axon custom precompiles alongside defaults
+axon_precompiles = [
+    "0x0000000000000000000000000000000000000801",  # IAgentRegistry
+    "0x0000000000000000000000000000000000000802",  # IAgentReputation
+    "0x0000000000000000000000000000000000000803",  # IAgentWallet
+]
+existing = app["evm"]["params"].get("active_static_precompiles", [])
+for pc in axon_precompiles:
+    if pc not in existing:
+        existing.append(pc)
+app["evm"]["params"]["active_static_precompiles"] = existing
+
 app["feemarket"]["params"]["no_base_fee"] = True
 app["feemarket"]["params"]["min_gas_price"] = "0.000000000000000000"
 
