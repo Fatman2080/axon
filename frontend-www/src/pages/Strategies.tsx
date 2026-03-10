@@ -98,6 +98,7 @@ type LeaderboardItem = {
   id: string;
   agentName: string;
   owner: string;
+  ownerAvatar?: string;
   ownerUserId?: string;
   rank: number;
   roi: number;
@@ -164,6 +165,11 @@ const LeaderboardRow = ({ item }: { item: LeaderboardItem }) => {
   const tier = tierColor(item.category);
   const roiColor = item.roi >= 0 ? "var(--green)" : "var(--red)";
   const roiPrefix = item.roi >= 0 ? "+" : "";
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [item.ownerAvatar]);
 
   const rowClassName = [
     "grid grid-cols-12 gap-4 py-3 px-4 items-center text-sm font-mono",
@@ -176,15 +182,26 @@ const LeaderboardRow = ({ item }: { item: LeaderboardItem }) => {
       <div className="col-span-1 text-center font-bold text-lg">#{item.rank}</div>
       <div className="col-span-3 flex items-center gap-3">
         <div className="w-8 h-8 rounded shrink-0 bg-[#0a0a0c] border border-[var(--border)] flex items-center justify-center relative overflow-hidden">
-          <div
-            className="absolute inset-0 opacity-30"
-            style={{
-              background: `linear-gradient(135deg, ${tier.text} 0%, transparent 100%)`,
-            }}
-          ></div>
-          <span className="text-xs font-bold" style={{ color: tier.text }}>
-            {item.agentName.substring(0, 2).toUpperCase()}
-          </span>
+          {item.ownerAvatar && !avatarFailed ? (
+            <img
+              src={item.ownerAvatar}
+              alt={item.owner}
+              className="h-full w-full object-cover"
+              onError={() => setAvatarFailed(true)}
+            />
+          ) : (
+            <>
+              <div
+                className="absolute inset-0 opacity-30"
+                style={{
+                  background: `linear-gradient(135deg, ${tier.text} 0%, transparent 100%)`,
+                }}
+              ></div>
+              <span className="text-xs font-bold" style={{ color: tier.text }}>
+                {item.agentName.substring(0, 2).toUpperCase()}
+              </span>
+            </>
+          )}
         </div>
         <div>
           <div className="font-bold text-[var(--text-primary)]">{item.agentName}</div>
@@ -263,6 +280,7 @@ const Strategies = () => {
       id: s.id,
       agentName: s.name || `${s.id.slice(0, 8)}...`,
       owner: formatOwner(s.creator, t("strategies.leaderboard.notPublic")),
+      ownerAvatar: s.creatorAvatar,
       ownerUserId: s.ownerUserId,
       rank: idx + 1,
       roi: calcROI(s),

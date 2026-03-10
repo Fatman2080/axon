@@ -47,6 +47,7 @@ function mapAgentToStrategy(agent: AgentMarketItem): Strategy {
     runningDays: calcRunningDays(agent.startedAt),
     userCount: 0,
     creator: agent.userName || '',
+    creatorAvatar: agent.avatar || '',
     ownerUserId: agent.userId || '',
     currentTvl: agent.tvl || agent.accountValue || 0,
     maxTvl: 10000000,

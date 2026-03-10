@@ -584,12 +584,16 @@ func (s *Store) listAgentStats(search string) ([]AgentMarketItem, error) {
 		       IFNULL(a.description, ''),
 		       IFNULL(a.category, 'trend'),
 		       IFNULL(a.assigned_user_id, ''),
-		       CASE
-		         WHEN IFNULL(u.show_x_on_leaderboard, 0) = 1 THEN IFNULL(u.x_username, '')
-		         ELSE ''
-		       END,
-		       IFNULL(latest.account_value, 0),
-		       IFNULL(latest.account_value, 0) - IFNULL(first.account_value, 0),
+	       CASE
+	         WHEN IFNULL(u.show_x_on_leaderboard, 0) = 1 THEN IFNULL(u.x_username, '')
+	         ELSE ''
+	       END,
+	       CASE
+	         WHEN IFNULL(u.show_x_on_leaderboard, 0) = 1 THEN IFNULL(u.avatar, '')
+	         ELSE ''
+	       END,
+	       IFNULL(latest.account_value, 0),
+	       IFNULL(latest.account_value, 0) - IFNULL(first.account_value, 0),
 		       IFNULL(latest.created_at, ''),
 		       IFNULL(a.vault_address, ''),
 		       IFNULL(a.evm_balance, 0),
@@ -638,6 +642,7 @@ func (s *Store) listAgentStats(search string) ([]AgentMarketItem, error) {
 			&item.Category,
 			&item.UserID,
 			&item.UserName,
+			&item.Avatar,
 			&item.AccountValue,
 			&item.TotalPnL,
 			&item.LastSyncedAt,
@@ -669,12 +674,16 @@ func (s *Store) getAgentStats(publicKey string) (AgentMarketItem, error) {
 		       IFNULL(a.description, ''),
 		       IFNULL(a.category, 'trend'),
 		       IFNULL(a.assigned_user_id, ''),
-		       CASE
-		         WHEN IFNULL(u.show_x_on_leaderboard, 0) = 1 THEN IFNULL(u.x_username, '')
-		         ELSE ''
-		       END,
-		       IFNULL(latest.account_value, 0),
-		       IFNULL(latest.account_value, 0) - IFNULL(first.account_value, 0),
+	       CASE
+	         WHEN IFNULL(u.show_x_on_leaderboard, 0) = 1 THEN IFNULL(u.x_username, '')
+	         ELSE ''
+	       END,
+	       CASE
+	         WHEN IFNULL(u.show_x_on_leaderboard, 0) = 1 THEN IFNULL(u.avatar, '')
+	         ELSE ''
+	       END,
+	       IFNULL(latest.account_value, 0),
+	       IFNULL(latest.account_value, 0) - IFNULL(first.account_value, 0),
 		       IFNULL(latest.created_at, ''),
 		       IFNULL(a.vault_address, ''),
 		       IFNULL(a.evm_balance, 0),
@@ -707,6 +716,7 @@ func (s *Store) getAgentStats(publicKey string) (AgentMarketItem, error) {
 		&item.Category,
 		&item.UserID,
 		&item.UserName,
+		&item.Avatar,
 		&item.AccountValue,
 		&item.TotalPnL,
 		&item.LastSyncedAt,

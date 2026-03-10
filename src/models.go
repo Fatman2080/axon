@@ -70,6 +70,7 @@ type AgentMarketItem struct {
 	Category       string  `json:"category,omitempty"`
 	UserID         string  `json:"userId,omitempty"`
 	UserName       string  `json:"userName,omitempty"`
+	Avatar         string  `json:"avatar,omitempty"`
 	AccountValue   float64 `json:"accountValue,omitempty"`
 	TotalPnL       float64 `json:"totalPnL,omitempty"`
 	VaultAddress   string  `json:"vaultAddress,omitempty"`

@@ -26,6 +26,7 @@ export interface Strategy {
   runningDays: number;
   userCount: number; // 支持者数量 (Stakers/Voters)
   creator: string;
+  creatorAvatar?: string;
   ownerUserId?: string;
   // Agent TVL管理
   currentTvl: number; // 从大池子分配到的管理资金
@@ -158,6 +159,7 @@ export interface AgentMarketItem {
   category?: Strategy['category'];
   userId?: string;
   userName?: string;
+  avatar?: string;
   accountValue?: number;
   totalPnL?: number;
   vaultAddress?: string;
