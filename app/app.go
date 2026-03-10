@@ -532,7 +532,7 @@ func NewAxonApp(
 	transferModule := transfer.NewAppModule(app.TransferKeeper)
 
 	// ---- Axon Agent AppModule (adaptor for new SDK) ----
-	agentAppModule := NewAgentAppModule(appCodec, app.AgentKeeper, app.BankKeeper)
+	agentAppModule := NewAgentAppModule(appCodec, app.AgentKeeper, app.BankKeeper, app.FeeMarketKeeper)
 
 	// ---- Module Manager ----
 
@@ -588,13 +588,13 @@ func NewAxonApp(
 		ibcexported.ModuleName, ibctransfertypes.ModuleName,
 		erc20types.ModuleName, feemarkettypes.ModuleName,
 		evmtypes.ModuleName,
+		agenttypes.ModuleName, // must run before distribution to burn base fees first
 		distrtypes.ModuleName, slashingtypes.ModuleName,
 		evidencetypes.ModuleName, stakingtypes.ModuleName,
 		authtypes.ModuleName, banktypes.ModuleName, govtypes.ModuleName, genutiltypes.ModuleName,
 		authz.ModuleName, feegrant.ModuleName,
 		consensusparamtypes.ModuleName,
 		vestingtypes.ModuleName,
-		agenttypes.ModuleName,
 	)
 
 	app.ModuleManager.SetOrderEndBlockers(

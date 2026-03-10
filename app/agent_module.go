@@ -15,6 +15,8 @@ import (
 
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 
+	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
+
 	agentkeeper "github.com/axon-chain/axon/x/agent/keeper"
 	agenttypes "github.com/axon-chain/axon/x/agent/types"
 )
@@ -26,13 +28,14 @@ var (
 )
 
 type AgentAppModule struct {
-	cdc        codec.Codec
-	keeper     agentkeeper.Keeper
-	bankKeeper bankkeeper.Keeper
+	cdc             codec.Codec
+	keeper          agentkeeper.Keeper
+	bankKeeper      bankkeeper.Keeper
+	feeMarketKeeper feemarketkeeper.Keeper
 }
 
-func NewAgentAppModule(cdc codec.Codec, keeper agentkeeper.Keeper, bankKeeper bankkeeper.Keeper) AgentAppModule {
-	return AgentAppModule{cdc: cdc, keeper: keeper, bankKeeper: bankKeeper}
+func NewAgentAppModule(cdc codec.Codec, keeper agentkeeper.Keeper, bankKeeper bankkeeper.Keeper, fmKeeper feemarketkeeper.Keeper) AgentAppModule {
+	return AgentAppModule{cdc: cdc, keeper: keeper, bankKeeper: bankKeeper, feeMarketKeeper: fmKeeper}
 }
 
 func (am AgentAppModule) Name() string { return agenttypes.ModuleName }
@@ -88,8 +91,7 @@ func (am AgentAppModule) ConsensusVersion() uint64 { return 1 }
 
 func (am AgentAppModule) BeginBlock(ctx context.Context) error {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	// Burn gas fees before distribution module runs
-	BurnCollectedFees(sdkCtx, am.bankKeeper)
+	BurnCollectedFees(sdkCtx, am.bankKeeper, am.feeMarketKeeper)
 	am.keeper.BeginBlocker(sdkCtx)
 	return nil
 }

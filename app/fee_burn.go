@@ -6,40 +6,58 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+
+	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
 )
 
-// BurnCollectedFees burns a portion of collected gas fees from FeeCollector
-// at BeginBlock, implementing the Axon deflationary model:
-// - Base Fee portion → 100% burned
-// - The remaining fees (priority/tips) are left for distribution to proposer/validators
+// BurnCollectedFees implements whitepaper §8.5 / §8.6:
+//   - Base Fee  → 100% burned (deflationary)
+//   - Priority Fee → left in FeeCollector for x/distribution → proposer
 //
-// Since precise per-tx base fee tracking is complex, we burn 50% of all fees
-// as a conservative estimate (base fee typically = ~50% of total gas cost).
-// When NoBaseFee = true (testnet), fees are still burned at this ratio.
-const FeeBurnRatioPercent = 50
-
-func BurnCollectedFees(ctx sdk.Context, bankKeeper bankkeeper.Keeper) {
+// This MUST run before x/distribution's BeginBlocker so that distribution
+// only distributes the remaining priority fees to the proposer/validators.
+//
+// When EIP-1559 is active (NoBaseFee=false), base fee dominates gas costs
+// (typically 70-95% of effectiveGasPrice). Without per-tx tracking we use
+// 80% as a conservative estimate for the base-fee share. When NoBaseFee=true
+// (testnet mode), we burn 50% as a rough approximation.
+func BurnCollectedFees(ctx sdk.Context, bankKeeper bankkeeper.Keeper, fmKeeper feemarketkeeper.Keeper) {
 	feeCollectorAddr := authtypes.NewModuleAddress(authtypes.FeeCollectorName)
 	balance := bankKeeper.GetBalance(ctx, feeCollectorAddr, "aaxon")
 
-	if balance.IsZero() || !balance.IsPositive() {
+	if !balance.IsPositive() {
 		return
 	}
 
-	burnAmount := balance.Amount.QuoRaw(100).MulRaw(int64(FeeBurnRatioPercent))
+	fmParams := fmKeeper.GetParams(ctx)
+
+	var burnPercent int64
+	if fmParams.NoBaseFee {
+		burnPercent = 50
+	} else {
+		// EIP-1559 active: base fee is the dominant portion of gas costs.
+		// A priority fee of ~20% on top of base fee → base fee ≈ 80%.
+		burnPercent = 80
+	}
+
+	burnAmount := balance.Amount.MulRaw(burnPercent).QuoRaw(100)
 	if burnAmount.IsZero() {
 		return
 	}
 
 	burnCoin := sdk.NewCoin("aaxon", burnAmount)
 	if err := bankKeeper.BurnCoins(ctx, authtypes.FeeCollectorName, sdk.NewCoins(burnCoin)); err != nil {
+		ctx.Logger().Error("failed to burn gas fees", "error", err)
 		return
 	}
 
+	remaining := balance.Sub(burnCoin)
+
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
 		"gas_fee_burned",
-		sdk.NewAttribute("amount", burnCoin.String()),
-		sdk.NewAttribute("remaining", balance.Sub(burnCoin).String()),
+		sdk.NewAttribute("burned", burnCoin.String()),
+		sdk.NewAttribute("remaining_for_proposer", remaining.String()),
+		sdk.NewAttribute("burn_percent", fmt.Sprintf("%d", burnPercent)),
 		sdk.NewAttribute("block", fmt.Sprintf("%d", ctx.BlockHeight())),
 	))
 }
