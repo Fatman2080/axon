@@ -16,44 +16,38 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/axon-chain/axon/x/agent/keeper"
-	"github.com/axon-chain/axon/x/agent/types"
 )
 
 var (
-	address = common.HexToAddress("0x0000000000000000000000000000000000000803")
-	_       = vm.PrecompiledContract(&Precompile{})
+	contractAddress = common.HexToAddress("0x0000000000000000000000000000000000000803")
+	_               = vm.PrecompiledContract(&Precompile{})
 )
 
+// Method names
 const (
-	CreateWalletMethod  = "createWallet"
-	ExecuteMethod       = "execute"
-	FreezeMethod        = "freeze"
-	RecoverMethod       = "recover"
-	GetWalletInfoMethod = "getWalletInfo"
+	MethodCreateWallet  = "createWallet"
+	MethodExecute       = "execute"
+	MethodSetTrust      = "setTrust"
+	MethodRemoveTrust   = "removeTrust"
+	MethodFreeze        = "freeze"
+	MethodRecover       = "recover"
+	MethodGetWalletInfo = "getWalletInfo"
+	MethodGetTrust      = "getTrust"
+)
 
+// Gas costs
+const (
 	GasCreateWallet  = 50000
 	GasExecute       = 30000
+	GasSetTrust      = 20000
+	GasRemoveTrust   = 10000
 	GasFreeze        = 10000
 	GasRecover       = 30000
 	GasGetWalletInfo = 1000
-
-	// BlocksPerDay at 5s/block
-	BlocksPerDay int64 = 17280
-
-	WalletKeyPrefix = "AgentWallet/"
+	GasGetTrust      = 1000
 )
 
-// WalletInfo is stored in the x/agent KV store.
-type WalletInfo struct {
-	Operator       common.Address
-	Guardian       common.Address
-	TxLimit        *big.Int
-	DailyLimit     *big.Int
-	CooldownBlocks *big.Int
-	DailySpent     *big.Int
-	LastResetBlock int64
-	IsFrozen       bool
-}
+const BlocksPerDay int64 = 17280 // at ~5 s/block
 
 type Precompile struct {
 	cmn.Precompile
@@ -70,14 +64,14 @@ func NewPrecompile(k keeper.Keeper) (*Precompile, error) {
 		Precompile: cmn.Precompile{
 			KvGasConfig:          storetypes.GasConfig{},
 			TransientKVGasConfig: storetypes.GasConfig{},
-			ContractAddress:      address,
+			ContractAddress:      contractAddress,
 		},
 		abi:    parsed,
 		keeper: k,
 	}, nil
 }
 
-func (Precompile) Address() common.Address { return address }
+func (Precompile) Address() common.Address { return contractAddress }
 
 func (p Precompile) RequiredGas(input []byte) uint64 {
 	if len(input) < 4 {
@@ -88,16 +82,22 @@ func (p Precompile) RequiredGas(input []byte) uint64 {
 		return 0
 	}
 	switch method.Name {
-	case CreateWalletMethod:
+	case MethodCreateWallet:
 		return GasCreateWallet
-	case ExecuteMethod:
+	case MethodExecute:
 		return GasExecute
-	case FreezeMethod:
+	case MethodSetTrust:
+		return GasSetTrust
+	case MethodRemoveTrust:
+		return GasRemoveTrust
+	case MethodFreeze:
 		return GasFreeze
-	case RecoverMethod:
+	case MethodRecover:
 		return GasRecover
-	case GetWalletInfoMethod:
+	case MethodGetWalletInfo:
 		return GasGetWalletInfo
+	case MethodGetTrust:
+		return GasGetTrust
 	default:
 		return 0
 	}
@@ -105,58 +105,69 @@ func (p Precompile) RequiredGas(input []byte) uint64 {
 
 func (p Precompile) Run(evm *vm.EVM, contract *vm.Contract, readonly bool) ([]byte, error) {
 	return p.RunNativeAction(evm, contract, func(ctx sdk.Context) ([]byte, error) {
-		return p.execute(ctx, contract, readonly, evm)
+		return p.dispatch(ctx, contract, readonly, evm)
 	})
 }
 
 func (p Precompile) IsTransaction(method *abi.Method) bool {
 	switch method.Name {
-	case CreateWalletMethod, ExecuteMethod, FreezeMethod, RecoverMethod:
+	case MethodCreateWallet, MethodExecute, MethodSetTrust, MethodRemoveTrust, MethodFreeze, MethodRecover:
 		return true
 	default:
 		return false
 	}
 }
 
-func (p Precompile) execute(ctx sdk.Context, contract *vm.Contract, readOnly bool, evm *vm.EVM) ([]byte, error) {
+func (p Precompile) dispatch(ctx sdk.Context, contract *vm.Contract, readOnly bool, evm *vm.EVM) ([]byte, error) {
 	method, args, err := cmn.SetupABI(p.abi, contract, readOnly, p.IsTransaction)
 	if err != nil {
 		return nil, err
 	}
 
 	switch method.Name {
-	case CreateWalletMethod:
+	case MethodCreateWallet:
 		return p.createWallet(ctx, contract, method, args)
-	case ExecuteMethod:
+	case MethodExecute:
 		return p.executeWallet(ctx, contract, method, args, evm)
-	case FreezeMethod:
+	case MethodSetTrust:
+		return p.setTrust(ctx, contract, method, args)
+	case MethodRemoveTrust:
+		return p.removeTrust(ctx, contract, method, args)
+	case MethodFreeze:
 		return p.freezeWallet(ctx, contract, method, args)
-	case RecoverMethod:
+	case MethodRecover:
 		return p.recoverWallet(ctx, contract, method, args)
-	case GetWalletInfoMethod:
+	case MethodGetWalletInfo:
 		return p.getWalletInfo(ctx, method, args)
+	case MethodGetTrust:
+		return p.getTrustInfo(ctx, method, args)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method.Name)
 	}
 }
 
+// ============================================================
+// Write methods
+// ============================================================
+
+// createWallet: caller becomes Owner; specifies operator, guardian, and default limits.
 func (p Precompile) createWallet(ctx sdk.Context, contract *vm.Contract, method *abi.Method, args []interface{}) ([]byte, error) {
-	if len(args) < 4 {
-		return nil, fmt.Errorf("createWallet requires 4 arguments")
+	if len(args) < 5 {
+		return nil, fmt.Errorf("createWallet requires 5 arguments")
 	}
 
-	txLimit, _ := args[0].(*big.Int)
-	dailyLimit, _ := args[1].(*big.Int)
-	cooldownBlocks, _ := args[2].(*big.Int)
-	guardian, _ := args[3].(common.Address)
+	operator, _ := args[0].(common.Address)
+	guardian, _ := args[1].(common.Address)
+	txLimit, _ := args[2].(*big.Int)
+	dailyLimit, _ := args[3].(*big.Int)
+	cooldownBlocks, _ := args[4].(*big.Int)
 
-	caller := contract.Caller()
-
-	// Wallet address = hash(operator, block_height)
-	walletAddr := generateWalletAddress(caller, ctx.BlockHeight())
+	owner := contract.Caller()
+	walletAddr := generateWalletAddress(owner, ctx.BlockHeight())
 
 	wallet := WalletInfo{
-		Operator:       caller,
+		Owner:          owner,
+		Operator:       operator,
 		Guardian:       guardian,
 		TxLimit:        txLimit,
 		DailyLimit:     dailyLimit,
@@ -166,18 +177,29 @@ func (p Precompile) createWallet(ctx sdk.Context, contract *vm.Contract, method 
 		IsFrozen:       false,
 	}
 
-	p.setWallet(ctx, walletAddr, wallet)
+	p.storeWallet(ctx, walletAddr, wallet)
 
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
 		"agent_wallet_created",
 		sdk.NewAttribute("wallet", walletAddr.Hex()),
-		sdk.NewAttribute("operator", caller.Hex()),
+		sdk.NewAttribute("owner", owner.Hex()),
+		sdk.NewAttribute("operator", operator.Hex()),
 		sdk.NewAttribute("guardian", guardian.Hex()),
 	))
 
 	return method.Outputs.Pack(walletAddr)
 }
 
+// executeWallet: trust-aware transaction execution by Operator.
+//
+// Resolution order:
+//  1. Wallet frozen? → reject
+//  2. Caller == Operator? → reject if not
+//  3. Lookup TrustedChannel for target
+//     - TrustBlocked → reject
+//     - TrustFull    → execute immediately, no caps
+//     - TrustLimited → per-channel txLimit + dailyLimit
+//     - Unknown      → wallet default txLimit + dailyLimit
 func (p Precompile) executeWallet(ctx sdk.Context, contract *vm.Contract, method *abi.Method, args []interface{}, evm *vm.EVM) ([]byte, error) {
 	if len(args) < 4 {
 		return nil, fmt.Errorf("execute requires 4 arguments")
@@ -186,75 +208,154 @@ func (p Precompile) executeWallet(ctx sdk.Context, contract *vm.Contract, method
 	walletAddr, _ := args[0].(common.Address)
 	target, _ := args[1].(common.Address)
 	value, _ := args[2].(*big.Int)
-	// data arg[3] is calldata for the target - unused for simple transfers
 
-	wallet, found := p.getWallet(ctx, walletAddr)
+	wallet, found := p.loadWallet(ctx, walletAddr)
 	if !found {
 		return nil, fmt.Errorf("wallet not found")
 	}
-
 	if wallet.IsFrozen {
 		return nil, fmt.Errorf("wallet is frozen")
 	}
-
 	if contract.Caller() != wallet.Operator {
 		return nil, fmt.Errorf("only operator can execute")
 	}
 
-	if wallet.TxLimit != nil && value.Cmp(wallet.TxLimit) > 0 {
-		return nil, fmt.Errorf("transaction exceeds per-tx limit")
+	channel, hasTrust := p.loadTrustChannel(ctx, walletAddr, target)
+	if hasTrust && channel.ExpiresAt > 0 && ctx.BlockHeight() > channel.ExpiresAt {
+		hasTrust = false
 	}
 
-	// Reset daily spent if a new day has passed
-	if ctx.BlockHeight()-wallet.LastResetBlock >= BlocksPerDay {
-		wallet.DailySpent = big.NewInt(0)
-		wallet.LastResetBlock = ctx.BlockHeight()
+	if hasTrust {
+		switch channel.Level {
+
+		case TrustBlocked:
+			return nil, fmt.Errorf("target is blacklisted")
+
+		case TrustFull:
+			p.doTransfer(evm, walletAddr, target, value)
+			return method.Outputs.Pack()
+
+		case TrustLimited:
+			if err := p.checkChannelLimits(ctx, walletAddr, target, value, channel); err != nil {
+				return nil, err
+			}
+			p.doTransfer(evm, walletAddr, target, value)
+			return method.Outputs.Pack()
+		}
 	}
 
-	newSpent := new(big.Int).Add(wallet.DailySpent, value)
-	if wallet.DailyLimit != nil && newSpent.Cmp(wallet.DailyLimit) > 0 {
-		return nil, fmt.Errorf("transaction exceeds daily limit")
+	// Unknown target — apply wallet-level default limits
+	if err := p.checkDefaultLimits(ctx, walletAddr, value, &wallet); err != nil {
+		return nil, err
+	}
+	p.storeWallet(ctx, walletAddr, wallet)
+	p.doTransfer(evm, walletAddr, target, value)
+	return method.Outputs.Pack()
+}
+
+// setTrust: Owner authorizes a trust channel for a target contract.
+func (p Precompile) setTrust(ctx sdk.Context, contract *vm.Contract, method *abi.Method, args []interface{}) ([]byte, error) {
+	if len(args) < 6 {
+		return nil, fmt.Errorf("setTrust requires 6 arguments")
 	}
 
-	wallet.DailySpent = newSpent
-	p.setWallet(ctx, walletAddr, wallet)
+	walletAddr, _ := args[0].(common.Address)
+	target, _ := args[1].(common.Address)
+	level, _ := args[2].(*big.Int)
+	txLimit, _ := args[3].(*big.Int)
+	dailyLimit, _ := args[4].(*big.Int)
+	expiresAt, _ := args[5].(*big.Int)
 
-	// Execute the transfer via EVM
-	if value.Sign() > 0 {
-		val, _ := uint256.FromBig(value)
-		evm.Context.Transfer(evm.StateDB, walletAddr, target, val)
+	wallet, found := p.loadWallet(ctx, walletAddr)
+	if !found {
+		return nil, fmt.Errorf("wallet not found")
 	}
+	if contract.Caller() != wallet.Owner {
+		return nil, fmt.Errorf("only owner can set trust level")
+	}
+
+	trustLevel := TrustLevel(level.Uint64())
+	if trustLevel > TrustFull {
+		return nil, fmt.Errorf("invalid trust level: must be 0-3")
+	}
+
+	tc := TrustedChannel{
+		Level:        trustLevel,
+		TxLimit:      txLimit,
+		DailyLimit:   dailyLimit,
+		AuthorizedAt: ctx.BlockHeight(),
+		ExpiresAt:    expiresAt.Int64(),
+	}
+	p.storeTrustChannel(ctx, walletAddr, target, tc)
+
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		"agent_trust_set",
+		sdk.NewAttribute("wallet", walletAddr.Hex()),
+		sdk.NewAttribute("target", target.Hex()),
+		sdk.NewAttribute("level", fmt.Sprintf("%d", trustLevel)),
+	))
 
 	return method.Outputs.Pack()
 }
 
+// removeTrust: Owner revokes a trust channel.
+func (p Precompile) removeTrust(ctx sdk.Context, contract *vm.Contract, method *abi.Method, args []interface{}) ([]byte, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("removeTrust requires 2 arguments")
+	}
+
+	walletAddr, _ := args[0].(common.Address)
+	target, _ := args[1].(common.Address)
+
+	wallet, found := p.loadWallet(ctx, walletAddr)
+	if !found {
+		return nil, fmt.Errorf("wallet not found")
+	}
+	if contract.Caller() != wallet.Owner {
+		return nil, fmt.Errorf("only owner can remove trust")
+	}
+
+	p.deleteTrustChannel(ctx, walletAddr, target)
+
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		"agent_trust_removed",
+		sdk.NewAttribute("wallet", walletAddr.Hex()),
+		sdk.NewAttribute("target", target.Hex()),
+	))
+
+	return method.Outputs.Pack()
+}
+
+// freezeWallet: Guardian OR Owner can freeze a wallet.
 func (p Precompile) freezeWallet(ctx sdk.Context, contract *vm.Contract, method *abi.Method, args []interface{}) ([]byte, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("freeze requires 1 argument")
 	}
 	walletAddr, _ := args[0].(common.Address)
 
-	wallet, found := p.getWallet(ctx, walletAddr)
+	wallet, found := p.loadWallet(ctx, walletAddr)
 	if !found {
 		return nil, fmt.Errorf("wallet not found")
 	}
 
-	if contract.Caller() != wallet.Guardian {
-		return nil, fmt.Errorf("only guardian can freeze")
+	caller := contract.Caller()
+	if caller != wallet.Guardian && caller != wallet.Owner {
+		return nil, fmt.Errorf("only guardian or owner can freeze")
 	}
 
 	wallet.IsFrozen = true
-	p.setWallet(ctx, walletAddr, wallet)
+	p.storeWallet(ctx, walletAddr, wallet)
 
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
 		"agent_wallet_frozen",
 		sdk.NewAttribute("wallet", walletAddr.Hex()),
-		sdk.NewAttribute("guardian", contract.Caller().Hex()),
+		sdk.NewAttribute("by", caller.Hex()),
 	))
 
 	return method.Outputs.Pack()
 }
 
+// recoverWallet: Guardian replaces the Operator and auto-unfreezes.
 func (p Precompile) recoverWallet(ctx sdk.Context, contract *vm.Contract, method *abi.Method, args []interface{}) ([]byte, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("recover requires 2 arguments")
@@ -262,18 +363,17 @@ func (p Precompile) recoverWallet(ctx sdk.Context, contract *vm.Contract, method
 	walletAddr, _ := args[0].(common.Address)
 	newOperator, _ := args[1].(common.Address)
 
-	wallet, found := p.getWallet(ctx, walletAddr)
+	wallet, found := p.loadWallet(ctx, walletAddr)
 	if !found {
 		return nil, fmt.Errorf("wallet not found")
 	}
-
 	if contract.Caller() != wallet.Guardian {
 		return nil, fmt.Errorf("only guardian can recover")
 	}
 
 	wallet.Operator = newOperator
 	wallet.IsFrozen = false
-	p.setWallet(ctx, walletAddr, wallet)
+	p.storeWallet(ctx, walletAddr, wallet)
 
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
 		"agent_wallet_recovered",
@@ -284,21 +384,25 @@ func (p Precompile) recoverWallet(ctx sdk.Context, contract *vm.Contract, method
 	return method.Outputs.Pack()
 }
 
+// ============================================================
+// Read methods
+// ============================================================
+
 func (p Precompile) getWalletInfo(ctx sdk.Context, method *abi.Method, args []interface{}) ([]byte, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("getWalletInfo requires 1 argument")
 	}
 	walletAddr, _ := args[0].(common.Address)
 
-	wallet, found := p.getWallet(ctx, walletAddr)
+	wallet, found := p.loadWallet(ctx, walletAddr)
 	if !found {
+		zero := big.NewInt(0)
 		return method.Outputs.Pack(
-			big.NewInt(0), big.NewInt(0), big.NewInt(0),
-			false, common.Address{}, common.Address{},
+			zero, zero, zero,
+			false, common.Address{}, common.Address{}, common.Address{},
 		)
 	}
 
-	// Reset daily spent for display if a new day has passed
 	dailySpent := wallet.DailySpent
 	if ctx.BlockHeight()-wallet.LastResetBlock >= BlocksPerDay {
 		dailySpent = big.NewInt(0)
@@ -309,24 +413,97 @@ func (p Precompile) getWalletInfo(ctx sdk.Context, method *abi.Method, args []in
 		wallet.DailyLimit,
 		dailySpent,
 		wallet.IsFrozen,
+		wallet.Owner,
 		wallet.Operator,
 		wallet.Guardian,
 	)
 }
 
-// Storage helpers using x/agent KV store
+func (p Precompile) getTrustInfo(ctx sdk.Context, method *abi.Method, args []interface{}) ([]byte, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("getTrust requires 2 arguments")
+	}
+	walletAddr, _ := args[0].(common.Address)
+	target, _ := args[1].(common.Address)
 
-func walletKey(addr common.Address) []byte {
-	return []byte(WalletKeyPrefix + addr.Hex())
+	tc, found := p.loadTrustChannel(ctx, walletAddr, target)
+	if !found {
+		zero := big.NewInt(0)
+		return method.Outputs.Pack(
+			big.NewInt(int64(TrustUnknown)),
+			zero, zero, zero, zero,
+		)
+	}
+
+	return method.Outputs.Pack(
+		big.NewInt(int64(tc.Level)),
+		tc.TxLimit,
+		tc.DailyLimit,
+		big.NewInt(tc.AuthorizedAt),
+		big.NewInt(tc.ExpiresAt),
+	)
 }
 
-func (p Precompile) setWallet(ctx sdk.Context, addr common.Address, w WalletInfo) {
+// ============================================================
+// Limit checking helpers
+// ============================================================
+
+// checkChannelLimits enforces per-channel txLimit and dailyLimit for TrustLimited targets.
+func (p Precompile) checkChannelLimits(ctx sdk.Context, walletAddr, target common.Address, value *big.Int, ch TrustedChannel) error {
+	if ch.TxLimit != nil && ch.TxLimit.Sign() > 0 && value.Cmp(ch.TxLimit) > 0 {
+		return fmt.Errorf("exceeds channel tx limit")
+	}
+	if ch.DailyLimit != nil && ch.DailyLimit.Sign() > 0 {
+		spent := p.loadDailySpentTo(ctx, walletAddr, target)
+		if ctx.BlockHeight()-spent.ResetBlock >= BlocksPerDay {
+			spent = DailySpentEntry{Amount: big.NewInt(0), ResetBlock: ctx.BlockHeight()}
+		}
+		newSpent := new(big.Int).Add(spent.Amount, value)
+		if newSpent.Cmp(ch.DailyLimit) > 0 {
+			return fmt.Errorf("exceeds channel daily limit")
+		}
+		spent.Amount = newSpent
+		p.storeDailySpentTo(ctx, walletAddr, target, spent)
+	}
+	return nil
+}
+
+// checkDefaultLimits enforces wallet-level txLimit and dailyLimit for unknown targets.
+func (p Precompile) checkDefaultLimits(ctx sdk.Context, walletAddr common.Address, value *big.Int, wallet *WalletInfo) error {
+	if wallet.TxLimit != nil && wallet.TxLimit.Sign() > 0 && value.Cmp(wallet.TxLimit) > 0 {
+		return fmt.Errorf("exceeds default tx limit")
+	}
+
+	if ctx.BlockHeight()-wallet.LastResetBlock >= BlocksPerDay {
+		wallet.DailySpent = big.NewInt(0)
+		wallet.LastResetBlock = ctx.BlockHeight()
+	}
+
+	newSpent := new(big.Int).Add(wallet.DailySpent, value)
+	if wallet.DailyLimit != nil && wallet.DailyLimit.Sign() > 0 && newSpent.Cmp(wallet.DailyLimit) > 0 {
+		return fmt.Errorf("exceeds default daily limit")
+	}
+	wallet.DailySpent = newSpent
+	return nil
+}
+
+func (p Precompile) doTransfer(evm *vm.EVM, from, to common.Address, value *big.Int) {
+	if value.Sign() > 0 {
+		val, _ := uint256.FromBig(value)
+		evm.Context.Transfer(evm.StateDB, from, to, val)
+	}
+}
+
+// ============================================================
+// KV store helpers
+// ============================================================
+
+func (p Precompile) storeWallet(ctx sdk.Context, addr common.Address, w WalletInfo) {
 	store := ctx.KVStore(p.keeper.StoreKey())
-	bz := encodeWallet(w)
-	store.Set(walletKey(addr), bz)
+	store.Set(walletKey(addr), encodeWallet(w))
 }
 
-func (p Precompile) getWallet(ctx sdk.Context, addr common.Address) (WalletInfo, bool) {
+func (p Precompile) loadWallet(ctx sdk.Context, addr common.Address) (WalletInfo, bool) {
 	store := ctx.KVStore(p.keeper.StoreKey())
 	bz := store.Get(walletKey(addr))
 	if bz == nil {
@@ -335,55 +512,51 @@ func (p Precompile) getWallet(ctx sdk.Context, addr common.Address) (WalletInfo,
 	return decodeWallet(bz), true
 }
 
-func generateWalletAddress(operator common.Address, blockHeight int64) common.Address {
-	data := append(operator.Bytes(), types.Uint64ToBytes(uint64(blockHeight))...)
-	hash := common.BytesToAddress(data[:20])
-	return hash
+func (p Precompile) storeTrustChannel(ctx sdk.Context, wallet, target common.Address, tc TrustedChannel) {
+	store := ctx.KVStore(p.keeper.StoreKey())
+	store.Set(trustKey(wallet, target), encodeTrustChannel(tc))
 }
 
-// Simple binary encoding for WalletInfo (no protobuf needed for internal state).
-func encodeWallet(w WalletInfo) []byte {
-	// Format: operator(20) + guardian(20) + txLimit(32) + dailyLimit(32) +
-	//         cooldownBlocks(32) + dailySpent(32) + lastResetBlock(8) + isFrozen(1)
-	buf := make([]byte, 0, 177)
-	buf = append(buf, w.Operator.Bytes()...)
-	buf = append(buf, w.Guardian.Bytes()...)
-	buf = append(buf, common.LeftPadBytes(w.TxLimit.Bytes(), 32)...)
-	buf = append(buf, common.LeftPadBytes(w.DailyLimit.Bytes(), 32)...)
-	buf = append(buf, common.LeftPadBytes(w.CooldownBlocks.Bytes(), 32)...)
-	buf = append(buf, common.LeftPadBytes(w.DailySpent.Bytes(), 32)...)
-	buf = append(buf, types.Uint64ToBytes(uint64(w.LastResetBlock))...)
-	if w.IsFrozen {
-		buf = append(buf, 1)
-	} else {
-		buf = append(buf, 0)
+func (p Precompile) loadTrustChannel(ctx sdk.Context, wallet, target common.Address) (TrustedChannel, bool) {
+	store := ctx.KVStore(p.keeper.StoreKey())
+	bz := store.Get(trustKey(wallet, target))
+	if bz == nil {
+		return TrustedChannel{}, false
 	}
-	return buf
+	return decodeTrustChannel(bz), true
 }
 
-func decodeWallet(bz []byte) WalletInfo {
-	if len(bz) < 177 {
-		return WalletInfo{}
-	}
-	w := WalletInfo{}
-	w.Operator = common.BytesToAddress(bz[0:20])
-	w.Guardian = common.BytesToAddress(bz[20:40])
-	w.TxLimit = new(big.Int).SetBytes(bz[40:72])
-	w.DailyLimit = new(big.Int).SetBytes(bz[72:104])
-	w.CooldownBlocks = new(big.Int).SetBytes(bz[104:136])
-	w.DailySpent = new(big.Int).SetBytes(bz[136:168])
-	w.LastResetBlock = int64(types.BytesToUint64(bz[168:176]))
-	w.IsFrozen = bz[176] == 1
-	return w
+func (p Precompile) deleteTrustChannel(ctx sdk.Context, wallet, target common.Address) {
+	store := ctx.KVStore(p.keeper.StoreKey())
+	store.Delete(trustKey(wallet, target))
 }
+
+func (p Precompile) loadDailySpentTo(ctx sdk.Context, wallet, target common.Address) DailySpentEntry {
+	store := ctx.KVStore(p.keeper.StoreKey())
+	bz := store.Get(spentToKey(wallet, target))
+	if bz == nil {
+		return DailySpentEntry{Amount: big.NewInt(0), ResetBlock: ctx.BlockHeight()}
+	}
+	return decodeDailySpent(bz)
+}
+
+func (p Precompile) storeDailySpentTo(ctx sdk.Context, wallet, target common.Address, e DailySpentEntry) {
+	store := ctx.KVStore(p.keeper.StoreKey())
+	store.Set(spentToKey(wallet, target), encodeDailySpent(e))
+}
+
+// ============================================================
+// ABI definition
+// ============================================================
 
 const abiJSON = `[
 	{
 		"inputs": [
+			{"name": "operator", "type": "address"},
+			{"name": "guardian", "type": "address"},
 			{"name": "txLimit", "type": "uint256"},
 			{"name": "dailyLimit", "type": "uint256"},
-			{"name": "cooldownBlocks", "type": "uint256"},
-			{"name": "guardian", "type": "address"}
+			{"name": "cooldownBlocks", "type": "uint256"}
 		],
 		"name": "createWallet",
 		"outputs": [{"name": "wallet", "type": "address"}],
@@ -398,6 +571,30 @@ const abiJSON = `[
 			{"name": "data", "type": "bytes"}
 		],
 		"name": "execute",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{"name": "wallet", "type": "address"},
+			{"name": "target", "type": "address"},
+			{"name": "level", "type": "uint256"},
+			{"name": "txLimit", "type": "uint256"},
+			{"name": "dailyLimit", "type": "uint256"},
+			{"name": "expiresAt", "type": "uint256"}
+		],
+		"name": "setTrust",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{"name": "wallet", "type": "address"},
+			{"name": "target", "type": "address"}
+		],
+		"name": "removeTrust",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -427,8 +624,25 @@ const abiJSON = `[
 			{"name": "dailyLimit", "type": "uint256"},
 			{"name": "dailySpent", "type": "uint256"},
 			{"name": "isFrozen", "type": "bool"},
+			{"name": "owner", "type": "address"},
 			{"name": "operator", "type": "address"},
 			{"name": "guardian", "type": "address"}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{"name": "wallet", "type": "address"},
+			{"name": "target", "type": "address"}
+		],
+		"name": "getTrust",
+		"outputs": [
+			{"name": "level", "type": "uint256"},
+			{"name": "txLimit", "type": "uint256"},
+			{"name": "dailyLimit", "type": "uint256"},
+			{"name": "authorizedAt", "type": "uint256"},
+			{"name": "expiresAt", "type": "uint256"}
 		],
 		"stateMutability": "view",
 		"type": "function"
