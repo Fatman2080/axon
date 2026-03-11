@@ -27,9 +27,7 @@ func (k Keeper) BeginBlocker(ctx sdk.Context) {
 				start = currentEpoch - maxCatchup + 1
 			}
 			for e := start; e <= currentEpoch; e++ {
-				if e > 1 {
-					k.onEpochStart(ctx, params, e, e-1)
-				}
+				k.onEpochStart(ctx, params, e, e-1)
 			}
 			k.SetLastProcessedEpoch(ctx, currentEpoch)
 		}

@@ -72,7 +72,9 @@ func (am AgentAppModule) RegisterServices(cfg module.Configurator) {
 func (am AgentAppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONCodec, data json.RawMessage) []abci.ValidatorUpdate {
 	var gs agenttypes.GenesisState
 	cdc.MustUnmarshalJSON(data, &gs)
-	am.keeper.SetParams(ctx, gs.Params)
+	if err := am.keeper.SetParams(ctx, gs.Params); err != nil {
+		panic(fmt.Sprintf("invalid agent module params in genesis: %v", err))
+	}
 	for _, agent := range gs.Agents {
 		am.keeper.SetAgent(ctx, agent)
 	}
