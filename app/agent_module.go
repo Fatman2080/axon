@@ -85,15 +85,17 @@ func (am AgentAppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONCodec, data 
 	}
 	if extra.TotalBlockRewardsMinted != "" {
 		v, ok := sdkmath.NewIntFromString(extra.TotalBlockRewardsMinted)
-		if ok {
-			am.keeper.SetTotalBlockRewardsMinted(ctx, v)
+		if !ok {
+			panic(fmt.Sprintf("failed to parse total_block_rewards_minted %q — refusing to start with reset mint cap", extra.TotalBlockRewardsMinted))
 		}
+		am.keeper.SetTotalBlockRewardsMinted(ctx, v)
 	}
 	if extra.TotalContributionMinted != "" {
 		v, ok := sdkmath.NewIntFromString(extra.TotalContributionMinted)
-		if ok {
-			am.keeper.SetTotalContributionMinted(ctx, v)
+		if !ok {
+			panic(fmt.Sprintf("failed to parse total_contribution_minted %q — refusing to start with reset mint cap", extra.TotalContributionMinted))
 		}
+		am.keeper.SetTotalContributionMinted(ctx, v)
 	}
 	if extra.LastProcessedEpoch > 0 {
 		am.keeper.SetLastProcessedEpoch(ctx, extra.LastProcessedEpoch)
@@ -116,6 +118,9 @@ func (am AgentAppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONCodec, data 
 	if len(extra.AIBonuses) > 0 {
 		am.keeper.ImportAIBonuses(ctx, extra.AIBonuses)
 	}
+	if len(extra.Wallets) > 0 {
+		am.keeper.ImportWalletData(ctx, extra.Wallets)
+	}
 	return nil
 }
 
@@ -136,6 +141,7 @@ func (am AgentAppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONCodec) jso
 		ContributionPool:        am.keeper.GetContributionPool(ctx).Amount.String(),
 		ContractDeployers:       am.keeper.ExportContractDeployers(ctx),
 		AIBonuses:               am.keeper.ExportAIBonuses(ctx),
+		Wallets:                 am.keeper.ExportWalletData(ctx),
 	}
 	extraBz, _ := json.Marshal(extra)
 
@@ -169,6 +175,7 @@ type genesisExtra struct {
 	ContributionPool        string            `json:"contribution_pool,omitempty"`
 	ContractDeployers       map[string]string `json:"contract_deployers,omitempty"`
 	AIBonuses               map[string]int64  `json:"ai_bonuses,omitempty"`
+	Wallets                 map[string]string `json:"wallets,omitempty"`
 }
 
 func mergeJSON(base, overlay json.RawMessage) json.RawMessage {

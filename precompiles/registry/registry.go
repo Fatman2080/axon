@@ -172,11 +172,17 @@ func (p Precompile) register(ctx sdk.Context, contract *vm.Contract, method *abi
 	if len(args) < 3 {
 		return nil, fmt.Errorf("register requires 3 arguments: capabilities, model, stakeAmount")
 	}
-	capabilities, _ := args[0].(string)
-	model, _ := args[1].(string)
-	stakeAmountBig, _ := args[2].(*big.Int)
-	if stakeAmountBig == nil || stakeAmountBig.Sign() <= 0 {
-		return nil, fmt.Errorf("stakeAmount must be positive")
+	capabilities, ok := args[0].(string)
+	if !ok {
+		return nil, fmt.Errorf("capabilities: expected string, got %T", args[0])
+	}
+	model, ok := args[1].(string)
+	if !ok {
+		return nil, fmt.Errorf("model: expected string, got %T", args[1])
+	}
+	stakeAmountBig, ok := args[2].(*big.Int)
+	if !ok || stakeAmountBig == nil || stakeAmountBig.Sign() <= 0 {
+		return nil, fmt.Errorf("stakeAmount must be a positive integer")
 	}
 
 	caller := sdk.AccAddress(contract.Caller().Bytes())

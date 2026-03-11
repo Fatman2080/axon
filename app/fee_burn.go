@@ -35,9 +35,21 @@ func BurnCollectedFees(ctx sdk.Context, bankKeeper bankkeeper.Keeper, fmKeeper f
 	if fmParams.NoBaseFee {
 		burnPercent = 50
 	} else {
-		// EIP-1559 active: base fee is the dominant portion of gas costs.
-		// A priority fee of ~20% on top of base fee → base fee ≈ 80%.
-		burnPercent = 80
+		baseFee := fmParams.BaseFee
+		minGasPrice := fmParams.MinGasPrice
+		if baseFee.IsPositive() && minGasPrice.IsPositive() {
+			// Dynamic ratio: baseFee / minGasPrice, capped at [50, 95]
+			ratio := baseFee.MulInt64(100).Quo(minGasPrice).TruncateInt64()
+			if ratio < 50 {
+				ratio = 50
+			}
+			if ratio > 95 {
+				ratio = 95
+			}
+			burnPercent = ratio
+		} else {
+			burnPercent = 80
+		}
 	}
 
 	burnAmount := balance.Amount.MulRaw(burnPercent).QuoRaw(100)

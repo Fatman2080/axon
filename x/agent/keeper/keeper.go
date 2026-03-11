@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"cosmossdk.io/log/v2"
@@ -180,4 +181,35 @@ func (k Keeper) GetCurrentEpoch(ctx sdk.Context) uint64 {
 		return 0
 	}
 	return uint64(ctx.BlockHeight()) / params.EpochLength
+}
+
+const walletKVPrefix = "AgentWallet/"
+
+func (k Keeper) ExportWalletData(ctx sdk.Context) map[string]string {
+	result := make(map[string]string)
+	store := ctx.KVStore(k.storeKey)
+	prefix := []byte(walletKVPrefix)
+	iterator := storetypes.KVStorePrefixIterator(store, prefix)
+	defer iterator.Close()
+	for ; iterator.Valid(); iterator.Next() {
+		keyHex := hex.EncodeToString(iterator.Key())
+		valHex := hex.EncodeToString(iterator.Value())
+		result[keyHex] = valHex
+	}
+	return result
+}
+
+func (k Keeper) ImportWalletData(ctx sdk.Context, data map[string]string) {
+	store := ctx.KVStore(k.storeKey)
+	for keyHex, valHex := range data {
+		key, err := hex.DecodeString(keyHex)
+		if err != nil {
+			continue
+		}
+		val, err := hex.DecodeString(valHex)
+		if err != nil {
+			continue
+		}
+		store.Set(key, val)
+	}
 }

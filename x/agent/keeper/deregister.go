@@ -94,16 +94,17 @@ func (k Keeper) executeDeregister(ctx sdk.Context, address string, params types.
 
 	if agent.Reputation == 0 && moduleHeld.IsPositive() {
 		if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, sdk.NewCoins(moduleHeld)); err != nil {
-			k.Logger(ctx).Error("failed to burn remaining stake", "address", address, "error", err)
+			k.Logger(ctx).Error("failed to burn remaining stake — will retry next block", "address", address, "error", err)
+			return
 		}
 	} else if moduleHeld.IsPositive() {
 		refundCoins := sdk.NewCoins(moduleHeld)
 		if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, recipientAddr, refundCoins); err != nil {
-			k.Logger(ctx).Error("failed to refund stake", "address", address, "error", err)
+			k.Logger(ctx).Error("failed to refund stake — will retry next block", "address", address, "error", err)
+			return
 		}
 	}
 
-	// Clean up all associated state
 	k.DeleteAgent(ctx, address)
 	k.DeleteDeregisterRequest(ctx, address)
 	k.DeleteAIBonus(ctx, address)

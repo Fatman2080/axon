@@ -48,14 +48,17 @@ func (p Params) Validate() error {
 	if p.EpochLength == 0 {
 		return fmt.Errorf("EpochLength must be > 0")
 	}
-	if p.HeartbeatInterval == 0 {
-		return fmt.Errorf("HeartbeatInterval must be > 0")
+	if p.HeartbeatInterval <= 0 {
+		return fmt.Errorf("HeartbeatInterval must be > 0, got %d", p.HeartbeatInterval)
+	}
+	if p.HeartbeatTimeout <= 0 {
+		return fmt.Errorf("HeartbeatTimeout must be > 0, got %d", p.HeartbeatTimeout)
 	}
 	if p.HeartbeatTimeout <= p.HeartbeatInterval {
 		return fmt.Errorf("HeartbeatTimeout (%d) must be > HeartbeatInterval (%d)", p.HeartbeatTimeout, p.HeartbeatInterval)
 	}
-	if p.AiChallengeWindow == 0 {
-		return fmt.Errorf("AiChallengeWindow must be > 0")
+	if p.AiChallengeWindow <= 0 {
+		return fmt.Errorf("AiChallengeWindow must be > 0, got %d", p.AiChallengeWindow)
 	}
 	if p.InitialReputation > p.MaxReputation {
 		return fmt.Errorf("InitialReputation (%d) must not exceed MaxReputation (%d)", p.InitialReputation, p.MaxReputation)

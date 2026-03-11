@@ -887,15 +887,23 @@ func axonStaticPrecompiles(
 		govKeeper, slashingKeeper, cdc,
 	)
 
-	if reg, err := registryprecompile.NewPrecompile(agentKeeper); err == nil {
-		defaults[reg.Address()] = reg
+	reg, err := registryprecompile.NewPrecompile(agentKeeper)
+	if err != nil {
+		panic(fmt.Sprintf("failed to init registry precompile: %v", err))
 	}
-	if rep, err := reputationprecompile.NewPrecompile(agentKeeper); err == nil {
-		defaults[rep.Address()] = rep
+	defaults[reg.Address()] = reg
+
+	rep, err := reputationprecompile.NewPrecompile(agentKeeper)
+	if err != nil {
+		panic(fmt.Sprintf("failed to init reputation precompile: %v", err))
 	}
-	if wal, err := walletprecompile.NewPrecompile(agentKeeper); err == nil {
-		defaults[wal.Address()] = wal
+	defaults[rep.Address()] = rep
+
+	wal, err := walletprecompile.NewPrecompile(agentKeeper)
+	if err != nil {
+		panic(fmt.Sprintf("failed to init wallet precompile: %v", err))
 	}
+	defaults[wal.Address()] = wal
 
 	return defaults
 }

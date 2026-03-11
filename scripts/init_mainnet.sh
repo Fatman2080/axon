@@ -162,14 +162,15 @@ echo "  Initial Supply:        0 (100% mined)"
 echo ""
 echo "Genesis file: $GENESIS"
 echo ""
-# ── Validate genesis ──
+# ── Validate genesis (MUST pass before mainnet launch) ──
 echo "Validating genesis..."
-if $BINARY genesis validate-genesis --home "$HOME_DIR" 2>/dev/null || \
-   $BINARY validate-genesis "$GENESIS" 2>/dev/null; then
+if $BINARY genesis validate-genesis --home "$HOME_DIR" 2>&1; then
     echo "Genesis validation passed."
+elif $BINARY validate-genesis "$GENESIS" 2>&1; then
+    echo "Genesis validation passed (legacy command)."
 else
-    echo "WARNING: could not run genesis validation (command may differ by version)."
-    echo "Please run manually:  $BINARY genesis validate-genesis --home $HOME_DIR"
+    echo "FATAL: Genesis validation FAILED. Fix errors above before proceeding."
+    exit 1
 fi
 
 echo ""

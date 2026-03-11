@@ -100,7 +100,10 @@ func (k Keeper) GetTotalBlockRewardsMinted(ctx sdk.Context) sdkmath.Int {
 }
 
 func (k Keeper) SetTotalBlockRewardsMinted(ctx sdk.Context, total sdkmath.Int) {
-	bz, _ := total.Marshal()
+	bz, err := total.Marshal()
+	if err != nil {
+		panic(fmt.Sprintf("failed to marshal TotalBlockRewardsMinted: %v", err))
+	}
 	store := ctx.KVStore(k.storeKey)
 	store.Set([]byte(types.TotalBlockRewardsMintedKey), bz)
 }

@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 
@@ -162,6 +163,13 @@ func (p Precompile) createWallet(ctx sdk.Context, contract *vm.Contract, method 
 	dailyLimit, _ := args[3].(*big.Int)
 	cooldownBlocks, _ := args[4].(*big.Int)
 
+	zeroAddr := common.Address{}
+	if operator == zeroAddr {
+		return nil, fmt.Errorf("operator cannot be zero address")
+	}
+	if guardian == zeroAddr {
+		return nil, fmt.Errorf("guardian cannot be zero address")
+	}
 	if operator == guardian {
 		return nil, fmt.Errorf("operator and guardian must be different addresses")
 	}
@@ -305,6 +313,11 @@ func (p Precompile) setTrust(ctx sdk.Context, contract *vm.Contract, method *abi
 		return nil, fmt.Errorf("invalid trust level: must be 0-3")
 	}
 	trustLevel := TrustLevel(level.Uint64())
+
+	maxInt64 := new(big.Int).SetInt64(math.MaxInt64)
+	if expiresAt == nil || expiresAt.Sign() < 0 || expiresAt.Cmp(maxInt64) > 0 {
+		return nil, fmt.Errorf("expiresAt out of range: must be 0..%d", math.MaxInt64)
+	}
 
 	tc := TrustedChannel{
 		Level:        trustLevel,

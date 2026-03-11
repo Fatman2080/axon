@@ -19,15 +19,14 @@ func (k Keeper) BeginBlocker(ctx sdk.Context) {
 		lastProcessedEpoch := k.GetLastProcessedEpoch(ctx)
 
 		if currentEpoch > lastProcessedEpoch {
-			// Process each intermediate epoch to ensure rewards/challenges aren't lost.
-			// Cap iterations to prevent excessive computation on large param changes.
 			maxCatchup := uint64(10)
 			start := lastProcessedEpoch + 1
 			if currentEpoch-lastProcessedEpoch > maxCatchup {
 				start = currentEpoch - maxCatchup + 1
 			}
 			for e := start; e <= currentEpoch; e++ {
-				k.onEpochStart(ctx, params, e, e-1)
+				isCatchup := e < currentEpoch
+				k.onEpochStart(ctx, params, e, e-1, isCatchup)
 			}
 			k.SetLastProcessedEpoch(ctx, currentEpoch)
 		}
@@ -46,10 +45,14 @@ func (k Keeper) EndBlocker(ctx sdk.Context) {
 	}
 }
 
-func (k Keeper) onEpochStart(ctx sdk.Context, params types.Params, epoch, previousEpoch uint64) {
-	k.Logger(ctx).Info("new epoch started", "epoch", epoch)
+func (k Keeper) onEpochStart(ctx sdk.Context, params types.Params, epoch, previousEpoch uint64, isCatchup bool) {
+	k.Logger(ctx).Info("new epoch started", "epoch", epoch, "catchup", isCatchup)
 
-	k.GenerateChallenge(ctx, epoch)
+	// Only generate challenges for the real current epoch.
+	// During catchup, intermediate epochs have already passed — no one can respond.
+	if !isCatchup {
+		k.GenerateChallenge(ctx, epoch)
+	}
 
 	if previousEpoch > 0 {
 		k.DistributeEpochRewards(ctx, previousEpoch)

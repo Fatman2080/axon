@@ -107,6 +107,9 @@ func (k Keeper) ProcessEpochReputation(ctx sdk.Context, epoch uint64) {
 		if agent.Status == types.AgentStatus_AGENT_STATUS_SUSPENDED {
 			return false
 		}
+		if agent.Reputation == 0 {
+			return false
+		}
 
 		delta := int64(0)
 
@@ -160,15 +163,19 @@ func (k Keeper) handleZeroReputation(ctx sdk.Context, agent types.Agent, params 
 		remaining = agent.StakeAmount.Sub(burnedAtRegister)
 	}
 
+	burned := false
 	if remaining.IsPositive() {
 		if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, sdk.NewCoins(remaining)); err != nil {
-			k.Logger(ctx).Error("failed to burn stake for zero reputation", "address", agent.Address, "error", err)
-			return
+			k.Logger(ctx).Error("failed to burn stake for zero reputation — suspending without burn", "address", agent.Address, "error", err)
+		} else {
+			burned = true
 		}
 	}
 
 	agent.Status = types.AgentStatus_AGENT_STATUS_SUSPENDED
-	agent.StakeAmount = sdk.NewInt64Coin("aaxon", 0)
+	if burned || !remaining.IsPositive() {
+		agent.StakeAmount = sdk.NewInt64Coin("aaxon", 0)
+	}
 	k.SetAgent(ctx, agent)
 
 	ctx.EventManager().EmitEvent(sdk.NewEvent(

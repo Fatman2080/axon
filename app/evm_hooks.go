@@ -27,6 +27,11 @@ var _ evmtypes.EvmHooks = DeployBurnHook{}
 
 // DeployBurnHook burns 10 AXON from the deployer when a contract is created,
 // and tracks the deployment for contribution rewards.
+//
+// Limitation: only top-level deployments (receipt.ContractAddress) trigger the
+// burn. Internal CREATE/CREATE2 by factory contracts bypass it. Mitigated by
+// factory itself paying the burn + normal gas-fee burning. A future upgrade
+// may add EVM tracing to catch internal creations.
 type DeployBurnHook struct {
 	bankKeeper  bankkeeper.Keeper
 	agentKeeper agentkeeper.Keeper
