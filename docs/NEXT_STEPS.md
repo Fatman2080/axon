@@ -10,11 +10,11 @@
 ```
 ✅ 已完成                              ⚠️ 部分完成                    ❌ 未实现
 ─────────────────────────────────────────────────────────────────────────
-✅ 链骨架 (Cosmos SDK + EVM)                          ❌ 链升级机制（x/upgrade）
-✅ x/agent 模块（注册/心跳/信誉）                       ❌ 治理模块集成（x/gov）
-✅ AI 挑战（commit/reveal/评估，110 题库）               ❌ IBC 跨链
-✅ 预编译 IAgentRegistry / IAgentReputation             ❌ 以太坊桥
-✅ 预编译 IAgentWallet + 信任通道                       ❌ 安全审计
+✅ 链骨架 (Cosmos SDK + EVM)                          ❌ IBC 跨链（远期）
+✅ x/agent 模块（注册/心跳/信誉）                       ❌ 以太坊桥（远期）
+✅ AI 挑战（commit/reveal/评估，110 题库）
+✅ 预编译 IAgentRegistry / IAgentReputation
+✅ 预编译 IAgentWallet + 信任通道
 ✅ 区块奖励（650M 硬顶 + 4 年减半）
 ✅ 贡献奖励（350M 硬顶 + 防刷）
 ✅ 零预分配代币经济
@@ -29,6 +29,11 @@
 ✅ Agent 心跳守护进程（sidecar）
 ✅ 首批示范合约（DAO / 市场 / 金库 / 信任通道）
 ✅ Docker Compose 全栈部署（4 节点 + 水龙头 + 浏览器 + daemon）
+✅ 链升级机制（x/upgrade，含 v0.1.0 handler）
+✅ 治理模块（x/gov，7 天投票期，33.4% 法定人数）
+✅ 安全审计自查报告
+✅ 主网创世配置脚本 + 参数文档
+✅ CHANGELOG + 发布准备
 ```
 
 ---
@@ -575,4 +580,14 @@ Sprint 4（主网）
 | 3.4 CI/CD | ✅ 完成 | 全量测试 + Docker GHCR 推送 + 多平台 Release |
 | 3.5 公开测试网发布 | ✅ 完成 | 文档已包含接入指南 |
 
-**Sprint 1 + Sprint 2 + Sprint 3 全部完成。下一步：Sprint 4（主网准备）。**
+### Sprint 4 进度
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| 4.1 链升级机制 | ✅ 已有 | `app/upgrades.go` + x/upgrade 完整集成 |
+| 4.2 治理模块 | ✅ 已有 | x/gov 完整集成，genesis 参数已配置 |
+| 4.3 安全审计 | ✅ 完成 | 自查报告 `SECURITY_AUDIT.md`，0 高风险，6 中风险 |
+| 4.4 创世配置 | ✅ 完成 | `scripts/init_mainnet.sh` + `MAINNET_PARAMS.md` |
+| 4.5 发布准备 | ✅ 完成 | `CHANGELOG.md` v1.0.0 |
+
+**Sprint 1-4 全部完成。剩余 Sprint 5（生态扩展：IBC / 以太坊桥 / Block-STM）为远期规划。**
