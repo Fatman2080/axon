@@ -128,6 +128,26 @@ func (k Keeper) GetContractDeployer(ctx sdk.Context, contractAddr string) string
 	return string(bz)
 }
 
+func (k Keeper) ExportContractDeployers(ctx sdk.Context) map[string]string {
+	result := make(map[string]string)
+	store := ctx.KVStore(k.storeKey)
+	prefix := []byte("ContractDeployer/")
+	iterator := storetypes.KVStorePrefixIterator(store, prefix)
+	defer iterator.Close()
+	for ; iterator.Valid(); iterator.Next() {
+		contractAddr := string(iterator.Key()[len(prefix):])
+		deployerAddr := string(iterator.Value())
+		result[contractAddr] = deployerAddr
+	}
+	return result
+}
+
+func (k Keeper) ImportContractDeployers(ctx sdk.Context, deployers map[string]string) {
+	for contractAddr, deployerAddr := range deployers {
+		k.SetContractDeployer(ctx, contractAddr, deployerAddr)
+	}
+}
+
 func (k Keeper) GetReputation(ctx sdk.Context, address string) uint64 {
 	agent, found := k.GetAgent(ctx, address)
 	if !found {

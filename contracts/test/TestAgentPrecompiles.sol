@@ -32,8 +32,8 @@ contract TestAgentPrecompiles {
         return registry.getAgent(account);
     }
 
-    function registerAgent(string memory capabilities, string memory model) external payable {
-        registry.register{value: msg.value}(capabilities, model);
+    function registerAgent(string memory capabilities, string memory model, uint256 stakeAmount) external {
+        registry.register(capabilities, model, stakeAmount);
     }
 
     function sendHeartbeat() external {

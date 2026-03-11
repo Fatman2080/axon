@@ -27,10 +27,11 @@ export const REGISTRY_ABI = [
     inputs: [
       { name: "capabilities", type: "string" },
       { name: "model", type: "string" },
+      { name: "stakeAmount", type: "uint256" },
     ],
     name: "register",
     outputs: [],
-    stateMutability: "payable",
+    stateMutability: "nonpayable",
     type: "function",
   },
   {

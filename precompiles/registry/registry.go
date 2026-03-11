@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -168,14 +169,18 @@ func (p Precompile) getAgent(ctx sdk.Context, method *abi.Method, args []interfa
 }
 
 func (p Precompile) register(ctx sdk.Context, contract *vm.Contract, method *abi.Method, args []interface{}) ([]byte, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("register requires 2 arguments")
+	if len(args) < 3 {
+		return nil, fmt.Errorf("register requires 3 arguments: capabilities, model, stakeAmount")
 	}
 	capabilities, _ := args[0].(string)
 	model, _ := args[1].(string)
+	stakeAmountBig, _ := args[2].(*big.Int)
+	if stakeAmountBig == nil || stakeAmountBig.Sign() <= 0 {
+		return nil, fmt.Errorf("stakeAmount must be positive")
+	}
 
 	caller := sdk.AccAddress(contract.Caller().Bytes())
-	stakeAmount := sdk.NewCoin("aaxon", sdkmath.NewIntFromBigInt(contract.Value().ToBig()))
+	stakeAmount := sdk.NewCoin("aaxon", sdkmath.NewIntFromBigInt(stakeAmountBig))
 
 	msgServer := keeper.NewMsgServerImpl(p.keeper)
 	resp, err := msgServer.Register(ctx, &types.MsgRegister{
@@ -263,11 +268,12 @@ const abiJSON = `[
 	{
 		"inputs": [
 			{"name": "capabilities", "type": "string"},
-			{"name": "model", "type": "string"}
+			{"name": "model", "type": "string"},
+			{"name": "stakeAmount", "type": "uint256"}
 		],
 		"name": "register",
 		"outputs": [],
-		"stateMutability": "payable",
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{

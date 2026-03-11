@@ -66,6 +66,12 @@ func (k queryServer) CurrentChallenge(goCtx context.Context, req *types.QueryCur
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
 
-	// TODO: implement current challenge lookup
-	return &types.QueryCurrentChallengeResponse{}, nil
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	epoch := k.GetCurrentEpoch(ctx)
+	challenge, found := k.GetChallenge(ctx, epoch)
+	if !found {
+		return nil, status.Errorf(codes.NotFound, "no active challenge for epoch %d", epoch)
+	}
+
+	return &types.QueryCurrentChallengeResponse{Challenge: &challenge}, nil
 }

@@ -216,6 +216,11 @@ func (p Precompile) executeWallet(ctx sdk.Context, contract *vm.Contract, method
 	walletAddr, _ := args[0].(common.Address)
 	target, _ := args[1].(common.Address)
 	value, _ := args[2].(*big.Int)
+	data, _ := args[3].([]byte)
+
+	if len(data) > 0 {
+		return nil, fmt.Errorf("contract calls via smart wallet will be available in a future upgrade; currently only value transfers are supported")
+	}
 
 	wallet, found := p.loadWallet(ctx, walletAddr)
 	if !found {

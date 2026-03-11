@@ -114,3 +114,11 @@ func (k Keeper) AddToRewardPool(ctx sdk.Context, amount sdk.Coin) {
 	current := k.getRewardPool(ctx)
 	k.setRewardPool(ctx, current.Add(amount))
 }
+
+func (k Keeper) GetRewardPool(ctx sdk.Context) sdk.Coin {
+	return k.getRewardPool(ctx)
+}
+
+func (k Keeper) SetRewardPool(ctx sdk.Context, coin sdk.Coin) {
+	k.setRewardPool(ctx, coin)
+}

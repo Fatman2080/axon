@@ -60,8 +60,8 @@ services:
     ports:
       - "26656:26656"    # P2P
       - "127.0.0.1:26657:26657"    # CometBFT RPC
-      - "8545:8545"      # JSON-RPC
-      - "8546:8546"      # WebSocket
+      - "127.0.0.1:8545:8545"      # JSON-RPC (localhost only)
+      - "127.0.0.1:8546:8546"      # WebSocket (localhost only)
       - "127.0.0.1:1317:1317"      # REST API
       - "127.0.0.1:9090:9090"      # gRPC
     volumes:

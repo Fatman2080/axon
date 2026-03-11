@@ -57,5 +57,8 @@ func (p Params) Validate() error {
 	if p.AiChallengeWindow == 0 {
 		return fmt.Errorf("AiChallengeWindow must be > 0")
 	}
+	if p.InitialReputation > p.MaxReputation {
+		return fmt.Errorf("InitialReputation (%d) must not exceed MaxReputation (%d)", p.InitialReputation, p.MaxReputation)
+	}
 	return nil
 }

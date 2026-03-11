@@ -144,7 +144,7 @@ func CmdSubmitAIChallenge() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "submit-challenge [epoch] [answer]",
 		Short: "Submit a commit hash for an AI challenge (commit phase)",
-		Long:  "Submits sha256(answer) as the commit hash. You must reveal the answer later.",
+		Long:  "Submits sha256(address+\":\"+answer) as the commit hash. The sender address is used as implicit salt. You must reveal the answer later.",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)

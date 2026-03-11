@@ -317,3 +317,11 @@ func (k Keeper) addToContributionPool(ctx sdk.Context, amount sdk.Coin) {
 	current := k.getContributionPool(ctx)
 	k.setContributionPool(ctx, current.Add(amount))
 }
+
+func (k Keeper) GetContributionPool(ctx sdk.Context) sdk.Coin {
+	return k.getContributionPool(ctx)
+}
+
+func (k Keeper) SetContributionPool(ctx sdk.Context, coin sdk.Coin) {
+	k.setContributionPool(ctx, coin)
+}

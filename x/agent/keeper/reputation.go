@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	sdkmath "cosmossdk.io/math"
+	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/axon-chain/axon/x/agent/types"
@@ -197,6 +198,26 @@ func (k Keeper) GetDailyRegisterCount(ctx sdk.Context, address string) uint64 {
 		return 0
 	}
 	return binary.BigEndian.Uint64(bz)
+}
+
+func (k Keeper) ExportAIBonuses(ctx sdk.Context) map[string]int64 {
+	result := make(map[string]int64)
+	store := ctx.KVStore(k.storeKey)
+	prefix := []byte(types.AIBonusKeyPrefix)
+	iterator := storetypes.KVStorePrefixIterator(store, prefix)
+	defer iterator.Close()
+	for ; iterator.Valid(); iterator.Next() {
+		address := string(iterator.Key()[len(prefix):])
+		bonus := k.GetAIBonus(ctx, address)
+		result[address] = bonus
+	}
+	return result
+}
+
+func (k Keeper) ImportAIBonuses(ctx sdk.Context, bonuses map[string]int64) {
+	for address, bonus := range bonuses {
+		k.SetAIBonus(ctx, address, bonus)
+	}
 }
 
 func (k Keeper) IncrementDailyRegisterCount(ctx sdk.Context, address string) {

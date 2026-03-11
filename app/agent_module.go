@@ -95,6 +95,24 @@ func (am AgentAppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONCodec, data 
 	if extra.LastProcessedEpoch > 0 {
 		am.keeper.SetLastProcessedEpoch(ctx, extra.LastProcessedEpoch)
 	}
+	if extra.RewardPool != "" {
+		v, ok := sdkmath.NewIntFromString(extra.RewardPool)
+		if ok && v.IsPositive() {
+			am.keeper.SetRewardPool(ctx, sdk.NewCoin("aaxon", v))
+		}
+	}
+	if extra.ContributionPool != "" {
+		v, ok := sdkmath.NewIntFromString(extra.ContributionPool)
+		if ok && v.IsPositive() {
+			am.keeper.SetContributionPool(ctx, sdk.NewCoin("aaxon", v))
+		}
+	}
+	if len(extra.ContractDeployers) > 0 {
+		am.keeper.ImportContractDeployers(ctx, extra.ContractDeployers)
+	}
+	if len(extra.AIBonuses) > 0 {
+		am.keeper.ImportAIBonuses(ctx, extra.AIBonuses)
+	}
 	return nil
 }
 
@@ -111,6 +129,10 @@ func (am AgentAppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONCodec) jso
 		TotalBlockRewardsMinted: am.keeper.GetTotalBlockRewardsMinted(ctx).String(),
 		TotalContributionMinted: am.keeper.GetTotalContributionMinted(ctx).String(),
 		LastProcessedEpoch:      am.keeper.GetLastProcessedEpoch(ctx),
+		RewardPool:              am.keeper.GetRewardPool(ctx).Amount.String(),
+		ContributionPool:        am.keeper.GetContributionPool(ctx).Amount.String(),
+		ContractDeployers:       am.keeper.ExportContractDeployers(ctx),
+		AIBonuses:               am.keeper.ExportAIBonuses(ctx),
 	}
 	extraBz, _ := json.Marshal(extra)
 
@@ -137,9 +159,13 @@ func (am AgentAppModule) IsOnePerModuleType() {}
 func (am AgentAppModule) IsAppModule()        {}
 
 type genesisExtra struct {
-	TotalBlockRewardsMinted string `json:"total_block_rewards_minted,omitempty"`
-	TotalContributionMinted string `json:"total_contribution_minted,omitempty"`
-	LastProcessedEpoch      uint64 `json:"last_processed_epoch,omitempty"`
+	TotalBlockRewardsMinted string            `json:"total_block_rewards_minted,omitempty"`
+	TotalContributionMinted string            `json:"total_contribution_minted,omitempty"`
+	LastProcessedEpoch      uint64            `json:"last_processed_epoch,omitempty"`
+	RewardPool              string            `json:"reward_pool,omitempty"`
+	ContributionPool        string            `json:"contribution_pool,omitempty"`
+	ContractDeployers       map[string]string `json:"contract_deployers,omitempty"`
+	AIBonuses               map[string]int64  `json:"ai_bonuses,omitempty"`
 }
 
 func mergeJSON(base, overlay json.RawMessage) json.RawMessage {
