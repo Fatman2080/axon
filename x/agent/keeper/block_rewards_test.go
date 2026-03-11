@@ -183,9 +183,9 @@ func TestReputationBonusTierTransitions(t *testing.T) {
 		expect int64
 	}{
 		{29, 30, 5},
-		{50, 51, 10},
-		{70, 71, 15},
-		{90, 91, 20},
+		{49, 50, 10},
+		{69, 70, 15},
+		{89, 90, 20},
 	}
 	for _, tr := range transitions {
 		belowBonus := keeper.ReputationBonusPercentForTest(tr.below)

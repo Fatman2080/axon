@@ -6,6 +6,7 @@ import (
 
 	abci "github.com/cometbft/cometbft/abci/types"
 
+	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -74,6 +75,24 @@ func (am AgentAppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONCodec, data 
 	for _, agent := range gs.Agents {
 		am.keeper.SetAgent(ctx, agent)
 	}
+
+	var extra genesisExtra
+	_ = json.Unmarshal(data, &extra)
+	if extra.TotalBlockRewardsMinted != "" {
+		v, ok := sdkmath.NewIntFromString(extra.TotalBlockRewardsMinted)
+		if ok {
+			am.keeper.SetTotalBlockRewardsMinted(ctx, v)
+		}
+	}
+	if extra.TotalContributionMinted != "" {
+		v, ok := sdkmath.NewIntFromString(extra.TotalContributionMinted)
+		if ok {
+			am.keeper.SetTotalContributionMinted(ctx, v)
+		}
+	}
+	if extra.LastProcessedEpoch > 0 {
+		am.keeper.SetLastProcessedEpoch(ctx, extra.LastProcessedEpoch)
+	}
 	return nil
 }
 
@@ -84,7 +103,17 @@ func (am AgentAppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONCodec) jso
 		Params: params,
 		Agents: agents,
 	}
-	return cdc.MustMarshalJSON(&gs)
+	base := cdc.MustMarshalJSON(&gs)
+
+	extra := genesisExtra{
+		TotalBlockRewardsMinted: am.keeper.GetTotalBlockRewardsMinted(ctx).String(),
+		TotalContributionMinted: am.keeper.GetTotalContributionMinted(ctx).String(),
+		LastProcessedEpoch:      am.keeper.GetLastProcessedEpoch(ctx),
+	}
+	extraBz, _ := json.Marshal(extra)
+
+	merged := mergeJSON(base, extraBz)
+	return merged
 }
 
 func (am AgentAppModule) ConsensusVersion() uint64 { return 1 }
@@ -104,3 +133,27 @@ func (am AgentAppModule) EndBlock(ctx context.Context) error {
 
 func (am AgentAppModule) IsOnePerModuleType() {}
 func (am AgentAppModule) IsAppModule()        {}
+
+type genesisExtra struct {
+	TotalBlockRewardsMinted string `json:"total_block_rewards_minted,omitempty"`
+	TotalContributionMinted string `json:"total_contribution_minted,omitempty"`
+	LastProcessedEpoch      uint64 `json:"last_processed_epoch,omitempty"`
+}
+
+func mergeJSON(base, overlay json.RawMessage) json.RawMessage {
+	var bMap, oMap map[string]json.RawMessage
+	if err := json.Unmarshal(base, &bMap); err != nil {
+		return base
+	}
+	if err := json.Unmarshal(overlay, &oMap); err != nil {
+		return base
+	}
+	for k, v := range oMap {
+		bMap[k] = v
+	}
+	merged, err := json.Marshal(bMap)
+	if err != nil {
+		return base
+	}
+	return merged
+}

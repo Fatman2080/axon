@@ -33,6 +33,9 @@ func (k msgServer) Register(goCtx context.Context, msg *types.MsgRegister) (*typ
 		return nil, types.ErrAgentAlreadyRegistered
 	}
 
+	if msg.Stake.Denom != "aaxon" {
+		return nil, fmt.Errorf("invalid stake denom: expected aaxon, got %s", msg.Stake.Denom)
+	}
 	minStakeInt := sdkmath.NewIntFromBigInt(new(big.Int).Mul(big.NewInt(int64(params.MinRegisterStake)), oneAxon))
 	minStake := sdk.NewCoin("aaxon", minStakeInt)
 	if msg.Stake.IsLT(minStake) {
@@ -61,6 +64,12 @@ func (k msgServer) Register(goCtx context.Context, msg *types.MsgRegister) (*typ
 		return nil, err
 	}
 
+	if len(msg.Capabilities) > 1024 {
+		return nil, fmt.Errorf("capabilities too long: max 1024 bytes")
+	}
+	if len(msg.Model) > 256 {
+		return nil, fmt.Errorf("model name too long: max 256 bytes")
+	}
 	capabilities := strings.Split(msg.Capabilities, ",")
 	for i := range capabilities {
 		capabilities[i] = strings.TrimSpace(capabilities[i])
@@ -240,6 +249,10 @@ func (k msgServer) RevealAIChallengeResponse(goCtx context.Context, msg *types.M
 
 	var response types.AIResponse
 	k.cdc.MustUnmarshal(bz, &response)
+
+	if len(msg.RevealData) > 512 {
+		return nil, fmt.Errorf("reveal data too long: max 512 bytes")
+	}
 
 	if response.Evaluated {
 		return nil, types.ErrAlreadyEvaluated

@@ -87,11 +87,15 @@ func (k Keeper) GetTotalContributionMinted(ctx sdk.Context) sdkmath.Int {
 	return amount
 }
 
-func (k Keeper) addTotalContributionMinted(ctx sdk.Context, amount sdkmath.Int) {
-	total := k.GetTotalContributionMinted(ctx).Add(amount)
+func (k Keeper) SetTotalContributionMinted(ctx sdk.Context, total sdkmath.Int) {
 	bz, _ := total.Marshal()
 	store := ctx.KVStore(k.storeKey)
 	store.Set([]byte(types.TotalContributionMintedKey), bz)
+}
+
+func (k Keeper) addTotalContributionMinted(ctx sdk.Context, amount sdkmath.Int) {
+	total := k.GetTotalContributionMinted(ctx).Add(amount)
+	k.SetTotalContributionMinted(ctx, total)
 }
 
 func calculateContributionPerBlock(blockHeight int64) sdkmath.Int {
@@ -260,7 +264,7 @@ func (k Keeper) incrementCounter(ctx sdk.Context, key []byte) {
 	store := ctx.KVStore(k.storeKey)
 	count := uint64(0)
 	bz := store.Get(key)
-	if bz != nil {
+	if bz != nil && len(bz) >= 8 {
 		count = binary.BigEndian.Uint64(bz)
 	}
 	count++
@@ -272,7 +276,7 @@ func (k Keeper) incrementCounter(ctx sdk.Context, key []byte) {
 func (k Keeper) getCounter(ctx sdk.Context, key []byte) uint64 {
 	store := ctx.KVStore(k.storeKey)
 	bz := store.Get(key)
-	if bz == nil {
+	if bz == nil || len(bz) < 8 {
 		return 0
 	}
 	return binary.BigEndian.Uint64(bz)

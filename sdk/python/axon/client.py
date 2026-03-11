@@ -158,8 +158,8 @@ class AgentClient:
         self,
         operator: str,
         guardian: str,
-        tx_limit_axon: float = 10.0,
-        daily_limit_axon: float = 100.0,
+        tx_limit_axon: int = 10,
+        daily_limit_axon: int = 100,
         cooldown_blocks: int = 10,
     ) -> str:
         """Create an Agent smart wallet. Caller becomes the Owner."""
@@ -167,21 +167,21 @@ class AgentClient:
         tx = self._wallet.functions.createWallet(
             Web3.to_checksum_address(operator),
             Web3.to_checksum_address(guardian),
-            int(tx_limit_axon * ONE_AXON),
-            int(daily_limit_axon * ONE_AXON),
+            int(tx_limit_axon) * ONE_AXON,
+            int(daily_limit_axon) * ONE_AXON,
             cooldown_blocks,
         ).build_transaction(self._tx_params())
         return self._send_tx(tx)
 
     def execute_wallet(
-        self, wallet: str, target: str, value_axon: float = 0, data: bytes = b""
+        self, wallet: str, target: str, value_axon: int = 0, data: bytes = b""
     ) -> str:
         """Execute a transaction through the Agent wallet (as Operator)."""
         self._require_account()
         tx = self._wallet.functions.execute(
             Web3.to_checksum_address(wallet),
             Web3.to_checksum_address(target),
-            int(value_axon * ONE_AXON),
+            int(value_axon) * ONE_AXON,
             data,
         ).build_transaction(self._tx_params())
         return self._send_tx(tx)
@@ -208,8 +208,8 @@ class AgentClient:
         wallet: str,
         target: str,
         level: int = TRUST_FULL,
-        tx_limit_axon: float = 0,
-        daily_limit_axon: float = 0,
+        tx_limit_axon: int = 0,
+        daily_limit_axon: int = 0,
         expires_at: int = 0,
     ) -> str:
         """Authorize a contract at a trust level (Owner only).
@@ -225,8 +225,8 @@ class AgentClient:
             Web3.to_checksum_address(wallet),
             Web3.to_checksum_address(target),
             level,
-            int(tx_limit_axon * ONE_AXON),
-            int(daily_limit_axon * ONE_AXON),
+            int(tx_limit_axon) * ONE_AXON,
+            int(daily_limit_axon) * ONE_AXON,
             expires_at,
         ).build_transaction(self._tx_params())
         return self._send_tx(tx)
@@ -312,13 +312,13 @@ class AgentClient:
 
     # ─── Transfer ────────────────────────────────────────────────────
 
-    def transfer(self, to: str, amount_axon: float) -> str:
+    def transfer(self, to: str, amount_axon: int) -> str:
         """Send AXON to an address."""
         self._require_account()
         tx = {
             **self._tx_params(),
             "to": Web3.to_checksum_address(to),
-            "value": int(amount_axon * ONE_AXON),
+            "value": int(amount_axon) * ONE_AXON,
             "gas": 21000,
         }
         return self._send_tx(tx)

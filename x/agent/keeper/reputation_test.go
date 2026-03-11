@@ -77,12 +77,12 @@ func TestReputationBonusExactBoundaries(t *testing.T) {
 		{1, 0},
 		{29, 0},
 		{30, 5},  // inclusive lower bound
-		{50, 5},  // upper edge of 30-50 tier
-		{51, 10}, // crosses into next tier
-		{70, 10}, // upper edge of 51-70 tier
-		{71, 15}, // crosses into next tier
-		{90, 15}, // upper edge of 71-90 tier
-		{91, 20}, // crosses into next tier
+		{50, 10}, // >=50 enters 10% tier
+		{51, 10},
+		{70, 15}, // >=70 enters 15% tier
+		{71, 15},
+		{90, 20}, // >=90 enters 20% tier
+		{91, 20},
 		{100, 20},
 	}
 	for _, tt := range tests {

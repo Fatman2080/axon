@@ -32,12 +32,9 @@ contract ReputationVault {
         require(msg.value > 0, "zero deposit");
 
         uint256 minted;
-        if (totalShares == 0) {
-            minted = msg.value;
-        } else {
-            // vault balance before this deposit = total - msg.value
-            minted = (msg.value * totalShares) / (address(this).balance - msg.value);
-        }
+        uint256 virtualShares = totalShares + 1e18;
+        uint256 virtualBalance = address(this).balance - msg.value + 1e18;
+        minted = (msg.value * virtualShares) / virtualBalance;
 
         shares[msg.sender] += minted;
         totalShares += minted;
@@ -51,7 +48,8 @@ contract ReputationVault {
         uint256 payout = (_shares * address(this).balance) / totalShares;
         shares[msg.sender] -= _shares;
         totalShares -= _shares;
-        payable(msg.sender).transfer(payout);
+        (bool ok, ) = payable(msg.sender).call{value: payout}("");
+        require(ok, "withdraw transfer failed");
         emit Withdrawn(msg.sender, _shares, payout);
     }
 

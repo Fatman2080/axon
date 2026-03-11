@@ -76,7 +76,8 @@ contract AgentMarketplace {
 
         uint256 fee = (s.price * FEE_BPS) / 10000;
         accumulatedFees += fee;
-        payable(s.seller).transfer(s.price - fee);
+        (bool ok, ) = payable(s.seller).call{value: s.price - fee}("");
+        require(ok, "seller payment failed");
         emit ServicePurchased(serviceId, msg.sender);
     }
 
@@ -105,7 +106,8 @@ contract AgentMarketplace {
         uint256 amount = accumulatedFees;
         require(amount > 0, "no fees");
         accumulatedFees = 0;
-        payable(to).transfer(amount);
+        (bool ok, ) = payable(to).call{value: amount}("");
+        require(ok, "withdrawal failed");
         emit FeesWithdrawn(to, amount);
     }
 }

@@ -99,11 +99,15 @@ func (k Keeper) GetTotalBlockRewardsMinted(ctx sdk.Context) sdkmath.Int {
 	return amount
 }
 
-func (k Keeper) addTotalBlockRewardsMinted(ctx sdk.Context, amount sdkmath.Int) {
-	total := k.GetTotalBlockRewardsMinted(ctx).Add(amount)
+func (k Keeper) SetTotalBlockRewardsMinted(ctx sdk.Context, total sdkmath.Int) {
 	bz, _ := total.Marshal()
 	store := ctx.KVStore(k.storeKey)
 	store.Set([]byte(types.TotalBlockRewardsMintedKey), bz)
+}
+
+func (k Keeper) addTotalBlockRewardsMinted(ctx sdk.Context, amount sdkmath.Int) {
+	total := k.GetTotalBlockRewardsMinted(ctx).Add(amount)
+	k.SetTotalBlockRewardsMinted(ctx, total)
 }
 
 // calculateBlockReward returns the per-block reward accounting for halvings.
@@ -166,11 +170,11 @@ func (k Keeper) distributeProposerReward(ctx sdk.Context, amount sdkmath.Int) {
 // reputationBonusPercent returns the tiered reputation bonus per whitepaper §7.3.
 func reputationBonusPercent(reputation uint64) int64 {
 	switch {
-	case reputation > 90:
+	case reputation >= 90:
 		return 20
-	case reputation > 70:
+	case reputation >= 70:
 		return 15
-	case reputation > 50:
+	case reputation >= 50:
 		return 10
 	case reputation >= 30:
 		return 5

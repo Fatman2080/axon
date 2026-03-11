@@ -2,6 +2,7 @@ package reputation
 
 import (
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -27,8 +28,11 @@ const (
 	MeetsReputationMethod = "meetsReputation"
 
 	GasGetReputation   = 200
-	GasGetReputations  = 500
+	GasGetReputations  = 200
+	GasPerReputation   = 200
 	GasMeetsReputation = 200
+
+	MaxReputationBatch = 100
 )
 
 type Precompile struct {
@@ -44,7 +48,7 @@ func NewPrecompile(k keeper.Keeper) (*Precompile, error) {
 	}
 	return &Precompile{
 		Precompile: cmn.Precompile{
-			KvGasConfig:          storetypes.GasConfig{},
+			KvGasConfig:          storetypes.KVGasConfig(),
 			TransientKVGasConfig: storetypes.GasConfig{},
 			ContractAddress:      address,
 		},
@@ -57,21 +61,30 @@ func (Precompile) Address() common.Address { return address }
 
 func (p Precompile) RequiredGas(input []byte) uint64 {
 	if len(input) < 4 {
-		return 0
+		return 3000
 	}
 	method, err := p.abi.MethodById(input[:4])
 	if err != nil {
-		return 0
+		return 3000
 	}
 	switch method.Name {
 	case GetReputationMethod:
 		return GasGetReputation
 	case GetReputationsMethod:
+		// Dynamic gas: base + per-element cost
+		// ABI encoding: 4 (selector) + 32 (offset) + 32 (length) + 32*N (elements)
+		if len(input) >= 68 {
+			arrLen := new(big.Int).SetBytes(input[36:68]).Uint64()
+			if arrLen > MaxReputationBatch {
+				arrLen = MaxReputationBatch
+			}
+			return GasGetReputations + arrLen*GasPerReputation
+		}
 		return GasGetReputations
 	case MeetsReputationMethod:
 		return GasMeetsReputation
 	default:
-		return 0
+		return 3000
 	}
 }
 
@@ -130,6 +143,9 @@ func (p Precompile) getReputations(ctx sdk.Context, method *abi.Method, args []i
 	addrs, ok := args[0].([]common.Address)
 	if !ok {
 		return nil, fmt.Errorf("invalid address array argument")
+	}
+	if len(addrs) > MaxReputationBatch {
+		return nil, fmt.Errorf("batch size %d exceeds maximum %d", len(addrs), MaxReputationBatch)
 	}
 
 	reps := make([]uint64, len(addrs))

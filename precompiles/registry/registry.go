@@ -52,7 +52,7 @@ func NewPrecompile(k keeper.Keeper) (*Precompile, error) {
 	}
 	return &Precompile{
 		Precompile: cmn.Precompile{
-			KvGasConfig:          storetypes.GasConfig{},
+			KvGasConfig:          storetypes.KVGasConfig(),
 			TransientKVGasConfig: storetypes.GasConfig{},
 			ContractAddress:      address,
 		},
@@ -65,11 +65,11 @@ func (Precompile) Address() common.Address { return address }
 
 func (p Precompile) RequiredGas(input []byte) uint64 {
 	if len(input) < 4 {
-		return 0
+		return 3000
 	}
 	method, err := p.abi.MethodById(input[:4])
 	if err != nil {
-		return 0
+		return 3000
 	}
 	switch method.Name {
 	case IsAgentMethod:
@@ -85,7 +85,7 @@ func (p Precompile) RequiredGas(input []byte) uint64 {
 	case DeregisterMethod:
 		return GasDeregister
 	default:
-		return 0
+		return 3000
 	}
 }
 

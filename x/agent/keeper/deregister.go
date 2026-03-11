@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
-	storetypes "cosmossdk.io/store/types"
 	sdkmath "cosmossdk.io/math"
+	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/axon-chain/axon/x/agent/types"

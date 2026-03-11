@@ -42,11 +42,11 @@ type Daemon struct {
 
 func main() {
 	var (
-		rpcURL     string
-		keyHex     string
-		keyFile    string
-		interval   uint64
-		logLevel   string
+		rpcURL   string
+		keyHex   string
+		keyFile  string
+		interval uint64
+		logLevel string
 	)
 
 	flag.StringVar(&rpcURL, "rpc", "http://localhost:8545", "JSON-RPC endpoint")
@@ -232,11 +232,10 @@ func (d *Daemon) sendHeartbeat(ctx context.Context) error {
 
 	if receipt.Status == types.ReceiptStatusSuccessful {
 		d.logger.Info("heartbeat confirmed", "tx", txHash, "block", receipt.BlockNumber, "gas_used", receipt.GasUsed)
-	} else {
-		d.logger.Warn("heartbeat reverted", "tx", txHash, "block", receipt.BlockNumber)
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("heartbeat transaction reverted at block %d", receipt.BlockNumber)
 }
 
 func (d *Daemon) waitReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {

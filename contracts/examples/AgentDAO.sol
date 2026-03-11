@@ -25,6 +25,7 @@ contract AgentDAO {
     uint64 public minReputation;
     uint256 public votingPeriod;
     uint256 public proposalCount;
+    uint256 public totalWeight;
 
     mapping(address => bool) public members;
     mapping(uint256 => Proposal) public proposals;
@@ -51,6 +52,8 @@ contract AgentDAO {
         require(REPUTATION.meetsReputation(msg.sender, minReputation), "reputation too low");
         require(!members[msg.sender], "already a member");
         members[msg.sender] = true;
+        uint64 rep = REPUTATION.getReputation(msg.sender);
+        totalWeight += rep;
         emit MemberJoined(msg.sender);
     }
 
@@ -92,6 +95,7 @@ contract AgentDAO {
         Proposal storage p = proposals[proposalId];
         require(block.number > p.endBlock, "voting not ended");
         require(!p.executed, "already executed");
+        require(p.weightFor + p.weightAgainst >= totalWeight / 4, "quorum not reached");
         require(p.weightFor > p.weightAgainst, "proposal not passed");
         p.executed = true;
         (bool ok, ) = p.target.call(p.data);

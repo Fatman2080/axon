@@ -62,7 +62,7 @@ func NewPrecompile(k keeper.Keeper) (*Precompile, error) {
 	}
 	return &Precompile{
 		Precompile: cmn.Precompile{
-			KvGasConfig:          storetypes.GasConfig{},
+			KvGasConfig:          storetypes.KVGasConfig(),
 			TransientKVGasConfig: storetypes.GasConfig{},
 			ContractAddress:      contractAddress,
 		},
@@ -75,11 +75,11 @@ func (Precompile) Address() common.Address { return contractAddress }
 
 func (p Precompile) RequiredGas(input []byte) uint64 {
 	if len(input) < 4 {
-		return 0
+		return 3000
 	}
 	method, err := p.abi.MethodById(input[:4])
 	if err != nil {
-		return 0
+		return 3000
 	}
 	switch method.Name {
 	case MethodCreateWallet:
@@ -99,7 +99,7 @@ func (p Precompile) RequiredGas(input []byte) uint64 {
 	case MethodGetTrust:
 		return GasGetTrust
 	default:
-		return 0
+		return 3000
 	}
 }
 
@@ -162,8 +162,16 @@ func (p Precompile) createWallet(ctx sdk.Context, contract *vm.Contract, method 
 	dailyLimit, _ := args[3].(*big.Int)
 	cooldownBlocks, _ := args[4].(*big.Int)
 
+	if operator == guardian {
+		return nil, fmt.Errorf("operator and guardian must be different addresses")
+	}
+
 	owner := contract.Caller()
 	walletAddr := generateWalletAddress(owner, ctx.BlockHeight())
+
+	if _, exists := p.loadWallet(ctx, walletAddr); exists {
+		return nil, fmt.Errorf("wallet already exists for this address in this block")
+	}
 
 	wallet := WalletInfo{
 		Owner:          owner,
@@ -232,14 +240,18 @@ func (p Precompile) executeWallet(ctx sdk.Context, contract *vm.Contract, method
 			return nil, fmt.Errorf("target is blacklisted")
 
 		case TrustFull:
-			p.doTransfer(evm, walletAddr, target, value)
+			if err := p.doTransfer(evm, walletAddr, target, value); err != nil {
+				return nil, err
+			}
 			return method.Outputs.Pack()
 
 		case TrustLimited:
 			if err := p.checkChannelLimits(ctx, walletAddr, target, value, channel); err != nil {
 				return nil, err
 			}
-			p.doTransfer(evm, walletAddr, target, value)
+			if err := p.doTransfer(evm, walletAddr, target, value); err != nil {
+				return nil, err
+			}
 			return method.Outputs.Pack()
 		}
 	}
@@ -249,7 +261,9 @@ func (p Precompile) executeWallet(ctx sdk.Context, contract *vm.Contract, method
 		return nil, err
 	}
 	p.storeWallet(ctx, walletAddr, wallet)
-	p.doTransfer(evm, walletAddr, target, value)
+	if err := p.doTransfer(evm, walletAddr, target, value); err != nil {
+		return nil, err
+	}
 	return method.Outputs.Pack()
 }
 
@@ -487,11 +501,15 @@ func (p Precompile) checkDefaultLimits(ctx sdk.Context, walletAddr common.Addres
 	return nil
 }
 
-func (p Precompile) doTransfer(evm *vm.EVM, from, to common.Address, value *big.Int) {
+func (p Precompile) doTransfer(evm *vm.EVM, from, to common.Address, value *big.Int) error {
 	if value.Sign() > 0 {
-		val, _ := uint256.FromBig(value)
+		val, overflow := uint256.FromBig(value)
+		if overflow {
+			return fmt.Errorf("transfer value exceeds uint256 max")
+		}
 		evm.Context.Transfer(evm.StateDB, from, to, val)
 	}
+	return nil
 }
 
 // ============================================================

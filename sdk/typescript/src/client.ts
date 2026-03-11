@@ -58,9 +58,9 @@ export class AgentClient {
   readonly provider: JsonRpcProvider;
   private _signer: Wallet | null = null;
 
-  private readonly _registry: Contract;
-  private readonly _reputation: Contract;
-  private readonly _wallet: Contract;
+  private _registry: Contract;
+  private _reputation: Contract;
+  private _wallet: Contract;
 
   constructor(rpcUrl: string = "http://localhost:8545", privateKey?: string) {
     this.provider = new JsonRpcProvider(rpcUrl);
@@ -80,9 +80,9 @@ export class AgentClient {
   connect(privateKey: string): void {
     this._signer = new Wallet(privateKey, this.provider);
     const signer = this._signer;
-    (this._registry as any).runner = signer;
-    (this._reputation as any).runner = signer;
-    (this._wallet as any).runner = signer;
+    this._registry = new Contract(REGISTRY_ADDRESS, REGISTRY_ABI, signer);
+    this._reputation = new Contract(REPUTATION_ADDRESS, REPUTATION_ABI, signer);
+    this._wallet = new Contract(WALLET_ADDRESS, WALLET_ABI, signer);
   }
 
   get address(): string | null {

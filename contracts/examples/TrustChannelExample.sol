@@ -18,6 +18,8 @@ contract TrustChannelExample {
 
     uint8 constant TRUST_FULL = 3;
 
+    address public owner;
+
     struct UserInfo {
         address wallet;
         uint256 totalCompounded;
@@ -25,6 +27,10 @@ contract TrustChannelExample {
     }
 
     mapping(address => UserInfo) public users;
+
+    constructor() {
+        owner = msg.sender;
+    }
 
     event Registered(address indexed agent, address indexed wallet);
     event TrustVerified(address indexed agent, uint8 level);
@@ -55,6 +61,7 @@ contract TrustChannelExample {
     ///         Because this contract has Full Trust, no per-tx or daily limits apply.
     ///         In a real protocol this could be yield reinvestment, rebalancing, etc.
     function autoCompound(address agent, uint256 amount) external {
+        require(msg.sender == agent || msg.sender == owner, "unauthorized");
         UserInfo storage u = users[agent];
         require(u.registered, "agent not registered");
 
@@ -66,7 +73,6 @@ contract TrustChannelExample {
             abi.encodeWithSignature("_receiveCompound(address)", agent)
         );
 
-        u.totalCompounded += amount;
         emit AutoCompounded(agent, amount);
     }
 

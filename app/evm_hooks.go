@@ -76,9 +76,17 @@ func (h DeployBurnHook) PostTxProcessing(
 		return nil
 	}
 
-	// Regular contract call (not deployment): track calls for agent contribution rewards
-	if msg.To != nil && h.agentKeeper.IsAgent(ctx, senderAccAddr.String()) {
-		h.agentKeeper.IncrementContractCalls(ctx, senderAccAddr.String())
+	// Track contract calls for contribution rewards.
+	// Only count calls to actual contracts (not EOA transfers).
+	// Credit goes to the contract's address (as agent), not the caller.
+	if msg.To != nil {
+		toAccAddr := sdk.AccAddress(msg.To.Bytes())
+		if h.agentKeeper.IsAgent(ctx, toAccAddr.String()) {
+			// Check that logs exist (indicates contract execution, not plain transfer)
+			if len(receipt.Logs) > 0 {
+				h.agentKeeper.IncrementContractCalls(ctx, toAccAddr.String())
+			}
+		}
 	}
 
 	return nil

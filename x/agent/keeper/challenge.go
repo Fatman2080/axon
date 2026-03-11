@@ -362,7 +362,14 @@ func scoreResponse(resp types.AIResponse, correctAnswer string) int {
 		return 100
 	}
 
-	if len(normalizedReveal) > 0 && len(normalizedAnswer) > 0 {
+	// Allow partial match if reveal length is reasonable relative to answer.
+	// Prevents gaming by concatenating all possible answers into a single reveal.
+	maxRevealLen := len(normalizedAnswer) * 3
+	if maxRevealLen < 64 {
+		maxRevealLen = 64
+	}
+	if len(normalizedReveal) > 0 && len(normalizedAnswer) > 0 &&
+		len(normalizedReveal) <= maxRevealLen {
 		if stringContains(normalizedReveal, normalizedAnswer) || stringContains(normalizedAnswer, normalizedReveal) {
 			return 50
 		}
