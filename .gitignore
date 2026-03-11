@@ -35,3 +35,4 @@ coverage.html
 # Environment
 .env
 .env.local
+tools/agent-daemon/agent-daemon
