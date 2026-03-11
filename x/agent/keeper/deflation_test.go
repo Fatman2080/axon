@@ -292,7 +292,7 @@ func TestCombinedWeightCalculation(t *testing.T) {
 		wantRatio  float64 // multiplier / 100
 	}{
 		{"low rep + no AI", 10, 0, 1.00},
-		{"mid rep + mid AI", 60, 70, 1.30},  // 100 + 10 + 20
+		{"mid rep + mid AI", 60, 70, 1.30},   // 100 + 10 + 20
 		{"high rep + high AI", 95, 95, 1.50}, // 100 + 20 + 30
 		{"max everything", 100, 100, 1.50},   // 100 + 20 + 30
 	}

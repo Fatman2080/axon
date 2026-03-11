@@ -14,6 +14,9 @@ contract TestAgentPrecompiles {
     event AgentChecked(address indexed account, bool isAgent);
     event ReputationChecked(address indexed account, uint64 rep);
     event WalletCreated(address indexed walletAddr);
+    event TrustSet(address indexed walletAddr, address indexed target, uint8 level);
+
+    // ─── Registry ───────────────────────────────────────────────────
 
     function checkIsAgent(address account) external view returns (bool) {
         return registry.isAgent(account);
@@ -37,6 +40,8 @@ contract TestAgentPrecompiles {
         registry.heartbeat();
     }
 
+    // ─── Reputation ─────────────────────────────────────────────────
+
     function checkReputation(address agent) external view returns (uint64) {
         return reputation.getReputation(agent);
     }
@@ -49,13 +54,63 @@ contract TestAgentPrecompiles {
         return reputation.getReputations(agents);
     }
 
+    // ─── Wallet ─────────────────────────────────────────────────────
+
     function createAgentWallet(
+        address operator,
+        address guardian,
         uint256 txLimit,
         uint256 dailyLimit,
-        uint256 cooldownBlocks,
-        address guardian
+        uint256 cooldownBlocks
     ) external returns (address) {
-        return wallet.createWallet(txLimit, dailyLimit, cooldownBlocks, guardian);
+        address w = wallet.createWallet(operator, guardian, txLimit, dailyLimit, cooldownBlocks);
+        emit WalletCreated(w);
+        return w;
+    }
+
+    function executeWallet(
+        address walletAddr,
+        address target,
+        uint256 value,
+        bytes calldata data
+    ) external {
+        wallet.execute(walletAddr, target, value, data);
+    }
+
+    function freezeWallet(address walletAddr) external {
+        wallet.freeze(walletAddr);
+    }
+
+    function recoverWallet(address walletAddr, address newOperator) external {
+        wallet.recover(walletAddr, newOperator);
+    }
+
+    // ─── Trusted Channel ────────────────────────────────────────────
+
+    function setWalletTrust(
+        address walletAddr,
+        address target,
+        uint8 level,
+        uint256 txLimit,
+        uint256 dailyLimit,
+        uint256 expiresAt
+    ) external {
+        wallet.setTrust(walletAddr, target, level, txLimit, dailyLimit, expiresAt);
+        emit TrustSet(walletAddr, target, level);
+    }
+
+    function removeWalletTrust(address walletAddr, address target) external {
+        wallet.removeTrust(walletAddr, target);
+    }
+
+    function getWalletTrust(address walletAddr, address target) external view returns (
+        uint8 level,
+        uint256 txLimit,
+        uint256 dailyLimit,
+        uint256 authorizedAt,
+        uint256 expiresAt
+    ) {
+        return wallet.getTrust(walletAddr, target);
     }
 
     function queryWallet(address walletAddr) external view returns (
@@ -63,6 +118,7 @@ contract TestAgentPrecompiles {
         uint256 dailyLimit,
         uint256 dailySpent,
         bool isFrozen,
+        address owner,
         address operator,
         address guardian
     ) {

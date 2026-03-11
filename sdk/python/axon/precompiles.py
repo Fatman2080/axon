@@ -91,10 +91,11 @@ REPUTATION_ABI = [
 WALLET_ABI = [
     {
         "inputs": [
+            {"name": "operator", "type": "address"},
+            {"name": "guardian", "type": "address"},
             {"name": "txLimit", "type": "uint256"},
             {"name": "dailyLimit", "type": "uint256"},
             {"name": "cooldownBlocks", "type": "uint256"},
-            {"name": "guardian", "type": "address"},
         ],
         "name": "createWallet",
         "outputs": [{"name": "wallet", "type": "address"}],
@@ -131,6 +132,46 @@ WALLET_ABI = [
         "type": "function",
     },
     {
+        "inputs": [
+            {"name": "wallet", "type": "address"},
+            {"name": "target", "type": "address"},
+            {"name": "level", "type": "uint8"},
+            {"name": "txLimit", "type": "uint256"},
+            {"name": "dailyLimit", "type": "uint256"},
+            {"name": "expiresAt", "type": "uint256"},
+        ],
+        "name": "setTrust",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "inputs": [
+            {"name": "wallet", "type": "address"},
+            {"name": "target", "type": "address"},
+        ],
+        "name": "removeTrust",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "inputs": [
+            {"name": "wallet", "type": "address"},
+            {"name": "target", "type": "address"},
+        ],
+        "name": "getTrust",
+        "outputs": [
+            {"name": "level", "type": "uint8"},
+            {"name": "txLimit", "type": "uint256"},
+            {"name": "dailyLimit", "type": "uint256"},
+            {"name": "authorizedAt", "type": "uint256"},
+            {"name": "expiresAt", "type": "uint256"},
+        ],
+        "stateMutability": "view",
+        "type": "function",
+    },
+    {
         "inputs": [{"name": "wallet", "type": "address"}],
         "name": "getWalletInfo",
         "outputs": [
@@ -138,6 +179,7 @@ WALLET_ABI = [
             {"name": "dailyLimit", "type": "uint256"},
             {"name": "dailySpent", "type": "uint256"},
             {"name": "isFrozen", "type": "bool"},
+            {"name": "owner", "type": "address"},
             {"name": "operator", "type": "address"},
             {"name": "guardian", "type": "address"},
         ],
@@ -145,3 +187,9 @@ WALLET_ABI = [
         "type": "function",
     },
 ]
+
+# Trust levels for Trusted Channel system
+TRUST_BLOCKED = 0
+TRUST_UNKNOWN = 1
+TRUST_LIMITED = 2
+TRUST_FULL = 3

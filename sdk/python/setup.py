@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="axon-sdk",
-    version="0.2.0",
+    version="0.3.0",
     description="Python SDK for the Axon AI Agent blockchain",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",

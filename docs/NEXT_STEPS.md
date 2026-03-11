@@ -554,4 +554,15 @@ Sprint 4（主网）
 | 1.6 IAgentWallet 接口同步 | ✅ 完成 | Solidity 接口新增 setTrust/removeTrust/getTrust |
 | 1.7 通缩集成测试 | ⏳ 待做 | |
 
-**下一步：执行任务 1.7（通缩集成测试），然后进入 Sprint 2。**
+### Sprint 2 进度
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| 2.1 Python SDK 完善 | ✅ 完成 | Wallet ABI同步 + Trusted Channel 方法 + v0.3.0 |
+| 2.2 TypeScript SDK | ✅ 完成 | ethers v6 完整实现 @axon-chain/sdk v0.3.0 |
+| 2.3 开发者文档 | ✅ 完成 | DEVELOPER_GUIDE.md 1070 行完整指南 |
+| 2.4 AI 题库扩充 | ✅ 完成 | 30→110 题，覆盖 14 个领域 |
+| 2.5 单元测试补全 | ✅ 完成 | 新增 4 个测试文件 70+ 测试用例 |
+| 2.6 EVM 兼容性测试 | ✅ 完成 | Hardhat 测试 + TestAgentPrecompiles.sol 更新 |
+
+**Sprint 1 + Sprint 2 全部完成。下一步：Sprint 3（公开测试网）。**

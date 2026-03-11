@@ -7,6 +7,7 @@ from eth_account import Account
 from axon.precompiles import (
     REGISTRY_ADDRESS, REPUTATION_ADDRESS, WALLET_ADDRESS,
     REGISTRY_ABI, REPUTATION_ABI, WALLET_ABI,
+    TRUST_BLOCKED, TRUST_UNKNOWN, TRUST_LIMITED, TRUST_FULL,
 )
 
 AXON_DECIMALS = 18
@@ -14,7 +15,14 @@ ONE_AXON = 10 ** AXON_DECIMALS
 
 
 class AgentClient:
-    """High-level client for interacting with the Axon chain."""
+    """High-level client for interacting with the Axon chain.
+
+    Usage::
+
+        client = AgentClient("http://localhost:8545")
+        client.set_account("0x...")
+        client.register_agent("nlp,reasoning", "axon-7b", stake_axon=100)
+    """
 
     def __init__(self, rpc_url: str = "http://localhost:8545"):
         self.w3 = Web3(Web3.HTTPProvider(rpc_url))
@@ -32,7 +40,7 @@ class AgentClient:
             address=Web3.to_checksum_address(WALLET_ADDRESS), abi=WALLET_ABI
         )
 
-    # ---- Connection info ----
+    # ─── Connection info ─────────────────────────────────────────────
 
     @property
     def chain_id(self) -> int:
@@ -47,30 +55,42 @@ class AgentClient:
         return self._account.address if self._account else None
 
     def balance(self, address: Optional[str] = None) -> float:
+        """Return AXON balance (human-readable, not wei)."""
         addr = address or self.address
         if not addr:
             raise ValueError("No address specified")
         wei = self.w3.eth.get_balance(Web3.to_checksum_address(addr))
         return wei / ONE_AXON
 
-    # ---- Account management ----
+    def balance_wei(self, address: Optional[str] = None) -> int:
+        """Return raw balance in aaxon (wei)."""
+        addr = address or self.address
+        if not addr:
+            raise ValueError("No address specified")
+        return self.w3.eth.get_balance(Web3.to_checksum_address(addr))
+
+    # ─── Account management ──────────────────────────────────────────
 
     def set_account(self, private_key: str):
+        """Set the signing account from a private key."""
         self._account = Account.from_key(private_key)
 
     def create_account(self) -> Tuple[str, str]:
+        """Create a new random account. Returns (address, private_key)."""
         acct = Account.create()
         self._account = acct
         return acct.address, acct.key.hex()
 
-    # ---- Agent Registry (0x...0801) ----
+    # ─── Agent Registry (0x...0801) ──────────────────────────────────
 
     def is_agent(self, address: str) -> bool:
+        """Check if an address is a registered Agent."""
         return self._registry.functions.isAgent(
             Web3.to_checksum_address(address)
         ).call()
 
     def get_agent(self, address: str) -> Dict[str, Any]:
+        """Query full Agent info from the registry."""
         result = self._registry.functions.getAgent(
             Web3.to_checksum_address(address)
         ).call()
@@ -85,6 +105,7 @@ class AgentClient:
     def register_agent(
         self, capabilities: str, model: str, stake_axon: float = 100
     ) -> str:
+        """Register as an AI Agent. Requires >= 100 AXON stake (20 burned)."""
         self._require_account()
         stake_wei = int(stake_axon * ONE_AXON)
         tx = self._registry.functions.register(capabilities, model).build_transaction(
@@ -93,6 +114,7 @@ class AgentClient:
         return self._send_tx(tx)
 
     def update_agent(self, capabilities: str, model: str) -> str:
+        """Update Agent capabilities and model."""
         self._require_account()
         tx = self._registry.functions.updateAgent(
             capabilities, model
@@ -100,50 +122,142 @@ class AgentClient:
         return self._send_tx(tx)
 
     def heartbeat(self) -> str:
+        """Send a heartbeat to keep Agent status ONLINE."""
         self._require_account()
         tx = self._registry.functions.heartbeat().build_transaction(self._tx_params())
         return self._send_tx(tx)
 
     def deregister(self) -> str:
+        """Start the deregistration process (stake returned after cooldown)."""
         self._require_account()
         tx = self._registry.functions.deregister().build_transaction(self._tx_params())
         return self._send_tx(tx)
 
-    # ---- Reputation (0x...0802) ----
+    # ─── Reputation (0x...0802) ──────────────────────────────────────
 
     def get_reputation(self, address: str) -> int:
+        """Get an Agent's reputation score (0-100)."""
         return self._reputation.functions.getReputation(
             Web3.to_checksum_address(address)
         ).call()
 
     def get_reputations(self, addresses: List[str]) -> List[int]:
+        """Batch-query reputation scores for multiple Agents."""
         addrs = [Web3.to_checksum_address(a) for a in addresses]
         return self._reputation.functions.getReputations(addrs).call()
 
     def meets_reputation(self, address: str, min_rep: int) -> bool:
+        """Check if an Agent meets a minimum reputation threshold."""
         return self._reputation.functions.meetsReputation(
             Web3.to_checksum_address(address), min_rep
         ).call()
 
-    # ---- Wallet (0x...0803) ----
+    # ─── Wallet (0x...0803) ──────────────────────────────────────────
 
     def create_wallet(
         self,
-        tx_limit_axon: float,
-        daily_limit_axon: float,
-        cooldown_blocks: int,
+        operator: str,
         guardian: str,
+        tx_limit_axon: float = 10.0,
+        daily_limit_axon: float = 100.0,
+        cooldown_blocks: int = 10,
     ) -> str:
+        """Create an Agent smart wallet. Caller becomes the Owner."""
         self._require_account()
         tx = self._wallet.functions.createWallet(
+            Web3.to_checksum_address(operator),
+            Web3.to_checksum_address(guardian),
             int(tx_limit_axon * ONE_AXON),
             int(daily_limit_axon * ONE_AXON),
             cooldown_blocks,
-            Web3.to_checksum_address(guardian),
         ).build_transaction(self._tx_params())
         return self._send_tx(tx)
 
+    def execute_wallet(
+        self, wallet: str, target: str, value_axon: float = 0, data: bytes = b""
+    ) -> str:
+        """Execute a transaction through the Agent wallet (as Operator)."""
+        self._require_account()
+        tx = self._wallet.functions.execute(
+            Web3.to_checksum_address(wallet),
+            Web3.to_checksum_address(target),
+            int(value_axon * ONE_AXON),
+            data,
+        ).build_transaction(self._tx_params())
+        return self._send_tx(tx)
+
+    def freeze_wallet(self, wallet: str) -> str:
+        """Freeze a wallet (Guardian or Owner only)."""
+        self._require_account()
+        tx = self._wallet.functions.freeze(
+            Web3.to_checksum_address(wallet)
+        ).build_transaction(self._tx_params())
+        return self._send_tx(tx)
+
+    def recover_wallet(self, wallet: str, new_operator: str) -> str:
+        """Recover a wallet by replacing the Operator (Guardian only)."""
+        self._require_account()
+        tx = self._wallet.functions.recover(
+            Web3.to_checksum_address(wallet),
+            Web3.to_checksum_address(new_operator),
+        ).build_transaction(self._tx_params())
+        return self._send_tx(tx)
+
+    def set_trust(
+        self,
+        wallet: str,
+        target: str,
+        level: int = TRUST_FULL,
+        tx_limit_axon: float = 0,
+        daily_limit_axon: float = 0,
+        expires_at: int = 0,
+    ) -> str:
+        """Authorize a contract at a trust level (Owner only).
+
+        Trust levels:
+            0 = Blocked — always rejected
+            1 = Unknown  — wallet default limits
+            2 = Limited  — custom per-channel limits
+            3 = Full     — no limits
+        """
+        self._require_account()
+        tx = self._wallet.functions.setTrust(
+            Web3.to_checksum_address(wallet),
+            Web3.to_checksum_address(target),
+            level,
+            int(tx_limit_axon * ONE_AXON),
+            int(daily_limit_axon * ONE_AXON),
+            expires_at,
+        ).build_transaction(self._tx_params())
+        return self._send_tx(tx)
+
+    def remove_trust(self, wallet: str, target: str) -> str:
+        """Remove trust authorization for a contract (Owner only)."""
+        self._require_account()
+        tx = self._wallet.functions.removeTrust(
+            Web3.to_checksum_address(wallet),
+            Web3.to_checksum_address(target),
+        ).build_transaction(self._tx_params())
+        return self._send_tx(tx)
+
+    def get_trust(self, wallet: str, target: str) -> Dict[str, Any]:
+        """Query trust level and limits for a contract."""
+        result = self._wallet.functions.getTrust(
+            Web3.to_checksum_address(wallet),
+            Web3.to_checksum_address(target),
+        ).call()
+        level_names = {0: "blocked", 1: "unknown", 2: "limited", 3: "full"}
+        return {
+            "level": result[0],
+            "level_name": level_names.get(result[0], "unknown"),
+            "tx_limit": result[1] / ONE_AXON,
+            "daily_limit": result[2] / ONE_AXON,
+            "authorized_at": result[3],
+            "expires_at": result[4],
+        }
+
     def get_wallet_info(self, wallet_address: str) -> Dict[str, Any]:
+        """Query wallet configuration and status."""
         result = self._wallet.functions.getWalletInfo(
             Web3.to_checksum_address(wallet_address)
         ).call()
@@ -152,13 +266,18 @@ class AgentClient:
             "daily_limit": result[1] / ONE_AXON,
             "daily_spent": result[2] / ONE_AXON,
             "is_frozen": result[3],
-            "operator": result[4],
-            "guardian": result[5],
+            "owner": result[4],
+            "operator": result[5],
+            "guardian": result[6],
         }
 
-    # ---- Smart Contract deployment ----
+    # ─── Smart Contract deployment ───────────────────────────────────
 
     def deploy_contract(self, bytecode: str, **kwargs) -> Tuple[str, str]:
+        """Deploy an EVM contract. Returns (tx_hash, contract_address).
+
+        Note: deploying burns 10 AXON in addition to gas fees.
+        """
         self._require_account()
         tx = {
             **self._tx_params(),
@@ -172,28 +291,29 @@ class AgentClient:
     def call_contract(
         self, address: str, abi: list, method: str, args: list = None, value: int = 0
     ) -> Any:
+        """Call a read-only contract method."""
         contract = self.w3.eth.contract(
             address=Web3.to_checksum_address(address), abi=abi
         )
         fn = getattr(contract.functions, method)
-        call_args = args or []
-        return fn(*call_args).call()
+        return fn(*(args or [])).call()
 
     def send_contract_tx(
         self, address: str, abi: list, method: str, args: list = None, value: int = 0
     ) -> str:
+        """Send a state-changing contract transaction."""
         self._require_account()
         contract = self.w3.eth.contract(
             address=Web3.to_checksum_address(address), abi=abi
         )
         fn = getattr(contract.functions, method)
-        call_args = args or []
-        tx = fn(*call_args).build_transaction(self._tx_params(value=value))
+        tx = fn(*(args or [])).build_transaction(self._tx_params(value=value))
         return self._send_tx(tx)
 
-    # ---- Transfer ----
+    # ─── Transfer ────────────────────────────────────────────────────
 
     def transfer(self, to: str, amount_axon: float) -> str:
+        """Send AXON to an address."""
         self._require_account()
         tx = {
             **self._tx_params(),
@@ -203,7 +323,7 @@ class AgentClient:
         }
         return self._send_tx(tx)
 
-    # ---- Internals ----
+    # ─── Internals ───────────────────────────────────────────────────
 
     def _require_account(self):
         if not self._account:
@@ -225,5 +345,6 @@ class AgentClient:
         return tx_hash.hex()
 
     def wait_for_tx(self, tx_hash: str, timeout: int = 30) -> dict:
+        """Wait for a transaction to be mined and return the receipt."""
         receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=timeout)
         return dict(receipt)
