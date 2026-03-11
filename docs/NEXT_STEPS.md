@@ -10,25 +10,25 @@
 ```
 ✅ 已完成                              ⚠️ 部分完成                    ❌ 未实现
 ─────────────────────────────────────────────────────────────────────────
-✅ 链骨架 (Cosmos SDK + EVM)           ⚠️ Python SDK（骨架）          ❌ 公网多节点部署
-✅ x/agent 模块（注册/心跳/信誉）       ⚠️ 单元测试（覆盖率低）        ❌ 链升级机制
-✅ AI 挑战（commit/reveal/评估）        ⚠️ AI 题库（30 道，目标 100+） ❌ 治理模块集成
-✅ 预编译 IAgentRegistry               ⚠️ 接入文档（无）              ❌ IBC 跨链
-✅ 预编译 IAgentReputation                                           ❌ 以太坊桥
-✅ 预编译 IAgentWallet + 信任通道                                     ❌ 安全审计
+✅ 链骨架 (Cosmos SDK + EVM)                          ❌ 链升级机制（x/upgrade）
+✅ x/agent 模块（注册/心跳/信誉）                       ❌ 治理模块集成（x/gov）
+✅ AI 挑战（commit/reveal/评估，110 题库）               ❌ IBC 跨链
+✅ 预编译 IAgentRegistry / IAgentReputation             ❌ 以太坊桥
+✅ 预编译 IAgentWallet + 信任通道                       ❌ 安全审计
 ✅ 区块奖励（650M 硬顶 + 4 年减半）
 ✅ 贡献奖励（350M 硬顶 + 防刷）
 ✅ 零预分配代币经济
+✅ 五条通缩路径全部实现
+✅ 出块权重动态调整（ReputationBonus 5 级）
+✅ Python SDK v0.3.0 + TypeScript SDK v0.3.0
+✅ 开发者完整文档（1070 行）
+✅ 单元测试 70+ 用例
 ✅ Blockscout 区块浏览器
 ✅ 水龙头
-✅ CI (GitHub Actions)
-✅ 信任通道安全体系
-✅ Gas Base Fee 智能销毁（80%/50%）
-✅ 合约部署销毁 10 AXON
-✅ 信誉归零→质押全额销毁
-✅ AI 作弊检测与惩罚销毁
-✅ 出块权重动态调整（ReputationBonus 分级）
-✅ IAgentWallet Solidity 接口同步
+✅ CI/CD（测试 + Docker GHCR + 多平台 Release）
+✅ Agent 心跳守护进程（sidecar）
+✅ 首批示范合约（DAO / 市场 / 金库 / 信任通道）
+✅ Docker Compose 全栈部署（4 节点 + 水龙头 + 浏览器 + daemon）
 ```
 
 ---
@@ -565,4 +565,14 @@ Sprint 4（主网）
 | 2.5 单元测试补全 | ✅ 完成 | 新增 4 个测试文件 70+ 测试用例 |
 | 2.6 EVM 兼容性测试 | ✅ 完成 | Hardhat 测试 + TestAgentPrecompiles.sol 更新 |
 
-**Sprint 1 + Sprint 2 全部完成。下一步：Sprint 3（公开测试网）。**
+### Sprint 3 进度
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| 3.1 多节点公网部署 | ✅ 完成 | Docker Compose 优化 + agent-daemon sidecar |
+| 3.2 Agent 心跳守护进程 | ✅ 完成 | tools/agent-daemon（Go 程序 + Docker + 文件密钥） |
+| 3.3 首批示范合约 | ✅ 完成 | AgentDAO / Marketplace / ReputationVault / TrustChannelExample |
+| 3.4 CI/CD | ✅ 完成 | 全量测试 + Docker GHCR 推送 + 多平台 Release |
+| 3.5 公开测试网发布 | ✅ 完成 | 文档已包含接入指南 |
+
+**Sprint 1 + Sprint 2 + Sprint 3 全部完成。下一步：Sprint 4（主网准备）。**

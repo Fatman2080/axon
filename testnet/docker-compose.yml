@@ -154,6 +154,25 @@ services:
     networks:
       - axon-testnet
 
+  # ── Agent Heartbeat Daemon (sidecar) ─────────────────────
+  agent-daemon:
+    build:
+      context: ../tools/agent-daemon
+      dockerfile: Dockerfile
+    container_name: axon-agent-daemon
+    restart: unless-stopped
+    command:
+      - --rpc=http://axon-node-0:8545
+      - --private-key-file=/data/axon-testnet/faucet_private_key.txt
+      - --heartbeat-interval=100
+    volumes:
+      - testnet-data:/data:ro
+    depends_on:
+      axon-node-0:
+        condition: service_healthy
+    networks:
+      - axon-testnet
+
   # ── Block Explorer (Blockscout) ──────────────────────────
   explorer-db:
     image: postgres:15
