@@ -1,114 +1,114 @@
-> 🌐 [English Version](TESTNET_EN.md)
+> 🌐 [中文版](TESTNET.md)
 
-# Axon 公开测试网部署指南
+# Axon Public Testnet Deployment Guide
 
-## 目录
+## Table of Contents
 
-- [网络信息](#网络信息)
-- [快速开始](#快速开始)
-- [Docker 部署（推荐）](#docker-部署推荐)
-- [裸机部署](#裸机部署)
-- [加入现有测试网](#加入现有测试网)
-- [成为验证者](#成为验证者)
-- [水龙头](#水龙头)
-- [区块浏览器](#区块浏览器)
-- [监控](#监控)
-- [MetaMask 配置](#metamask-配置)
-- [预编译合约](#预编译合约)
-- [Python SDK 接入](#python-sdk-接入)
-- [运维](#运维)
-- [故障排除](#故障排除)
+- [Network Information](#network-information)
+- [Quick Start](#quick-start)
+- [Docker Deployment (Recommended)](#docker-deployment-recommended)
+- [Bare Metal Deployment](#bare-metal-deployment)
+- [Joining an Existing Testnet](#joining-an-existing-testnet)
+- [Becoming a Validator](#becoming-a-validator)
+- [Faucet](#faucet)
+- [Block Explorer](#block-explorer)
+- [Monitoring](#monitoring)
+- [MetaMask Configuration](#metamask-configuration)
+- [Precompile Contracts](#precompile-contracts)
+- [Python SDK Integration](#python-sdk-integration)
+- [Operations](#operations)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-## 网络信息
+## Network Information
 
-| 参数 | 值 |
-|------|-----|
-| 链名称 | Axon Public Testnet |
+| Parameter | Value |
+|-----------|-------|
+| Chain Name | Axon Public Testnet |
 | Chain ID (Cosmos) | `axon_9001-1` |
 | Chain ID (EVM) | `9001` |
-| 代币符号 | AXON |
-| 最小单位 | aaxon (10⁻¹⁸ AXON) |
-| 区块时间 | ~5 秒 |
+| Token Symbol | AXON |
+| Smallest Unit | aaxon (10⁻¹⁸ AXON) |
+| Block Time | ~5 seconds |
 | JSON-RPC | `http://<node-ip>:8545` |
 | WebSocket | `ws://<node-ip>:8546` |
 | CometBFT RPC | `http://<node-ip>:26657` |
 | REST API | `http://<node-ip>:1317` |
 | gRPC | `<node-ip>:9090` |
-| 区块浏览器 | `http://<node-ip>:4000` |
-| 水龙头 | `http://<node-ip>:8080` |
+| Block Explorer | `http://<node-ip>:4000` |
+| Faucet | `http://<node-ip>:8080` |
 | Grafana | `http://<node-ip>:3000` |
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 最快方式：Docker Compose 一键启动
+### Fastest Method: Docker Compose One-Click Launch
 
 ```bash
 git clone https://github.com/Fatman2080/axon.git
 cd axon
 
-# 启动完整测试网（4 验证者 + 水龙头 + 浏览器）
+# Start the full testnet (4 validators + faucet + explorer)
 docker compose -f testnet/docker-compose.yml up -d
 
-# 查看状态
+# Check status
 docker compose -f testnet/docker-compose.yml ps
 
-# 测试 JSON-RPC
+# Test JSON-RPC
 curl -s http://localhost:8545 -X POST \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 ```
 
-启动后可用端点：
+Available endpoints after launch:
 - **JSON-RPC**: http://localhost:8545
-- **水龙头**: http://localhost:8080
-- **区块浏览器**: http://localhost:4000
+- **Faucet**: http://localhost:8080
+- **Block Explorer**: http://localhost:4000
 - **CometBFT RPC**: http://localhost:26657
 
 ---
 
-## Docker 部署（推荐）
+## Docker Deployment (Recommended)
 
-### 系统要求
+### System Requirements
 
 ```
-CPU:    4+ 核
-内存:   8+ GB（推荐 16 GB）
-存储:   100 GB SSD
-Docker: 24.0+
+CPU:     4+ cores
+Memory:  8+ GB (16 GB recommended)
+Storage: 100 GB SSD
+Docker:  24.0+
 Docker Compose: v2.20+
 ```
 
-### 完整测试网（4 节点 + 基础设施）
+### Full Testnet (4 Nodes + Infrastructure)
 
 ```bash
-# 构建并启动
+# Build and start
 docker compose -f testnet/docker-compose.yml up -d --build
 
-# 查看日志
+# View logs
 docker logs -f axon-node-0
 
-# 停止
+# Stop
 docker compose -f testnet/docker-compose.yml down
 
-# 完全清除数据
+# Complete data cleanup
 docker compose -f testnet/docker-compose.yml down -v
 ```
 
-### 单独启动监控
+### Start Monitoring Separately
 
 ```bash
-# 先启动测试网，然后启动监控
+# Start testnet first, then start monitoring
 docker compose -f testnet/monitoring/docker-compose.yml up -d
 
 # Grafana: http://localhost:3000 (admin/axon)
 # Prometheus: http://localhost:9091
 ```
 
-### 服务架构
+### Service Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -130,96 +130,96 @@ docker compose -f testnet/monitoring/docker-compose.yml up -d
 
 ---
 
-## 裸机部署
+## Bare Metal Deployment
 
-### 一键部署脚本（Ubuntu 22.04+）
+### One-Click Deployment Script (Ubuntu 22.04+)
 
 ```bash
-# 下载并运行部署脚本
+# Download and run the deployment script
 curl -sSL https://raw.githubusercontent.com/Fatman2080/axon/main/testnet/deploy-node.sh | bash
 
-# 或自定义参数
+# Or customize parameters
 MONIKER="my-axon-node" \
 SEEDS="nodeid1@ip1:26656,nodeid2@ip2:26656" \
 GENESIS_URL="https://raw.githubusercontent.com/Fatman2080/axon/main/testnet/genesis.json" \
 bash deploy-node.sh
 ```
 
-部署脚本会自动：
-1. 安装 Go 和系统依赖
-2. 编译 axond 二进制文件
-3. 初始化节点并配置创世文件
-4. 配置防火墙（ufw）
-5. 创建 systemd 服务
+The deployment script automatically:
+1. Installs Go and system dependencies
+2. Compiles the axond binary
+3. Initializes the node and configures the genesis file
+4. Configures the firewall (ufw)
+5. Creates a systemd service
 
-### 手动安装
+### Manual Installation
 
 ```bash
-# 1. 安装 Go 1.23+
+# 1. Install Go 1.23+
 wget https://go.dev/dl/go1.23.4.linux-amd64.tar.gz
 sudo tar -C /usr/local -xzf go1.23.4.linux-amd64.tar.gz
 export PATH=$PATH:/usr/local/go/bin
 
-# 2. 编译
+# 2. Compile
 git clone https://github.com/Fatman2080/axon.git
 cd axon && make build
 sudo cp build/axond /usr/local/bin/
 
-# 3. 初始化
+# 3. Initialize
 axond init my-node --chain-id axon_9001-1 --home /opt/axon
 
-# 4. 下载创世文件（从种子节点获取）
+# 4. Download genesis file (obtain from seed node)
 # curl -sSL <genesis-url> -o /opt/axon/config/genesis.json
 
-# 5. 配置 seeds/peers（编辑 /opt/axon/config/config.toml）
+# 5. Configure seeds/peers (edit /opt/axon/config/config.toml)
 
-# 6. 启动
+# 6. Start
 axond start --home /opt/axon --json-rpc.enable
 ```
 
-### 管理命令
+### Management Commands
 
 ```bash
-# 启动/停止/重启
+# Start/Stop/Restart
 sudo systemctl start axond
 sudo systemctl stop axond
 sudo systemctl restart axond
 
-# 查看日志
+# View logs
 sudo journalctl -fu axond
 
-# 查看节点状态
+# Check node status
 curl -s localhost:26657/status | jq '.result.sync_info'
 
-# 查看节点 ID（用于 peer 配置）
+# Get node ID (used for peer configuration)
 axond comet show-node-id --home /opt/axon
 ```
 
 ---
 
-## 加入现有测试网
+## Joining an Existing Testnet
 
-### 1. 获取创世文件
+### 1. Obtain the Genesis File
 
 ```bash
-# 从种子节点下载
+# Download from a seed node
 curl -sSL http://<seed-node-ip>:26657/genesis | jq '.result.genesis' > /opt/axon/config/genesis.json
 ```
 
-### 2. 配置 Seeds
+### 2. Configure Seeds
 
-编辑 `/opt/axon/config/config.toml`：
+Edit `/opt/axon/config/config.toml`:
 
 ```toml
 [p2p]
 seeds = "<node-id>@<ip>:26656,<node-id2>@<ip2>:26656"
 ```
 
-### 3. 快速同步
+### 3. Fast Sync
 
 ```bash
-# 使用状态同步（可选，加速初始同步）
-# 编辑 config.toml
+# Use state sync (optional, speeds up initial sync)
+# Edit config.toml
 [statesync]
 enable = true
 rpc_servers = "http://<trusted-node>:26657,http://<trusted-node2>:26657"
@@ -227,29 +227,29 @@ trust_height = <recent-height>
 trust_hash = "<block-hash-at-trust-height>"
 ```
 
-### 4. 启动同步
+### 4. Start Syncing
 
 ```bash
 sudo systemctl start axond
-sudo journalctl -fu axond  # 观察同步进度
+sudo journalctl -fu axond  # Monitor sync progress
 ```
 
 ---
 
-## 成为验证者
+## Becoming a Validator
 
-节点完成同步后，可以创建验证者：
+After your node finishes syncing, you can create a validator:
 
 ```bash
-# 1. 创建密钥
+# 1. Create keys
 axond keys add validator --home /opt/axon
 
-# 2. 从水龙头获取测试 AXON（或从其他账户转账）
+# 2. Get test AXON from the faucet (or transfer from another account)
 curl -X POST http://<faucet>:8080/api/faucet \
   -H "Content-Type: application/json" \
   -d '{"address": "<your-0x-address>"}'
 
-# 3. 创建验证者
+# 3. Create validator
 axond tx staking create-validator \
   --amount=10000000000000000000000000aaxon \
   --pubkey=$(axond comet show-validator --home /opt/axon) \
@@ -262,35 +262,35 @@ axond tx staking create-validator \
   --from=validator \
   --home=/opt/axon
 
-# 4. 确认验证者状态
+# 4. Confirm validator status
 axond query staking validator $(axond keys show validator --bech val -a --home /opt/axon) \
   --home /opt/axon
 ```
 
 ---
 
-## 水龙头
+## Faucet
 
-### Web 界面
+### Web Interface
 
-访问 `http://<node-ip>:8080`，输入你的 0x 地址，点击 "Request Tokens"。
+Visit `http://<node-ip>:8080`, enter your 0x address, and click "Request Tokens".
 
-### API 调用
+### API Calls
 
 ```bash
-# 请求测试代币（每 24 小时一次）
+# Request test tokens (once every 24 hours)
 curl -X POST http://localhost:8080/api/faucet \
   -H "Content-Type: application/json" \
   -d '{"address": "0xYourAddress"}'
 
-# 查看水龙头状态
+# Check faucet status
 curl http://localhost:8080/api/status
 
-# 健康检查
+# Health check
 curl http://localhost:8080/health
 ```
 
-### 响应示例
+### Response Example
 
 ```json
 {
@@ -303,37 +303,37 @@ curl http://localhost:8080/health
 
 ---
 
-## 区块浏览器
+## Block Explorer
 
-Blockscout 区块浏览器随 Docker Compose 自动启动。
+The Blockscout block explorer starts automatically with Docker Compose.
 
-- 访问 `http://localhost:4000`
-- 查看区块、交易、合约
-- 验证智能合约代码
+- Visit `http://localhost:4000`
+- View blocks, transactions, and contracts
+- Verify smart contract code
 
 ---
 
-## 监控
+## Monitoring
 
-### Grafana 仪表盘
+### Grafana Dashboard
 
-随监控栈一起启动，默认访问：
+Launched together with the monitoring stack; default access:
 
-- **Grafana**: http://localhost:3000（用户名: `admin`，密码: `axon`）
+- **Grafana**: http://localhost:3000 (username: `admin`, password: `axon`)
 - **Prometheus**: http://localhost:9091
 
-仪表盘包含：
-- 区块高度实时趋势
-- 连接的 Peer 数量
-- 出块速率
-- 共识轮次
-- 内存池大小
-- 区块大小
-- 交易吞吐量
+Dashboard includes:
+- Block height real-time trend
+- Connected peer count
+- Block production rate
+- Consensus rounds
+- Mempool size
+- Block size
+- Transaction throughput
 
-### 监控指标端点
+### Metrics Endpoint
 
-每个节点暴露 Prometheus 指标：
+Each node exposes Prometheus metrics:
 
 ```bash
 curl http://localhost:26660/metrics
@@ -341,29 +341,29 @@ curl http://localhost:26660/metrics
 
 ---
 
-## MetaMask 配置
+## MetaMask Configuration
 
-| 参数 | 值 |
-|------|-----|
-| 网络名称 | Axon Testnet |
+| Parameter | Value |
+|-----------|-------|
+| Network Name | Axon Testnet |
 | RPC URL | `http://<node-ip>:8545` |
 | Chain ID | `9001` |
-| 货币符号 | AXON |
-| 区块浏览器 | `http://<node-ip>:4000` |
+| Currency Symbol | AXON |
+| Block Explorer | `http://<node-ip>:4000` |
 
 ---
 
-## 预编译合约
+## Precompile Contracts
 
-Axon 链提供 3 个原生预编译合约，所有 Solidity 合约均可直接调用：
+The Axon chain provides 3 native precompile contracts, callable from any Solidity contract:
 
-| 合约 | 地址 | 功能 |
-|------|------|------|
-| IAgentRegistry | `0x0000000000000000000000000000000000000801` | Agent 注册、查询、心跳、注销 |
-| IAgentReputation | `0x0000000000000000000000000000000000000802` | 信誉查询、批量查询、阈值判断 |
-| IAgentWallet | `0x0000000000000000000000000000000000000803` | Agent 安全钱包（创建、执行、冻结、恢复） |
+| Contract | Address | Function |
+|----------|---------|----------|
+| IAgentRegistry | `0x0000000000000000000000000000000000000801` | Agent registration, query, heartbeat, deregistration |
+| IAgentReputation | `0x0000000000000000000000000000000000000802` | Reputation query, batch query, threshold checks |
+| IAgentWallet | `0x0000000000000000000000000000000000000803` | Agent secure wallet (create, execute, freeze, recover) |
 
-### Solidity 调用示例
+### Solidity Call Example
 
 ```solidity
 interface IAgentRegistry {
@@ -383,7 +383,7 @@ bool isRegistered = registry.isAgent(someAddress);
 
 ---
 
-## Python SDK 接入
+## Python SDK Integration
 
 ```bash
 pip install -e sdk/python
@@ -396,33 +396,33 @@ client = AgentClient("http://localhost:8545")
 print(f"Chain ID: {client.chain_id()}")
 print(f"Block:    {client.block_number()}")
 
-# 创建账户并注册 Agent
+# Create an account and register an Agent
 client.create_account()
 client.register_agent("coding,analysis", "gpt-4", stake_axon=100)
 
-# 查询信誉
+# Query reputation
 rep = client.get_reputation(client.account.address)
 print(f"Reputation: {rep}")
 ```
 
 ---
 
-## 运维
+## Operations
 
-### 备份
+### Backup
 
 ```bash
-# 停止节点
+# Stop the node
 sudo systemctl stop axond
 
-# 备份数据
+# Backup data
 tar -czf axon-backup-$(date +%Y%m%d).tar.gz /opt/axon/data/
 
-# 重启节点
+# Restart the node
 sudo systemctl start axond
 ```
 
-### 升级
+### Upgrade
 
 ```bash
 sudo systemctl stop axond
@@ -434,7 +434,7 @@ sudo cp build/axond /usr/local/bin/axond
 sudo systemctl start axond
 ```
 
-### 日志轮转
+### Log Rotation
 
 ```bash
 # /etc/logrotate.d/axond
@@ -449,65 +449,65 @@ sudo systemctl start axond
 
 ---
 
-## 故障排除
+## Troubleshooting
 
-### 节点无法启动
+### Node Fails to Start
 
 ```bash
-# 检查日志
+# Check logs
 sudo journalctl -fu axond --no-pager -n 50
 
-# 验证创世文件
+# Validate genesis file
 axond genesis validate-genesis --home /opt/axon
 
-# 重置数据（保留密钥和创世）
+# Reset data (keeps keys and genesis)
 axond comet unsafe-reset-all --home /opt/axon
 ```
 
-### 节点不出块
+### Node Not Producing Blocks
 
 ```bash
-# 检查同步状态
+# Check sync status
 curl -s localhost:26657/status | jq '.result.sync_info.catching_up'
-# true = 正在同步，等待完成
+# true = syncing, wait for completion
 
-# 检查 peer 连接
+# Check peer connections
 curl -s localhost:26657/net_info | jq '.result.n_peers'
 ```
 
-### JSON-RPC 无响应
+### JSON-RPC Not Responding
 
 ```bash
-# 确认 JSON-RPC 已启用
+# Confirm JSON-RPC is enabled
 curl -s localhost:8545 -X POST \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
 
-# 检查端口是否监听
+# Check if the port is listening
 ss -tlnp | grep 8545
 ```
 
-### Docker 容器启动失败
+### Docker Container Fails to Start
 
 ```bash
-# 查看容器日志
+# View container logs
 docker logs axon-node-0
 
-# 重新构建镜像
+# Rebuild the image
 docker compose -f testnet/docker-compose.yml build --no-cache
 
-# 完全清除重启
+# Complete cleanup and restart
 docker compose -f testnet/docker-compose.yml down -v
 docker compose -f testnet/docker-compose.yml up -d
 ```
 
-### 端口被占用
+### Port Already in Use
 
 ```bash
-# 查找占用进程
+# Find the process using the port
 sudo lsof -i :26657
 sudo lsof -i :8545
 
-# 终止占用进程
+# Kill the process
 sudo kill <PID>
 ```

@@ -1,3 +1,5 @@
+> 🌐 [English Version](README_EN.md)
+
 # Agent Heartbeat Daemon
 
 Axon 节点的 Agent 心跳守护进程（sidecar），自动向链上注册表预编译合约发送心跳交易，保持 Agent 在线状态。

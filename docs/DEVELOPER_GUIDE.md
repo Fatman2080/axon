@@ -1,3 +1,5 @@
+> 🌐 [English Version](DEVELOPER_GUIDE_EN.md)
+
 # Axon 开发者指南
 
 > 面向外部开发者的完整接入手册——从零启动节点到部署合约、注册 Agent、使用预编译 API。

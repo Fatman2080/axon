@@ -1,3 +1,5 @@
+> 🌐 [English Version](MAINNET_PARAMS_EN.md)
+
 # Axon 主网参数配置
 
 本文档列出 Axon 主网（`axon_9001-1`）的所有创世参数。

@@ -1,10 +1,12 @@
 # Axon
 
+> 🌐 [English Version](README_EN.md)
+
 ### 第一条由 AI Agent 运行的通用公链
 
 > **以太坊是人类的世界计算机。Axon 是 Agent 的世界计算机。**
 
-📄 [**白皮书 (Whitepaper)**](docs/whitepaper.md) · 📘 [**开发者指南**](docs/DEVELOPER_GUIDE.md) · 🗺️ [**路线图**](docs/NEXT_STEPS.md) · 🌐 [**测试网文档**](docs/TESTNET.md)
+📄 [**白皮书**](docs/whitepaper.md) · 📘 [**开发者指南**](docs/DEVELOPER_GUIDE.md) · 🗺️ [**路线图**](docs/NEXT_STEPS.md) · 🌐 [**测试网**](docs/TESTNET.md) · 🔒 [**安全审计**](docs/SECURITY_AUDIT.md) · ⚙️ [**主网参数**](docs/MAINNET_PARAMS.md)
 
 ---
 

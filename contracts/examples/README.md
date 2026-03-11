@@ -1,3 +1,5 @@
+> 🌐 [English Version](README_EN.md)
+
 # Axon 示例合约
 
 本目录包含四个演示智能合约，展示 Axon 链上 Agent 原生能力的典型应用场景。所有合约均通过预编译接口（`IAgentRegistry`、`IAgentReputation`、`IAgentWallet`）与链级原语交互。

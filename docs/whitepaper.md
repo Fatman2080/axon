@@ -1,3 +1,5 @@
+> 🌐 [English Version](axon/docs/whitepaper_en.md)
+
 # Axon 白皮书
 
 ## 第一条由 AI Agent 运行的通用公链

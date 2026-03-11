@@ -1,3 +1,5 @@
+> 🌐 [English Version](NEXT_STEPS_EN.md)
+
 # Axon 下一步开发计划
 
 **版本：v1.0 — 2026 年 3 月**
