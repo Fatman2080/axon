@@ -19,8 +19,8 @@ const (
 	// Whitepaper §8.2: Agent 贡献奖励 35% = 350,000,000 AXON
 	MaxContributionSupplyStr = "350000000000000000000000000"
 
-	// ContributionHalvingBlocks = 4 years
-	ContributionHalvingBlocks int64 = BlocksPerYear * 4
+	// ContributionPhaseBlocks = 4 years per phase
+	ContributionPhaseBlocks int64 = BlocksPerYear * 4
 
 	// MaxSharePerAgent = 2% of epoch pool
 	MaxSharePerAgentBPS = 200
@@ -98,21 +98,33 @@ func (k Keeper) addTotalContributionMinted(ctx sdk.Context, amount sdkmath.Int) 
 	k.SetTotalContributionMinted(ctx, total)
 }
 
+// calculateContributionPerBlock returns per-block contribution reward matching
+// the whitepaper §8.4 custom declining schedule (NOT equal halving):
+//
+//	Year 1-4:  35M AXON/year
+//	Year 5-8:  25M AXON/year
+//	Year 9-12: 15M AXON/year
+//	Year 12+:   5M AXON/year (long tail until 350M cap)
 func calculateContributionPerBlock(blockHeight int64) sdkmath.Int {
-	baseYearly, ok := new(big.Int).SetString(ContributionBaseYearlyStr, 10)
+	year := blockHeight / BlocksPerYear
+	var yearlyStr string
+	switch {
+	case year < 4:
+		yearlyStr = "35000000000000000000000000" // 35M AXON
+	case year < 8:
+		yearlyStr = "25000000000000000000000000" // 25M AXON
+	case year < 12:
+		yearlyStr = "15000000000000000000000000" // 15M AXON
+	default:
+		yearlyStr = "5000000000000000000000000" // 5M AXON
+	}
+
+	yearly, ok := new(big.Int).SetString(yearlyStr, 10)
 	if !ok {
 		return sdkmath.ZeroInt()
 	}
 
-	// Per-block = yearly / blocks_per_year
-	perBlock := new(big.Int).Div(baseYearly, big.NewInt(BlocksPerYear))
-
-	halvings := blockHeight / ContributionHalvingBlocks
-	if halvings >= 64 {
-		return sdkmath.ZeroInt()
-	}
-
-	perBlock.Rsh(perBlock, uint(halvings))
+	perBlock := new(big.Int).Div(yearly, big.NewInt(BlocksPerYear))
 	if perBlock.Sign() <= 0 {
 		return sdkmath.ZeroInt()
 	}

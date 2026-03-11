@@ -112,6 +112,22 @@ func (k Keeper) IsAgent(ctx sdk.Context, address string) bool {
 	return found
 }
 
+// Contract deployer tracking for contribution rewards
+
+func (k Keeper) SetContractDeployer(ctx sdk.Context, contractAddr, deployerAddr string) {
+	store := ctx.KVStore(k.storeKey)
+	store.Set([]byte("ContractDeployer/"+contractAddr), []byte(deployerAddr))
+}
+
+func (k Keeper) GetContractDeployer(ctx sdk.Context, contractAddr string) string {
+	store := ctx.KVStore(k.storeKey)
+	bz := store.Get([]byte("ContractDeployer/" + contractAddr))
+	if bz == nil {
+		return ""
+	}
+	return string(bz)
+}
+
 func (k Keeper) GetReputation(ctx sdk.Context, address string) uint64 {
 	agent, found := k.GetAgent(ctx, address)
 	if !found {

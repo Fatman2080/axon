@@ -285,33 +285,20 @@ func (k Keeper) EvaluateEpochChallenges(ctx sdk.Context, epoch uint64) {
 	))
 }
 
-// detectCheaters finds validators that collude or copy (audit H-2 fix).
-// Flags any validator whose commit hash OR normalized reveal data matches
-// another validator's. Comparing normalized reveals prevents bypass via
-// salt/whitespace differences on identical answers.
+// detectCheaters finds validators that share identical commit hashes (collusion).
+// Since commit = SHA256(address + ":" + answer), honest validators with the same
+// answer produce different hashes. Identical commits indicate key/answer sharing.
 func (k Keeper) detectCheaters(responses []types.AIResponse) map[string]bool {
 	commitCounts := make(map[string][]string)
-	revealCounts := make(map[string][]string)
 
 	for _, resp := range responses {
 		if resp.CommitHash != "" {
 			commitCounts[resp.CommitHash] = append(commitCounts[resp.CommitHash], resp.ValidatorAddress)
 		}
-		if resp.RevealData != "" {
-			normalized := normalizeAnswer(resp.RevealData)
-			revealCounts[normalized] = append(revealCounts[normalized], resp.ValidatorAddress)
-		}
 	}
 
 	cheaters := make(map[string]bool)
 	for _, addrs := range commitCounts {
-		if len(addrs) > 1 {
-			for _, addr := range addrs {
-				cheaters[addr] = true
-			}
-		}
-	}
-	for _, addrs := range revealCounts {
 		if len(addrs) > 1 {
 			for _, addr := range addrs {
 				cheaters[addr] = true
@@ -368,7 +355,7 @@ func scoreResponse(resp types.AIResponse, correctAnswer string) int {
 	if maxRevealLen < 64 {
 		maxRevealLen = 64
 	}
-	if len(normalizedReveal) > 0 && len(normalizedAnswer) > 0 &&
+	if len(normalizedReveal) >= 3 && len(normalizedAnswer) > 0 &&
 		len(normalizedReveal) <= maxRevealLen {
 		if stringContains(normalizedReveal, normalizedAnswer) || stringContains(normalizedAnswer, normalizedReveal) {
 			return 50

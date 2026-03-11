@@ -153,6 +153,8 @@ func (d *Daemon) Run(ctx context.Context) error {
 func (d *Daemon) loop(ctx context.Context) error {
 	var lastHeartbeatBlock uint64
 	var rpcBackoff = pollInterval
+	heartbeatBackoff := pollInterval
+	lastHeartbeatAttempt := time.Now().Add(-maxBackoff)
 
 	const maxBackoff = 300 * time.Second
 
@@ -178,11 +180,21 @@ func (d *Daemon) loop(ctx context.Context) error {
 		d.logger.Debug("polled block", "block", blockNum)
 
 		if lastHeartbeatBlock == 0 || blockNum-lastHeartbeatBlock >= d.heartbeatInterval {
-			d.logger.Info("heartbeat due", "block", blockNum, "last", lastHeartbeatBlock)
-			if err := d.sendHeartbeat(ctx); err != nil {
-				d.logger.Error("heartbeat failed", "error", err)
+			if heartbeatBackoff > pollInterval && time.Since(lastHeartbeatAttempt) < heartbeatBackoff {
+				// Still in backoff period
 			} else {
-				lastHeartbeatBlock = blockNum
+				d.logger.Info("heartbeat due", "block", blockNum, "last", lastHeartbeatBlock)
+				lastHeartbeatAttempt = time.Now()
+				if err := d.sendHeartbeat(ctx); err != nil {
+					d.logger.Error("heartbeat failed", "error", err, "retry_in", heartbeatBackoff)
+					heartbeatBackoff *= 2
+					if heartbeatBackoff > maxBackoff {
+						heartbeatBackoff = maxBackoff
+					}
+				} else {
+					lastHeartbeatBlock = blockNum
+					heartbeatBackoff = pollInterval
+				}
 			}
 		}
 

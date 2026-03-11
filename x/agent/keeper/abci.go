@@ -13,15 +13,24 @@ func (k Keeper) BeginBlocker(ctx sdk.Context) {
 	k.DistributeBlockRewards(ctx)
 	k.MintContributionRewards(ctx)
 
-	// Epoch transition based on tracked state (resilient to param changes mid-epoch)
+	// Epoch transition — process all skipped epochs to avoid losing rewards
 	if params.EpochLength > 0 && blockHeight > 0 {
 		currentEpoch := uint64(blockHeight) / params.EpochLength
 		lastProcessedEpoch := k.GetLastProcessedEpoch(ctx)
 
-		if currentEpoch > lastProcessedEpoch && lastProcessedEpoch > 0 {
-			k.onEpochStart(ctx, params, lastProcessedEpoch)
-		}
 		if currentEpoch > lastProcessedEpoch {
+			// Process each intermediate epoch to ensure rewards/challenges aren't lost.
+			// Cap iterations to prevent excessive computation on large param changes.
+			maxCatchup := uint64(10)
+			start := lastProcessedEpoch + 1
+			if currentEpoch-lastProcessedEpoch > maxCatchup {
+				start = currentEpoch - maxCatchup + 1
+			}
+			for e := start; e <= currentEpoch; e++ {
+				if e > 1 {
+					k.onEpochStart(ctx, params, e-1)
+				}
+			}
 			k.SetLastProcessedEpoch(ctx, currentEpoch)
 		}
 	}

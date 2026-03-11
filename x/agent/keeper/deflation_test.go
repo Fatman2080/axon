@@ -234,7 +234,8 @@ func TestContributionPerBlock(t *testing.T) {
 	}
 }
 
-func TestContributionHalving(t *testing.T) {
+func TestContributionPhaseTransition(t *testing.T) {
+	// Whitepaper §8.4: Year 1-4: 35M, Year 5-8: 25M → ratio ≈ 25/35 ≈ 0.714
 	reward1 := keeper.ExportCalculateContributionPerBlock(100)
 	reward2 := keeper.ExportCalculateContributionPerBlock(6_307_200 * 4)
 
@@ -243,8 +244,8 @@ func TestContributionHalving(t *testing.T) {
 		new(big.Float).SetInt(reward1.BigInt()),
 	)
 	ratioF, _ := ratio.Float64()
-	if ratioF < 0.45 || ratioF > 0.55 {
-		t.Errorf("contribution halving ratio = %f, expected ~0.5", ratioF)
+	if ratioF < 0.70 || ratioF > 0.73 {
+		t.Errorf("contribution phase transition ratio = %f, expected ~0.714 (25M/35M)", ratioF)
 	}
 }
 

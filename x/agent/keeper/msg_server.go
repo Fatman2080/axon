@@ -115,6 +115,12 @@ func (k msgServer) UpdateAgent(goCtx context.Context, msg *types.MsgUpdateAgent)
 		return nil, types.ErrAgentSuspended
 	}
 
+	if len(msg.Capabilities) > 1024 {
+		return nil, fmt.Errorf("capabilities too long: max 1024 bytes")
+	}
+	if len(msg.Model) > 256 {
+		return nil, fmt.Errorf("model name too long: max 256 bytes")
+	}
 	if msg.Capabilities != "" {
 		caps := strings.Split(msg.Capabilities, ",")
 		for i := range caps {
@@ -186,8 +192,12 @@ func (k msgServer) Deregister(goCtx context.Context, msg *types.MsgDeregister) (
 func (k msgServer) SubmitAIChallengeResponse(goCtx context.Context, msg *types.MsgSubmitAIChallengeResponse) (*types.MsgSubmitAIChallengeResponseResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
-	if !k.IsAgent(ctx, msg.Sender) {
+	agent, found := k.GetAgent(ctx, msg.Sender)
+	if !found {
 		return nil, types.ErrAgentNotFound
+	}
+	if agent.Status == types.AgentStatus_AGENT_STATUS_SUSPENDED {
+		return nil, types.ErrAgentSuspended
 	}
 
 	challenge, found := k.GetChallenge(ctx, msg.Epoch)
@@ -258,7 +268,9 @@ func (k msgServer) RevealAIChallengeResponse(goCtx context.Context, msg *types.M
 		return nil, types.ErrAlreadyEvaluated
 	}
 
-	revealHash := sha256.Sum256([]byte(msg.RevealData))
+	// Commit format: SHA256(sender + ":" + revealData) — address acts as implicit salt
+	commitInput := msg.Sender + ":" + msg.RevealData
+	revealHash := sha256.Sum256([]byte(commitInput))
 	if hex.EncodeToString(revealHash[:]) != response.CommitHash {
 		return nil, types.ErrInvalidReveal
 	}

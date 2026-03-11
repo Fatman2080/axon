@@ -139,34 +139,50 @@ func TestContributionPerBlockConsistentWithinEra(t *testing.T) {
 	}
 }
 
-func TestContributionPerBlockHalvingRatio(t *testing.T) {
-	era0 := keeper.ExportCalculateContributionPerBlock(1)
-	era1 := keeper.ExportCalculateContributionPerBlock(halvingInterval)
+func TestContributionPerBlockPhaseRatios(t *testing.T) {
+	// Whitepaper §8.4 declining schedule: 35M → 25M → 15M → 5M per year
+	phase0 := keeper.ExportCalculateContributionPerBlock(1)                  // Year 1-4: 35M/yr
+	phase1 := keeper.ExportCalculateContributionPerBlock(blocksPerYear * 4)  // Year 5-8: 25M/yr
+	phase2 := keeper.ExportCalculateContributionPerBlock(blocksPerYear * 8)  // Year 9-12: 15M/yr
+	phase3 := keeper.ExportCalculateContributionPerBlock(blocksPerYear * 12) // Year 12+: 5M/yr
 
-	if era0.IsZero() || era1.IsZero() {
-		t.Fatal("contribution for era 0 and era 1 should be non-zero")
+	if phase0.IsZero() || phase1.IsZero() || phase2.IsZero() || phase3.IsZero() {
+		t.Fatal("all contribution phases should be non-zero")
 	}
 
-	expected := era0.QuoRaw(2)
-	if !era1.Equal(expected) {
-		t.Errorf("contribution era1 = %s, want %s (half of %s)", era1, expected, era0)
+	// Each phase should be less than the previous
+	if !phase1.LT(phase0) {
+		t.Errorf("phase1 (%s) should be less than phase0 (%s)", phase1, phase0)
+	}
+	if !phase2.LT(phase1) {
+		t.Errorf("phase2 (%s) should be less than phase1 (%s)", phase2, phase1)
+	}
+	if !phase3.LT(phase2) {
+		t.Errorf("phase3 (%s) should be less than phase2 (%s)", phase3, phase2)
 	}
 }
 
-func TestContributionPerBlockZeroAfterManyHalvings(t *testing.T) {
-	reward := keeper.ExportCalculateContributionPerBlock(halvingInterval * 64)
-	if !reward.IsZero() {
-		t.Errorf("contribution after 64 halvings should be zero, got %s", reward)
+func TestContributionPerBlockTailPhase(t *testing.T) {
+	// Year 12+ all have same rate (5M/yr tail)
+	r50 := keeper.ExportCalculateContributionPerBlock(blocksPerYear * 50)
+	r100 := keeper.ExportCalculateContributionPerBlock(blocksPerYear * 100)
+	if r50.IsZero() {
+		t.Error("contribution at year 50 should be non-zero (tail phase)")
+	}
+	if !r50.Equal(r100) {
+		t.Errorf("tail phase should be constant: year50=%s, year100=%s", r50, r100)
 	}
 }
 
 func TestContributionPerBlockDecreasing(t *testing.T) {
+	// Test that rewards decrease at each phase boundary
+	boundaries := []int64{0, 4, 8, 12}
 	prev := keeper.ExportCalculateContributionPerBlock(1)
-	for era := int64(1); era < 10; era++ {
-		cur := keeper.ExportCalculateContributionPerBlock(halvingInterval * era)
+	for i := 1; i < len(boundaries); i++ {
+		cur := keeper.ExportCalculateContributionPerBlock(blocksPerYear * boundaries[i])
 		if !cur.LT(prev) {
-			t.Errorf("era %d contribution (%s) should be less than era %d (%s)",
-				era, cur, era-1, prev)
+			t.Errorf("phase %d contribution (%s) should be less than phase %d (%s)",
+				i, cur, i-1, prev)
 		}
 		prev = cur
 	}

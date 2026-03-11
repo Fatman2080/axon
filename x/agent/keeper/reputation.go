@@ -33,11 +33,28 @@ func (k Keeper) GetAIBonus(ctx sdk.Context, address string) int64 {
 		return 0
 	}
 	raw := binary.BigEndian.Uint64(bz)
-	// Legacy data: values > 1000 are old two's-complement encoding
-	if raw > 1000 {
-		return int64(raw)
+	// New offset encoding: stored = bonus + 128, valid range [123, 158]
+	// Legacy raw int64-as-uint64: positive values 0-30, negative values >= 2^63
+	const maxNewEncoded = uint64(types.MaxAIBonus + 128) // 158
+	if raw <= maxNewEncoded {
+		result := int64(raw) - 128
+		if result < types.MinAIBonus {
+			return types.MinAIBonus
+		}
+		if result > types.MaxAIBonus {
+			return types.MaxAIBonus
+		}
+		return result
 	}
-	return int64(raw) + (-128)
+	// Legacy or corrupted data — clamp to valid range
+	legacy := int64(raw)
+	if legacy < types.MinAIBonus {
+		return types.MinAIBonus
+	}
+	if legacy > types.MaxAIBonus {
+		return types.MaxAIBonus
+	}
+	return legacy
 }
 
 // DeleteAIBonus removes the AIBonus entry for an address.
@@ -136,7 +153,12 @@ func (k Keeper) handleZeroReputation(ctx sdk.Context, agent types.Agent, params 
 		burnedAtRegister = sdk.NewCoin("aaxon", sdkmath.NewIntFromBigInt(burnInt))
 	}
 
-	remaining := agent.StakeAmount.Sub(burnedAtRegister)
+	var remaining sdk.Coin
+	if agent.StakeAmount.IsLT(burnedAtRegister) {
+		remaining = sdk.NewInt64Coin("aaxon", 0)
+	} else {
+		remaining = agent.StakeAmount.Sub(burnedAtRegister)
+	}
 
 	if remaining.IsPositive() {
 		if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, sdk.NewCoins(remaining)); err != nil {

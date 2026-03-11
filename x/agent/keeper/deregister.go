@@ -85,7 +85,12 @@ func (k Keeper) executeDeregister(ctx sdk.Context, address string, params types.
 		burnInt := sdkmath.NewIntFromBigInt(new(big.Int).Mul(big.NewInt(int64(params.RegisterBurnAmount)), oneAxon))
 		burnedAmount = sdk.NewCoin("aaxon", burnInt)
 	}
-	moduleHeld := agent.StakeAmount.Sub(burnedAmount)
+	var moduleHeld sdk.Coin
+	if agent.StakeAmount.IsLT(burnedAmount) {
+		moduleHeld = sdk.NewInt64Coin("aaxon", 0)
+	} else {
+		moduleHeld = agent.StakeAmount.Sub(burnedAmount)
+	}
 
 	if agent.Reputation == 0 && moduleHeld.IsPositive() {
 		if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, sdk.NewCoins(moduleHeld)); err != nil {
@@ -95,7 +100,6 @@ func (k Keeper) executeDeregister(ctx sdk.Context, address string, params types.
 		refundCoins := sdk.NewCoins(moduleHeld)
 		if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, recipientAddr, refundCoins); err != nil {
 			k.Logger(ctx).Error("failed to refund stake", "address", address, "error", err)
-			return
 		}
 	}
 

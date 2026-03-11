@@ -62,6 +62,10 @@ func (h DeployBurnHook) PostTxProcessing(
 			return err
 		}
 
+		// Record deployer mapping for contribution reward attribution
+		contractAddrStr := sdk.AccAddress(receipt.ContractAddress.Bytes()).String()
+		h.agentKeeper.SetContractDeployer(ctx, contractAddrStr, senderAccAddr.String())
+
 		if h.agentKeeper.IsAgent(ctx, senderAccAddr.String()) {
 			h.agentKeeper.IncrementDeployCount(ctx, senderAccAddr.String())
 		}
@@ -76,16 +80,14 @@ func (h DeployBurnHook) PostTxProcessing(
 		return nil
 	}
 
-	// Track contract calls for contribution rewards.
-	// Only count calls to actual contracts (not EOA transfers).
-	// Credit goes to the contract's address (as agent), not the caller.
-	if msg.To != nil {
-		toAccAddr := sdk.AccAddress(msg.To.Bytes())
-		if h.agentKeeper.IsAgent(ctx, toAccAddr.String()) {
-			// Check that logs exist (indicates contract execution, not plain transfer)
-			if len(receipt.Logs) > 0 {
-				h.agentKeeper.IncrementContractCalls(ctx, toAccAddr.String())
-			}
+	// Track contract calls for contribution rewards (whitepaper §8.4).
+	// Credit goes to the contract deployer (not the contract address or caller).
+	// Self-calls excluded: sender must differ from deployer.
+	if msg.To != nil && len(receipt.Logs) > 0 {
+		contractAddr := sdk.AccAddress(msg.To.Bytes()).String()
+		deployer := h.agentKeeper.GetContractDeployer(ctx, contractAddr)
+		if deployer != "" && deployer != senderAccAddr.String() && h.agentKeeper.IsAgent(ctx, deployer) {
+			h.agentKeeper.IncrementContractCalls(ctx, deployer)
 		}
 	}
 

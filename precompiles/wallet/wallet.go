@@ -507,6 +507,10 @@ func (p Precompile) doTransfer(evm *vm.EVM, from, to common.Address, value *big.
 		if overflow {
 			return fmt.Errorf("transfer value exceeds uint256 max")
 		}
+		balance := evm.StateDB.GetBalance(from)
+		if balance.Cmp(val) < 0 {
+			return fmt.Errorf("insufficient wallet balance: have %s, need %s", balance, val)
+		}
 		evm.Context.Transfer(evm.StateDB, from, to, val)
 	}
 	return nil
