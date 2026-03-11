@@ -94,8 +94,7 @@ if [ -n "$SEEDS" ]; then
     sed -i "s|seeds = \"\"|seeds = \"$SEEDS\"|" "$CONFIG"
 fi
 
-# CometBFT RPC listens on localhost only — reverse proxy for public access
-sed -i 's|laddr = "tcp://127.0.0.1:26657"|laddr = "tcp://127.0.0.1:26657"|' "$CONFIG"
+# CometBFT RPC listens on localhost only — use a reverse proxy for public access
 sed -i 's|laddr = "tcp://0.0.0.0:26657"|laddr = "tcp://127.0.0.1:26657"|' "$CONFIG"
 sed -i 's|addr_book_strict = true|addr_book_strict = false|' "$CONFIG"
 sed -i 's|prometheus = false|prometheus = true|' "$CONFIG"
@@ -180,7 +179,7 @@ echo "  Peer address: ${NODE_ID}@${IP}:26656"
 echo ""
 echo "  Endpoints:"
 echo "    P2P:        $IP:26656"
-echo "    CometBFT:   http://$IP:26657"
+echo "    CometBFT:   http://127.0.0.1:26657 (localhost only)"
 echo "    JSON-RPC:   http://$IP:8545"
 echo "    WebSocket:  ws://$IP:8546"
 echo "    REST API:   http://$IP:1317"

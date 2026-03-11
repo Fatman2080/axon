@@ -38,15 +38,16 @@ GENESIS="$HOME_DIR/config/genesis.json"
 # ── Patch genesis with production parameters ──
 
 # Use Python for JSON manipulation
-python3 - "$GENESIS" << 'PYTHON_SCRIPT'
+python3 - "$GENESIS" "$CHAIN_ID" << 'PYTHON_SCRIPT'
 import json, sys
 
 genesis_path = sys.argv[1]
+chain_id = sys.argv[2]
 with open(genesis_path) as f:
     genesis = json.load(f)
 
 # ── Chain parameters ──
-genesis["chain_id"] = "axon_9001-1"
+genesis["chain_id"] = chain_id
 
 # ── Consensus parameters ──
 genesis["consensus"]["params"]["block"]["max_gas"] = "40000000"
@@ -142,7 +143,7 @@ echo ""
 echo "=== Mainnet Genesis Configuration ==="
 echo ""
 echo "Key Parameters:"
-echo "  Chain ID:              axon_9001-1"
+echo "  Chain ID:              $CHAIN_ID"
 echo "  Block Gas Limit:       40,000,000"
 echo "  Block Time:            ~5 seconds"
 echo "  Validator Unbonding:   14 days"
@@ -161,9 +162,20 @@ echo "  Initial Supply:        0 (100% mined)"
 echo ""
 echo "Genesis file: $GENESIS"
 echo ""
+# ── Validate genesis ──
+echo "Validating genesis..."
+if $BINARY genesis validate-genesis --home "$HOME_DIR" 2>/dev/null || \
+   $BINARY validate-genesis "$GENESIS" 2>/dev/null; then
+    echo "Genesis validation passed."
+else
+    echo "WARNING: could not run genesis validation (command may differ by version)."
+    echo "Please run manually:  $BINARY genesis validate-genesis --home $HOME_DIR"
+fi
+
+echo ""
 echo "Next steps:"
 echo "  1. Add initial validators: $BINARY genesis add-genesis-account ..."
 echo "  2. Collect gentxs:         $BINARY genesis collect-gentxs --home $HOME_DIR"
-echo "  3. Validate genesis:       $BINARY genesis validate --home $HOME_DIR"
+echo "  3. Validate genesis:       $BINARY genesis validate-genesis --home $HOME_DIR"
 echo "  4. Share genesis.json with all validators"
 echo "  5. Start the network:      $BINARY start --home $HOME_DIR"
