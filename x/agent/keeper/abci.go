@@ -10,14 +10,20 @@ func (k Keeper) BeginBlocker(ctx sdk.Context) {
 	params := k.GetParams(ctx)
 	blockHeight := ctx.BlockHeight()
 
-	// Mint and distribute block rewards every block
 	k.DistributeBlockRewards(ctx)
-
-	// Mint contribution rewards every block (accumulates in pool)
 	k.MintContributionRewards(ctx)
 
-	if params.EpochLength > 0 && blockHeight > 0 && uint64(blockHeight)%params.EpochLength == 0 {
-		k.onEpochStart(ctx, params)
+	// Epoch transition based on tracked state (resilient to param changes mid-epoch)
+	if params.EpochLength > 0 && blockHeight > 0 {
+		currentEpoch := uint64(blockHeight) / params.EpochLength
+		lastProcessedEpoch := k.GetLastProcessedEpoch(ctx)
+
+		if currentEpoch > lastProcessedEpoch && lastProcessedEpoch > 0 {
+			k.onEpochStart(ctx, params, lastProcessedEpoch)
+		}
+		if currentEpoch > lastProcessedEpoch {
+			k.SetLastProcessedEpoch(ctx, currentEpoch)
+		}
 	}
 
 	k.checkHeartbeatTimeouts(ctx, params)
@@ -33,15 +39,15 @@ func (k Keeper) EndBlocker(ctx sdk.Context) {
 	}
 }
 
-func (k Keeper) onEpochStart(ctx sdk.Context, params types.Params) {
+func (k Keeper) onEpochStart(ctx sdk.Context, params types.Params, previousEpoch uint64) {
 	epoch := k.GetCurrentEpoch(ctx)
 	k.Logger(ctx).Info("new epoch started", "epoch", epoch)
 
 	k.GenerateChallenge(ctx, epoch)
 
-	if epoch > 0 {
-		k.DistributeEpochRewards(ctx, epoch-1)
-		k.DistributeContributionRewards(ctx, epoch-1)
+	if previousEpoch > 0 {
+		k.DistributeEpochRewards(ctx, previousEpoch)
+		k.DistributeContributionRewards(ctx, previousEpoch)
 	}
 }
 
@@ -53,22 +59,49 @@ func (k Keeper) onEpochEnd(ctx sdk.Context) {
 	k.ProcessEpochReputation(ctx, epoch)
 }
 
+// checkHeartbeatTimeouts collects offline agents first, then applies changes.
 func (k Keeper) checkHeartbeatTimeouts(ctx sdk.Context, params types.Params) {
 	blockHeight := ctx.BlockHeight()
+
+	type offlineAgent struct {
+		agent types.Agent
+	}
+
+	var toOffline []offlineAgent
 
 	k.IterateAgents(ctx, func(agent types.Agent) bool {
 		if agent.Status == types.AgentStatus_AGENT_STATUS_ONLINE &&
 			blockHeight-agent.LastHeartbeat > params.HeartbeatTimeout {
-			agent.Status = types.AgentStatus_AGENT_STATUS_OFFLINE
-			k.SetAgent(ctx, agent)
-			k.UpdateReputation(ctx, agent.Address, types.ReputationLossOffline)
-
-			k.Logger(ctx).Info("agent went offline",
-				"address", agent.Address,
-				"last_heartbeat", agent.LastHeartbeat,
-				"current_block", blockHeight,
-			)
+			toOffline = append(toOffline, offlineAgent{agent: agent})
 		}
 		return false
 	})
+
+	for _, o := range toOffline {
+		o.agent.Status = types.AgentStatus_AGENT_STATUS_OFFLINE
+		k.SetAgent(ctx, o.agent)
+		k.UpdateReputation(ctx, o.agent.Address, types.ReputationLossOffline)
+
+		k.Logger(ctx).Info("agent went offline",
+			"address", o.agent.Address,
+			"last_heartbeat", o.agent.LastHeartbeat,
+			"current_block", blockHeight,
+		)
+	}
+}
+
+// Epoch state tracking to survive param changes
+
+func (k Keeper) GetLastProcessedEpoch(ctx sdk.Context) uint64 {
+	store := ctx.KVStore(k.storeKey)
+	bz := store.Get([]byte("LastProcessedEpoch"))
+	if bz == nil || len(bz) < 8 {
+		return 0
+	}
+	return types.BytesToUint64(bz)
+}
+
+func (k Keeper) SetLastProcessedEpoch(ctx sdk.Context, epoch uint64) {
+	store := ctx.KVStore(k.storeKey)
+	store.Set([]byte("LastProcessedEpoch"), types.Uint64ToBytes(epoch))
 }

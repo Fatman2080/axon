@@ -2,17 +2,26 @@ package keeper
 
 import (
 	"encoding/binary"
+	"math/big"
 
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/axon-chain/axon/x/agent/types"
 )
 
-// SetAIBonus stores the AIBonus percentage for a validator.
+// SetAIBonus stores the AIBonus percentage for a validator using signed encoding.
 func (k Keeper) SetAIBonus(ctx sdk.Context, address string, bonus int64) {
+	if bonus < types.MinAIBonus {
+		bonus = types.MinAIBonus
+	}
+	if bonus > types.MaxAIBonus {
+		bonus = types.MaxAIBonus
+	}
 	store := ctx.KVStore(k.storeKey)
 	bz := make([]byte, 8)
-	binary.BigEndian.PutUint64(bz, uint64(bonus))
+	// Encode as offset from MinInt64 to avoid implicit two's complement issues
+	binary.BigEndian.PutUint64(bz, uint64(bonus-(-128))+0)
 	store.Set(types.KeyAIBonus(address), bz)
 }
 
@@ -20,10 +29,15 @@ func (k Keeper) SetAIBonus(ctx sdk.Context, address string, bonus int64) {
 func (k Keeper) GetAIBonus(ctx sdk.Context, address string) int64 {
 	store := ctx.KVStore(k.storeKey)
 	bz := store.Get(types.KeyAIBonus(address))
-	if bz == nil {
+	if bz == nil || len(bz) < 8 {
 		return 0
 	}
-	return int64(binary.BigEndian.Uint64(bz))
+	raw := binary.BigEndian.Uint64(bz)
+	// Legacy data: values > 1000 are old two's-complement encoding
+	if raw > 1000 {
+		return int64(raw)
+	}
+	return int64(raw) + (-128)
 }
 
 // DeleteAIBonus removes the AIBonus entry for an address.
@@ -40,7 +54,7 @@ func (k Keeper) IncrementEpochActivity(ctx sdk.Context, address string) {
 
 	count := uint64(0)
 	bz := store.Get(key)
-	if bz != nil {
+	if bz != nil && len(bz) >= 8 {
 		count = binary.BigEndian.Uint64(bz)
 	}
 	count++
@@ -54,15 +68,23 @@ func (k Keeper) IncrementEpochActivity(ctx sdk.Context, address string) {
 func (k Keeper) GetEpochActivity(ctx sdk.Context, epoch uint64, address string) uint64 {
 	store := ctx.KVStore(k.storeKey)
 	bz := store.Get(types.KeyEpochActivity(epoch, address))
-	if bz == nil {
+	if bz == nil || len(bz) < 8 {
 		return 0
 	}
 	return binary.BigEndian.Uint64(bz)
 }
 
 // ProcessEpochReputation updates reputation for all agents at epoch boundaries.
+// Collects updates first, then applies them to avoid mutating state during iteration.
 func (k Keeper) ProcessEpochReputation(ctx sdk.Context, epoch uint64) {
 	params := k.GetParams(ctx)
+
+	type reputationUpdate struct {
+		address string
+		delta   int64
+	}
+
+	var updates []reputationUpdate
 
 	k.IterateAgents(ctx, func(agent types.Agent) bool {
 		if agent.Status == types.AgentStatus_AGENT_STATUS_SUSPENDED {
@@ -71,39 +93,49 @@ func (k Keeper) ProcessEpochReputation(ctx sdk.Context, epoch uint64) {
 
 		delta := int64(0)
 
-		// Online for the full epoch → +1
 		if agent.Status == types.AgentStatus_AGENT_STATUS_ONLINE {
 			delta += types.ReputationGainEpochOnline
 		}
 
-		// Offline (missed heartbeats) → -1
 		if agent.Status == types.AgentStatus_AGENT_STATUS_OFFLINE {
 			delta += types.ReputationLossNoHeartbeatEpoch
 		}
 
-		// Active in the epoch (≥10 tx) → +1
 		activity := k.GetEpochActivity(ctx, epoch, agent.Address)
 		if activity >= 10 {
 			delta += types.ReputationGainActiveEpoch
 		}
 
 		if delta != 0 {
-			k.UpdateReputation(ctx, agent.Address, delta)
-		}
-
-		// If reputation hits 0, burn all remaining stake
-		updatedAgent, found := k.GetAgent(ctx, agent.Address)
-		if found && updatedAgent.Reputation == 0 {
-			k.handleZeroReputation(ctx, updatedAgent, params)
+			updates = append(updates, reputationUpdate{address: agent.Address, delta: delta})
 		}
 
 		return false
 	})
+
+	// Apply updates outside of iteration
+	for _, u := range updates {
+		k.UpdateReputation(ctx, u.address, u.delta)
+
+		updatedAgent, found := k.GetAgent(ctx, u.address)
+		if found && updatedAgent.Reputation == 0 {
+			k.handleZeroReputation(ctx, updatedAgent, params)
+		}
+	}
 }
 
 // handleZeroReputation burns remaining stake and suspends the agent.
+// Uses the snapshot BurnedAtRegister instead of current params to avoid parameter-change drift.
 func (k Keeper) handleZeroReputation(ctx sdk.Context, agent types.Agent, params types.Params) {
-	burnedAtRegister := sdk.NewInt64Coin("aaxon", int64(params.RegisterBurnAmount)*1e18)
+	var burnedAtRegister sdk.Coin
+	if agent.BurnedAtRegister.Denom != "" && agent.BurnedAtRegister.IsPositive() {
+		burnedAtRegister = agent.BurnedAtRegister
+	} else {
+		// Fallback for legacy agents without snapshot
+		burnInt := new(big.Int).Mul(big.NewInt(int64(params.RegisterBurnAmount)), oneAxon)
+		burnedAtRegister = sdk.NewCoin("aaxon", sdkmath.NewIntFromBigInt(burnInt))
+	}
+
 	remaining := agent.StakeAmount.Sub(burnedAtRegister)
 
 	if remaining.IsPositive() {
@@ -123,4 +155,40 @@ func (k Keeper) handleZeroReputation(ctx sdk.Context, agent types.Agent, params 
 		sdk.NewAttribute("burned", remaining.String()),
 		sdk.NewAttribute("reason", "reputation_zero"),
 	))
+}
+
+// oneAxon = 10^18
+var oneAxon = new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
+
+// Daily registration rate limiting
+
+const dailyBlockWindow int64 = 17280 // ~24h at 5s/block
+
+func dailyRegisterKey(address string, day int64) []byte {
+	return []byte("DailyReg/" + address + "/" + string(types.Uint64ToBytes(uint64(day))))
+}
+
+func (k Keeper) GetDailyRegisterCount(ctx sdk.Context, address string) uint64 {
+	day := ctx.BlockHeight() / dailyBlockWindow
+	store := ctx.KVStore(k.storeKey)
+	bz := store.Get(dailyRegisterKey(address, day))
+	if bz == nil || len(bz) < 8 {
+		return 0
+	}
+	return binary.BigEndian.Uint64(bz)
+}
+
+func (k Keeper) IncrementDailyRegisterCount(ctx sdk.Context, address string) {
+	day := ctx.BlockHeight() / dailyBlockWindow
+	store := ctx.KVStore(k.storeKey)
+	key := dailyRegisterKey(address, day)
+	count := uint64(0)
+	bz := store.Get(key)
+	if bz != nil && len(bz) >= 8 {
+		count = binary.BigEndian.Uint64(bz)
+	}
+	count++
+	bz = make([]byte, 8)
+	binary.BigEndian.PutUint64(bz, count)
+	store.Set(key, bz)
 }

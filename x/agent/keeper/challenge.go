@@ -11,6 +11,9 @@ import (
 	"github.com/axon-chain/axon/x/agent/types"
 )
 
+// challengePool stores questions with plaintext answers in source.
+// On-chain state only stores the question hash (not the question itself),
+// so the current epoch's challenge cannot be identified until after evaluation.
 var challengePool = []struct {
 	Question string
 	Answer   string
@@ -128,6 +131,18 @@ var challengePool = []struct {
 	{"What security principle states users should have only the minimum permissions required?", "least privilege", "security"},
 }
 
+// questionHashIndex is a lookup table from question hash → pool index,
+// built once at init to avoid repeated hashing during challenge evaluation.
+var questionHashIndex map[string]int
+
+func init() {
+	questionHashIndex = make(map[string]int, len(challengePool))
+	for i, c := range challengePool {
+		h := sha256.Sum256([]byte(c.Question))
+		questionHashIndex[hex.EncodeToString(h[:])] = i
+	}
+}
+
 func (k Keeper) GetChallenge(ctx sdk.Context, epoch uint64) (types.AIChallenge, bool) {
 	store := ctx.KVStore(k.storeKey)
 	bz := store.Get(types.KeyChallenge(epoch))
@@ -146,6 +161,8 @@ func (k Keeper) SetChallenge(ctx sdk.Context, challenge types.AIChallenge) {
 }
 
 // GenerateChallenge creates a deterministic challenge for the epoch.
+// ChallengeData stores only the question hash (not plaintext) so the on-chain
+// state does not reveal which question was selected until after evaluation.
 func (k Keeper) GenerateChallenge(ctx sdk.Context, epoch uint64) types.AIChallenge {
 	poolSize := uint64(len(challengePool))
 	if poolSize == 0 {
@@ -160,13 +177,14 @@ func (k Keeper) GenerateChallenge(ctx sdk.Context, epoch uint64) types.AIChallen
 	selected := challengePool[index]
 
 	questionHash := sha256.Sum256([]byte(selected.Question))
+	questionHashHex := hex.EncodeToString(questionHash[:])
 	params := k.GetParams(ctx)
 
 	challenge := types.AIChallenge{
 		Epoch:         epoch,
-		ChallengeHash: hex.EncodeToString(questionHash[:]),
+		ChallengeHash: questionHashHex,
 		ChallengeType: selected.Category,
-		ChallengeData: selected.Question,
+		ChallengeData: questionHashHex, // hash only — no plaintext question on-chain
 		DeadlineBlock: ctx.BlockHeight() + params.AiChallengeWindow,
 	}
 
@@ -176,20 +194,18 @@ func (k Keeper) GenerateChallenge(ctx sdk.Context, epoch uint64) types.AIChallen
 		"ai_challenge_generated",
 		sdk.NewAttribute("epoch", fmt.Sprintf("%d", epoch)),
 		sdk.NewAttribute("category", selected.Category),
-		sdk.NewAttribute("question_hash", challenge.ChallengeHash),
+		sdk.NewAttribute("question_hash", questionHashHex),
 		sdk.NewAttribute("deadline_block", fmt.Sprintf("%d", challenge.DeadlineBlock)),
 	))
 
 	return challenge
 }
 
-// getChallengeAnswer re-derives the answer for the given challenge by finding
-// the matching question in the pool.
+// getChallengeAnswer looks up the answer by matching ChallengeHash against
+// the precomputed question hash index (no plaintext question comparison).
 func getChallengeAnswer(challenge types.AIChallenge) string {
-	for _, c := range challengePool {
-		if c.Question == challenge.ChallengeData {
-			return c.Answer
-		}
+	if idx, ok := questionHashIndex[challenge.ChallengeHash]; ok {
+		return challengePool[idx].Answer
 	}
 	return ""
 }
@@ -216,7 +232,8 @@ const CheatPenaltyReputation = -20
 const CheatPenaltyStakePercent = 20
 
 // EvaluateEpochChallenges scores responses and detects cheating (whitepaper §8.6 path 5).
-// Cheating = multiple validators submit identical commit hashes (collusion/copying).
+// Cheating = multiple validators submit identical commit hashes OR identical
+// normalized reveal data (collusion/copying — audit H-2 fix).
 func (k Keeper) EvaluateEpochChallenges(ctx sdk.Context, epoch uint64) {
 	challenge, found := k.GetChallenge(ctx, epoch)
 	if !found {
@@ -268,19 +285,33 @@ func (k Keeper) EvaluateEpochChallenges(ctx sdk.Context, epoch uint64) {
 	))
 }
 
-// detectCheaters finds validators that submitted identical commit hashes (collusion).
-// If 2+ validators share the same commit hash they are all flagged.
+// detectCheaters finds validators that collude or copy (audit H-2 fix).
+// Flags any validator whose commit hash OR normalized reveal data matches
+// another validator's. Comparing normalized reveals prevents bypass via
+// salt/whitespace differences on identical answers.
 func (k Keeper) detectCheaters(responses []types.AIResponse) map[string]bool {
-	commitCounts := make(map[string][]string) // commitHash → list of addresses
+	commitCounts := make(map[string][]string)
+	revealCounts := make(map[string][]string)
+
 	for _, resp := range responses {
-		if resp.CommitHash == "" {
-			continue
+		if resp.CommitHash != "" {
+			commitCounts[resp.CommitHash] = append(commitCounts[resp.CommitHash], resp.ValidatorAddress)
 		}
-		commitCounts[resp.CommitHash] = append(commitCounts[resp.CommitHash], resp.ValidatorAddress)
+		if resp.RevealData != "" {
+			normalized := normalizeAnswer(resp.RevealData)
+			revealCounts[normalized] = append(revealCounts[normalized], resp.ValidatorAddress)
+		}
 	}
 
 	cheaters := make(map[string]bool)
 	for _, addrs := range commitCounts {
+		if len(addrs) > 1 {
+			for _, addr := range addrs {
+				cheaters[addr] = true
+			}
+		}
+	}
+	for _, addrs := range revealCounts {
 		if len(addrs) > 1 {
 			for _, addr := range addrs {
 				cheaters[addr] = true

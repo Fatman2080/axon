@@ -50,7 +50,7 @@ func main() {
 	)
 
 	flag.StringVar(&rpcURL, "rpc", "http://localhost:8545", "JSON-RPC endpoint")
-	flag.StringVar(&keyHex, "private-key", "", "hex-encoded private key")
+	flag.StringVar(&keyHex, "private-key", "", "(DEPRECATED: use --private-key-file instead) hex-encoded private key")
 	flag.StringVar(&keyFile, "private-key-file", "", "path to file containing hex private key")
 	flag.Uint64Var(&interval, "heartbeat-interval", 100, "send heartbeat every N blocks")
 	flag.StringVar(&logLevel, "log-level", "info", "log level: debug, info, warn, error")
@@ -152,6 +152,9 @@ func (d *Daemon) Run(ctx context.Context) error {
 
 func (d *Daemon) loop(ctx context.Context) error {
 	var lastHeartbeatBlock uint64
+	var rpcBackoff = pollInterval
+
+	const maxBackoff = 300 * time.Second
 
 	for {
 		select {
@@ -162,10 +165,15 @@ func (d *Daemon) loop(ctx context.Context) error {
 
 		blockNum, err := d.client.BlockNumber(ctx)
 		if err != nil {
-			d.logger.Error("failed to get block number", "error", err)
-			sleepCtx(ctx, pollInterval)
+			d.logger.Error("failed to get block number", "error", err, "retry_in", rpcBackoff)
+			sleepCtx(ctx, rpcBackoff)
+			rpcBackoff *= 2
+			if rpcBackoff > maxBackoff {
+				rpcBackoff = maxBackoff
+			}
 			continue
 		}
+		rpcBackoff = pollInterval
 
 		d.logger.Debug("polled block", "block", blockNum)
 
@@ -219,8 +227,7 @@ func (d *Daemon) sendHeartbeat(ctx context.Context) error {
 
 	receipt, err := d.waitReceipt(ctx, signedTx.Hash())
 	if err != nil {
-		d.logger.Warn("failed to get receipt", "tx", txHash, "error", err)
-		return nil
+		return fmt.Errorf("wait receipt for %s: %w", txHash, err)
 	}
 
 	if receipt.Status == types.ReceiptStatusSuccessful {

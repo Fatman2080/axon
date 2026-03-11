@@ -2,8 +2,10 @@ package keeper
 
 import (
 	"fmt"
+	"math/big"
 
 	storetypes "cosmossdk.io/store/types"
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/axon-chain/axon/x/agent/types"
@@ -22,7 +24,7 @@ func (k Keeper) HasDeregisterRequest(ctx sdk.Context, address string) bool {
 func (k Keeper) GetDeregisterRequest(ctx sdk.Context, address string) (int64, bool) {
 	store := ctx.KVStore(k.storeKey)
 	bz := store.Get(types.KeyDeregisterQueue(address))
-	if bz == nil {
+	if bz == nil || len(bz) < 8 {
 		return 0, false
 	}
 	return int64(types.BytesToUint64(bz)), true
@@ -45,7 +47,11 @@ func (k Keeper) ProcessDeregisterQueue(ctx sdk.Context) {
 	var toProcess []string
 
 	for ; iterator.Valid(); iterator.Next() {
-		requestBlock := int64(types.BytesToUint64(iterator.Value()))
+		bz := iterator.Value()
+		if len(bz) < 8 {
+			continue
+		}
+		requestBlock := int64(types.BytesToUint64(bz))
 		if currentBlock-requestBlock >= types.DeregisterCooldownBlocks {
 			address := string(iterator.Key()[len(types.DeregisterQueueKeyPrefix):])
 			toProcess = append(toProcess, address)
@@ -71,11 +77,17 @@ func (k Keeper) executeDeregister(ctx sdk.Context, address string, params types.
 		return
 	}
 
-	burnedAmount := sdk.NewInt64Coin("aaxon", int64(params.RegisterBurnAmount)*1e18)
+	// Use snapshot from registration instead of current params
+	var burnedAmount sdk.Coin
+	if agent.BurnedAtRegister.Denom != "" && agent.BurnedAtRegister.IsPositive() {
+		burnedAmount = agent.BurnedAtRegister
+	} else {
+		burnInt := sdkmath.NewIntFromBigInt(new(big.Int).Mul(big.NewInt(int64(params.RegisterBurnAmount)), oneAxon))
+		burnedAmount = sdk.NewCoin("aaxon", burnInt)
+	}
 	moduleHeld := agent.StakeAmount.Sub(burnedAmount)
 
 	if agent.Reputation == 0 && moduleHeld.IsPositive() {
-		// Reputation zero → burn all remaining stake, no refund
 		if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, sdk.NewCoins(moduleHeld)); err != nil {
 			k.Logger(ctx).Error("failed to burn remaining stake", "address", address, "error", err)
 		}
@@ -87,9 +99,11 @@ func (k Keeper) executeDeregister(ctx sdk.Context, address string, params types.
 		}
 	}
 
+	// Clean up all associated state
 	k.DeleteAgent(ctx, address)
 	k.DeleteDeregisterRequest(ctx, address)
 	k.DeleteAIBonus(ctx, address)
+	k.cleanupAgentEpochData(ctx, address)
 
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
 		"agent_deregistered",
@@ -98,4 +112,32 @@ func (k Keeper) executeDeregister(ctx sdk.Context, address string, params types.
 	))
 
 	k.Logger(ctx).Info("agent deregistered after cooldown", "address", address)
+}
+
+// cleanupAgentEpochData removes epoch-scoped data for a deregistered agent.
+func (k Keeper) cleanupAgentEpochData(ctx sdk.Context, address string) {
+	store := ctx.KVStore(k.storeKey)
+
+	prefixes := []string{
+		types.EpochActivityKeyPrefix,
+		types.DeployCountKeyPrefix,
+		types.ContractCallKeyPrefix,
+		types.AIResponseKeyPrefix,
+	}
+
+	for _, prefix := range prefixes {
+		iterator := storetypes.KVStorePrefixIterator(store, []byte(prefix))
+		var toDelete [][]byte
+		for ; iterator.Valid(); iterator.Next() {
+			key := iterator.Key()
+			keyStr := string(key)
+			if len(keyStr) > len(address) && keyStr[len(keyStr)-len(address):] == address {
+				toDelete = append(toDelete, key)
+			}
+		}
+		iterator.Close()
+		for _, key := range toDelete {
+			store.Delete(key)
+		}
+	}
 }

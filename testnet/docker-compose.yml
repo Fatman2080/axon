@@ -53,17 +53,17 @@ services:
       - --json-rpc.enable
       - --json-rpc.address=0.0.0.0:8545
       - --json-rpc.ws-address=0.0.0.0:8546
-      - --json-rpc.api=eth,txpool,personal,net,debug,web3
+      - --json-rpc.api=eth,txpool,net,web3
       - --api.enable
       - --api.address=tcp://0.0.0.0:1317
       - --grpc.address=0.0.0.0:9090
     ports:
       - "26656:26656"    # P2P
-      - "26657:26657"    # CometBFT RPC
+      - "127.0.0.1:26657:26657"    # CometBFT RPC
       - "8545:8545"      # JSON-RPC
       - "8546:8546"      # WebSocket
-      - "1317:1317"      # REST API
-      - "9090:9090"      # gRPC
+      - "127.0.0.1:1317:1317"      # REST API
+      - "127.0.0.1:9090:9090"      # gRPC
     volumes:
       - testnet-data:/data
     depends_on:
@@ -203,7 +203,7 @@ services:
       - axon-testnet
 
   explorer:
-    image: blockscout/blockscout:latest
+    image: blockscout/blockscout:6.10.1
     container_name: axon-explorer
     restart: always
     depends_on:
@@ -232,7 +232,7 @@ services:
       POOL_SIZE_API: "10"
       ECTO_USE_SSL: "false"
       ACCOUNT_REDIS_URL: redis://explorer-redis:6379
-      SECRET_KEY_BASE: "change_me_in_production_axon_testnet_secret_key_base_at_least_64_chars_long_1234567890"
+      SECRET_KEY_BASE: "${BLOCKSCOUT_SECRET_KEY_BASE:?Set BLOCKSCOUT_SECRET_KEY_BASE in .env}"
     ports:
       - "4000:4000"
     networks:

@@ -278,8 +278,35 @@ func TestParamsZeroStakeInvalid(t *testing.T) {
 func TestParamsMinStakeOne(t *testing.T) {
 	p := types.DefaultParams()
 	p.MinRegisterStake = 1
+	p.RegisterBurnAmount = 0
 	if err := p.Validate(); err != nil {
-		t.Errorf("params with MinRegisterStake=1 should be valid: %v", err)
+		t.Errorf("params with MinRegisterStake=1, RegisterBurnAmount=0 should be valid: %v", err)
+	}
+}
+
+func TestParamsBurnExceedsStake(t *testing.T) {
+	p := types.DefaultParams()
+	p.MinRegisterStake = 10
+	p.RegisterBurnAmount = 20
+	if err := p.Validate(); err == nil {
+		t.Error("params with RegisterBurnAmount > MinRegisterStake should be invalid")
+	}
+}
+
+func TestParamsZeroEpochLength(t *testing.T) {
+	p := types.DefaultParams()
+	p.EpochLength = 0
+	if err := p.Validate(); err == nil {
+		t.Error("params with EpochLength=0 should be invalid")
+	}
+}
+
+func TestParamsHeartbeatTimeoutLessThanInterval(t *testing.T) {
+	p := types.DefaultParams()
+	p.HeartbeatTimeout = 50
+	p.HeartbeatInterval = 100
+	if err := p.Validate(); err == nil {
+		t.Error("params with HeartbeatTimeout <= HeartbeatInterval should be invalid")
 	}
 }
 

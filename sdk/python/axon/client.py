@@ -103,11 +103,11 @@ class AgentClient:
         }
 
     def register_agent(
-        self, capabilities: str, model: str, stake_axon: float = 100
+        self, capabilities: str, model: str, stake_axon: int = 100
     ) -> str:
         """Register as an AI Agent. Requires >= 100 AXON stake (20 burned)."""
         self._require_account()
-        stake_wei = int(stake_axon * ONE_AXON)
+        stake_wei = int(stake_axon) * ONE_AXON
         tx = self._registry.functions.register(capabilities, model).build_transaction(
             self._tx_params(value=stake_wei)
         )

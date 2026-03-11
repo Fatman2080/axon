@@ -63,6 +63,7 @@ type Agent struct {
 	StakeAmount          types.Coin  `protobuf:"bytes,7,opt,name=stake_amount,json=stakeAmount,proto3" json:"stake_amount"`
 	RegisteredAt         int64       `protobuf:"varint,8,opt,name=registered_at,json=registeredAt,proto3" json:"registered_at,omitempty"`
 	LastHeartbeat        int64       `protobuf:"varint,9,opt,name=last_heartbeat,json=lastHeartbeat,proto3" json:"last_heartbeat,omitempty"`
+	BurnedAtRegister     types.Coin  `protobuf:"bytes,10,opt,name=burned_at_register,json=burnedAtRegister,proto3" json:"burned_at_register"`
 	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
 	XXX_unrecognized     []byte      `json:"-"`
 	XXX_sizecache        int32       `json:"-"`
@@ -153,6 +154,13 @@ func (m *Agent) GetLastHeartbeat() int64 {
 		return m.LastHeartbeat
 	}
 	return 0
+}
+
+func (m *Agent) GetBurnedAtRegister() types.Coin {
+	if m != nil {
+		return m.BurnedAtRegister
+	}
+	return types.Coin{}
 }
 
 type AIChallenge struct {

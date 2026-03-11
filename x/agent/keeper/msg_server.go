@@ -5,8 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strings"
 
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/axon-chain/axon/x/agent/types"
@@ -31,9 +33,15 @@ func (k msgServer) Register(goCtx context.Context, msg *types.MsgRegister) (*typ
 		return nil, types.ErrAgentAlreadyRegistered
 	}
 
-	minStake := sdk.NewInt64Coin("aaxon", int64(params.MinRegisterStake)*1e18)
+	minStakeInt := sdkmath.NewIntFromBigInt(new(big.Int).Mul(big.NewInt(int64(params.MinRegisterStake)), oneAxon))
+	minStake := sdk.NewCoin("aaxon", minStakeInt)
 	if msg.Stake.IsLT(minStake) {
 		return nil, types.ErrInsufficientStake
+	}
+
+	// Per-address daily registration limit (whitepaper §10.5)
+	if k.GetDailyRegisterCount(ctx, msg.Sender) >= types.MaxDailyRegistrations {
+		return nil, types.ErrDailyRegisterLimitExceeded
 	}
 
 	senderAddr, err := sdk.AccAddressFromBech32(msg.Sender)
@@ -46,7 +54,8 @@ func (k msgServer) Register(goCtx context.Context, msg *types.MsgRegister) (*typ
 		return nil, err
 	}
 
-	burnAmount := sdk.NewInt64Coin("aaxon", int64(params.RegisterBurnAmount)*1e18)
+	burnInt := sdkmath.NewIntFromBigInt(new(big.Int).Mul(big.NewInt(int64(params.RegisterBurnAmount)), oneAxon))
+	burnAmount := sdk.NewCoin("aaxon", burnInt)
 	burnCoins := sdk.NewCoins(burnAmount)
 	if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, burnCoins); err != nil {
 		return nil, err
@@ -58,18 +67,20 @@ func (k msgServer) Register(goCtx context.Context, msg *types.MsgRegister) (*typ
 	}
 
 	agent := types.Agent{
-		Address:       msg.Sender,
-		AgentId:       generateAgentID(msg.Sender, ctx.BlockHeight()),
-		Capabilities:  capabilities,
-		Model:         msg.Model,
-		Reputation:    params.InitialReputation,
-		Status:        types.AgentStatus_AGENT_STATUS_ONLINE,
-		StakeAmount:   msg.Stake,
-		RegisteredAt:  ctx.BlockHeight(),
-		LastHeartbeat: ctx.BlockHeight(),
+		Address:          msg.Sender,
+		AgentId:          generateAgentID(msg.Sender, ctx.BlockHeight()),
+		Capabilities:     capabilities,
+		Model:            msg.Model,
+		Reputation:       params.InitialReputation,
+		Status:           types.AgentStatus_AGENT_STATUS_ONLINE,
+		StakeAmount:      msg.Stake,
+		BurnedAtRegister: burnAmount,
+		RegisteredAt:     ctx.BlockHeight(),
+		LastHeartbeat:    ctx.BlockHeight(),
 	}
 
 	k.SetAgent(ctx, agent)
+	k.IncrementDailyRegisterCount(ctx, msg.Sender)
 
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
 		"agent_registered",
@@ -89,6 +100,10 @@ func (k msgServer) UpdateAgent(goCtx context.Context, msg *types.MsgUpdateAgent)
 	agent, found := k.GetAgent(ctx, msg.Sender)
 	if !found {
 		return nil, types.ErrAgentNotFound
+	}
+
+	if agent.Status == types.AgentStatus_AGENT_STATUS_SUSPENDED {
+		return nil, types.ErrAgentSuspended
 	}
 
 	if msg.Capabilities != "" {
@@ -198,6 +213,23 @@ func (k msgServer) SubmitAIChallengeResponse(goCtx context.Context, msg *types.M
 
 func (k msgServer) RevealAIChallengeResponse(goCtx context.Context, msg *types.MsgRevealAIChallengeResponse) (*types.MsgRevealAIChallengeResponseResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
+	params := k.GetParams(ctx)
+
+	challenge, found := k.GetChallenge(ctx, msg.Epoch)
+	if !found {
+		return nil, types.ErrChallengeNotActive
+	}
+
+	// Reveal must happen after commit deadline
+	if ctx.BlockHeight() <= challenge.DeadlineBlock {
+		return nil, types.ErrRevealTooEarly
+	}
+
+	// Reveal must happen within the reveal window
+	revealDeadline := challenge.DeadlineBlock + params.AiChallengeWindow
+	if ctx.BlockHeight() > revealDeadline {
+		return nil, types.ErrRevealWindowClosed
+	}
 
 	store := ctx.KVStore(k.storeKey)
 	key := types.KeyAIResponse(msg.Epoch, msg.Sender)
@@ -208,6 +240,10 @@ func (k msgServer) RevealAIChallengeResponse(goCtx context.Context, msg *types.M
 
 	var response types.AIResponse
 	k.cdc.MustUnmarshal(bz, &response)
+
+	if response.Evaluated {
+		return nil, types.ErrAlreadyEvaluated
+	}
 
 	revealHash := sha256.Sum256([]byte(msg.RevealData))
 	if hex.EncodeToString(revealHash[:]) != response.CommitHash {

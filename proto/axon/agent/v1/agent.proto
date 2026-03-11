@@ -23,6 +23,7 @@ message Agent {
   cosmos.base.v1beta1.Coin stake_amount = 7 [(gogoproto.nullable) = false];
   int64 registered_at = 8;
   int64 last_heartbeat = 9;
+  cosmos.base.v1beta1.Coin burned_at_register = 10 [(gogoproto.nullable) = false];
 }
 
 message AIChallenge {

@@ -89,5 +89,8 @@ func Uint64ToBytes(v uint64) []byte {
 }
 
 func BytesToUint64(b []byte) uint64 {
+	if len(b) < 8 {
+		return 0
+	}
 	return binary.BigEndian.Uint64(b)
 }

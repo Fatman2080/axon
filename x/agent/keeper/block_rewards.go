@@ -269,7 +269,7 @@ func (k Keeper) distributeValidatorRewards(ctx sdk.Context, totalAmount sdkmath.
 }
 
 // distributeAIPerformanceRewards distributes 25% by AI challenge scores.
-// If no agents have AI scores, the reward goes to the block proposer as a bonus.
+// If no agents have AI scores, the reward goes to the reward pool for later epoch distribution.
 func (k Keeper) distributeAIPerformanceRewards(ctx sdk.Context, totalAmount sdkmath.Int) {
 	if totalAmount.IsZero() {
 		return
@@ -296,20 +296,7 @@ func (k Keeper) distributeAIPerformanceRewards(ctx sdk.Context, totalAmount sdkm
 		return false
 	})
 
-	// No agents with AI scores → send to proposer as bonus, else to reward pool
 	if totalBonus <= 0 || len(agents) == 0 {
-		proposerConsAddr := ctx.BlockHeader().ProposerAddress
-		if len(proposerConsAddr) > 0 {
-			if validator, err := k.stakingKeeper.GetValidatorByConsAddr(ctx, sdk.ConsAddress(proposerConsAddr)); err == nil {
-				if valAddr, err := sdk.ValAddressFromBech32(validator.OperatorAddress); err == nil {
-					accAddr := sdk.AccAddress(valAddr)
-					coins := sdk.NewCoins(sdk.NewCoin("aaxon", totalAmount))
-					if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, accAddr, coins); err == nil {
-						return
-					}
-				}
-			}
-		}
 		k.AddToRewardPool(ctx, sdk.NewCoin("aaxon", totalAmount))
 		return
 	}

@@ -1,22 +1,24 @@
 package types
 
+import "fmt"
+
 const (
 	// DeregisterCooldownBlocks is 7 days at 5s/block = 120960 blocks.
-	// For local testing, use a smaller value via genesis override.
 	DeregisterCooldownBlocks int64 = 120960
 
-	// ReputationGainEpochOnline is the reputation gained per epoch of continuous online status.
-	ReputationGainEpochOnline int64 = 1
-	// ReputationGainHeartbeatStreak is gained every 1000 blocks of continuous heartbeats.
-	ReputationGainHeartbeatStreak int64 = 1
-	// ReputationGainActiveEpoch is gained for >=10 tx in an epoch (stored as x10 internally).
-	ReputationGainActiveEpoch int64 = 1
-	// ReputationLossOffline is lost when going offline.
-	ReputationLossOffline int64 = -5
-	// ReputationLossSlashing is lost on double-sign.
-	ReputationLossSlashing int64 = -50
-	// ReputationLossNoHeartbeatEpoch is lost per epoch without heartbeat.
+	ReputationGainEpochOnline      int64 = 1
+	ReputationGainHeartbeatStreak  int64 = 1
+	ReputationGainActiveEpoch      int64 = 1
+	ReputationLossOffline          int64 = -5
+	ReputationLossSlashing         int64 = -50
 	ReputationLossNoHeartbeatEpoch int64 = -1
+
+	// MaxDailyRegistrations per address per ~24h window (whitepaper §10.5)
+	MaxDailyRegistrations uint64 = 3
+
+	// AIBonus bounds (whitepaper §7.3): -5% ~ +30%
+	MinAIBonus int64 = -5
+	MaxAIBonus int64 = 30
 )
 
 func DefaultParams() Params {
@@ -36,6 +38,24 @@ func DefaultParams() Params {
 func (p Params) Validate() error {
 	if p.MinRegisterStake == 0 {
 		return ErrInsufficientStake
+	}
+	if p.RegisterBurnAmount > p.MinRegisterStake {
+		return fmt.Errorf("RegisterBurnAmount (%d) must not exceed MinRegisterStake (%d)", p.RegisterBurnAmount, p.MinRegisterStake)
+	}
+	if p.MaxReputation == 0 {
+		return fmt.Errorf("MaxReputation must be > 0")
+	}
+	if p.EpochLength == 0 {
+		return fmt.Errorf("EpochLength must be > 0")
+	}
+	if p.HeartbeatInterval == 0 {
+		return fmt.Errorf("HeartbeatInterval must be > 0")
+	}
+	if p.HeartbeatTimeout <= p.HeartbeatInterval {
+		return fmt.Errorf("HeartbeatTimeout (%d) must be > HeartbeatInterval (%d)", p.HeartbeatTimeout, p.HeartbeatInterval)
+	}
+	if p.AiChallengeWindow == 0 {
+		return fmt.Errorf("AiChallengeWindow must be > 0")
 	}
 	return nil
 }
