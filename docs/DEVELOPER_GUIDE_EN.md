@@ -41,14 +41,14 @@ git clone https://github.com/Fatman2080/axon.git
 cd axon && go build -o axond ./cmd/axond
 
 # 3. Initialize a local node
-./axond init mynode --chain-id axon_9001-1
+./axond init mynode --chain-id axon_8210-1
 
 # 4. Create a validator account and add genesis balance
 ./axond keys add mykey
 ./axond genesis add-genesis-account mykey 1000000000000000000000aaxon
 
 # 5. Generate the genesis transaction
-./axond genesis gentx mykey 10000000000000000000000aaxon --chain-id axon_9001-1
+./axond genesis gentx mykey 10000000000000000000000aaxon --chain-id axon_8210-1
 
 # 6. Collect genesis transactions
 ./axond genesis collect-gentxs
@@ -79,7 +79,7 @@ Available services after launch:
 ```bash
 make build
 bash scripts/local_node.sh
-./build/axond start --home ~/.axond --chain-id axon_9001-1 --json-rpc.enable
+./build/axond start --home ~/.axond --chain-id axon_8210-1 --json-rpc.enable
 ```
 
 ### 1.5 Verify the Node Is Running
@@ -92,7 +92,7 @@ curl http://localhost:26657/status
 curl -X POST http://localhost:8545 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
-# Returns: "0x2329" (9001)
+# Returns: "0x201a" (8210)
 
 # Check latest block height
 curl -X POST http://localhost:8545 \
@@ -108,8 +108,8 @@ curl -X POST http://localhost:8545 \
 
 | Parameter | Value |
 |-----------|-------|
-| Chain ID (EVM) | `9001` |
-| Chain ID (Cosmos) | `axon_9001-1` |
+| Chain ID (EVM) | `8210` |
+| Chain ID (Cosmos) | `axon_8210-1` |
 | Block Time | ~5 seconds |
 | Finality | Instant (single-block confirmation, no forks) |
 | Native Token | AXON |
@@ -309,7 +309,7 @@ module.exports = {
   networks: {
     axon_local: {
       url: "http://localhost:8545",
-      chainId: 9001,
+      chainId: 8210,
       accounts: ["0xYOUR_PRIVATE_KEY"],
     },
     axon_testnet: {
@@ -389,7 +389,7 @@ forge build
 # Deploy
 forge create src/HelloAxon.sol:HelloAxon \
   --rpc-url http://localhost:8545 \
-  --chain-id 9001 \
+  --chain-id 8210 \
   --private-key 0xYOUR_PRIVATE_KEY
 
 # Run tests

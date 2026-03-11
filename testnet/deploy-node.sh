@@ -14,7 +14,7 @@ set -e
 # ============================================================
 
 AXON_HOME="${AXON_HOME:-/opt/axon}"
-CHAIN_ID="${CHAIN_ID:-axon_9001-1}"
+CHAIN_ID="${CHAIN_ID:-axon_8210-1}"
 MONIKER="${MONIKER:-axon-validator-$(hostname -s)}"
 SEEDS="${SEEDS:-}"
 GENESIS_URL="${GENESIS_URL:-}"

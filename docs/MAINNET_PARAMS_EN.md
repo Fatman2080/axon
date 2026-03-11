@@ -2,7 +2,7 @@
 
 # Axon Mainnet Parameter Configuration
 
-This document lists all genesis parameters for the Axon mainnet (`axon_9001-1`).
+This document lists core parameters and genesis configuration for the Axon mainnet (`axon_8210-1`).
 
 ---
 
@@ -10,7 +10,7 @@ This document lists all genesis parameters for the Axon mainnet (`axon_9001-1`).
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| Chain ID | `axon_9001-1` | Mainnet chain identifier |
+| Chain ID | `axon_8210-1` | Mainnet chain identifier |
 | Native Token | `aaxon` | Smallest unit (1 AXON = 10¹⁸ aaxon) |
 | Initial Supply | 0 | All tokens are produced through mining |
 
@@ -81,7 +81,7 @@ This document lists all genesis parameters for the Axon mainnet (`axon_9001-1`).
 | Epoch Length | 720 blocks (~1 hour) | Reward cycle |
 | Heartbeat Timeout | 720 blocks (~1 hour) | Heartbeat detection timeout threshold |
 | AI Challenge Window | 50 blocks | AI verification challenge response time |
-| Deregistration Cooldown | 120,960 blocks (~7 days) | Cooldown period after deregistration |
+| Deregistration Cooldown | 120,960 blocks (~7 days) | Protocol constant (not a genesis-configurable parameter) |
 
 ## Fee Market (EIP-1559)
 

@@ -10,7 +10,7 @@ set -euo pipefail
 
 BINARY="${BINARY:-axond}"
 HOME_DIR="${HOME_DIR:-$HOME/.axon-mainnet}"
-CHAIN_ID="${CHAIN_ID:-axon_9001-1}"
+CHAIN_ID="${CHAIN_ID:-axon_8210-1}"
 DENOM="aaxon"
 MIN_VALIDATOR_STAKE="10000000000000000000000"  # 10,000 AXON
 MIN_AGENT_STAKE="100"
@@ -108,7 +108,6 @@ if "agent" in genesis["app_state"]:
         params["epoch_length"] = 720
         params["heartbeat_timeout"] = 720
         params["ai_challenge_window"] = 50
-        params["deregister_cooldown"] = 120960  # ~7 days
 
 # ── Fee Market (EIP-1559) ──
 if "feemarket" in genesis["app_state"]:
@@ -135,7 +134,13 @@ PYTHON_SCRIPT
 # ── Patch app.toml for mainnet ──
 APP_TOML="$HOME_DIR/config/app.toml"
 if [ -f "$APP_TOML" ]; then
-    sed -i "s|minimum-gas-prices = \"\"|minimum-gas-prices = \"10000000000${DENOM}\"|" "$APP_TOML"
+    SED_EXPR="s|^[[:space:]]*minimum-gas-prices[[:space:]]*=.*$|minimum-gas-prices = \"10000000000${DENOM}\"|"
+    if sed --version >/dev/null 2>&1; then
+        sed -E -i "$SED_EXPR" "$APP_TOML"
+    else
+        # BSD sed (macOS) requires an explicit backup suffix for -i.
+        sed -E -i '' "$SED_EXPR" "$APP_TOML"
+    fi
     echo "app.toml patched: minimum-gas-prices = 10000000000${DENOM} (10 gwei)"
 fi
 
@@ -164,10 +169,8 @@ echo "Genesis file: $GENESIS"
 echo ""
 # ── Validate genesis (MUST pass before mainnet launch) ──
 echo "Validating genesis..."
-if $BINARY genesis validate-genesis --home "$HOME_DIR" 2>&1; then
+if $BINARY genesis validate "$GENESIS" 2>&1; then
     echo "Genesis validation passed."
-elif $BINARY validate-genesis "$GENESIS" 2>&1; then
-    echo "Genesis validation passed (legacy command)."
 else
     echo "FATAL: Genesis validation FAILED. Fix errors above before proceeding."
     exit 1
@@ -177,6 +180,6 @@ echo ""
 echo "Next steps:"
 echo "  1. Add initial validators: $BINARY genesis add-genesis-account ..."
 echo "  2. Collect gentxs:         $BINARY genesis collect-gentxs --home $HOME_DIR"
-echo "  3. Validate genesis:       $BINARY genesis validate-genesis --home $HOME_DIR"
+echo "  3. Validate genesis:       $BINARY genesis validate $GENESIS"
 echo "  4. Share genesis.json with all validators"
 echo "  5. Start the network:      $BINARY start --home $HOME_DIR"

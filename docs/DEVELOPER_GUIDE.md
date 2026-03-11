@@ -41,14 +41,14 @@ git clone https://github.com/Fatman2080/axon.git
 cd axon && go build -o axond ./cmd/axond
 
 # 3. 初始化本地节点
-./axond init mynode --chain-id axon_9001-1
+./axond init mynode --chain-id axon_8210-1
 
 # 4. 创建验证者账户并添加创世余额
 ./axond keys add mykey
 ./axond genesis add-genesis-account mykey 1000000000000000000000aaxon
 
 # 5. 生成创世交易
-./axond genesis gentx mykey 10000000000000000000000aaxon --chain-id axon_9001-1
+./axond genesis gentx mykey 10000000000000000000000aaxon --chain-id axon_8210-1
 
 # 6. 收集创世交易
 ./axond genesis collect-gentxs
@@ -79,7 +79,7 @@ docker compose -f testnet/docker-compose.yml up -d
 ```bash
 make build
 bash scripts/local_node.sh
-./build/axond start --home ~/.axond --chain-id axon_9001-1 --json-rpc.enable
+./build/axond start --home ~/.axond --chain-id axon_8210-1 --json-rpc.enable
 ```
 
 ### 1.5 验证节点运行
@@ -92,7 +92,7 @@ curl http://localhost:26657/status
 curl -X POST http://localhost:8545 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
-# 返回: "0x2329" (9001)
+# 返回: "0x201a" (8210)
 
 # 检查最新区块高度
 curl -X POST http://localhost:8545 \
@@ -108,8 +108,8 @@ curl -X POST http://localhost:8545 \
 
 | 参数 | 值 |
 |------|------|
-| Chain ID (EVM) | `9001` |
-| Chain ID (Cosmos) | `axon_9001-1` |
+| Chain ID (EVM) | `8210` |
+| Chain ID (Cosmos) | `axon_8210-1` |
 | 区块时间 | ~5 秒 |
 | 终局性 | 即时（单区块确认，无分叉） |
 | 原生代币 | AXON |
@@ -309,7 +309,7 @@ module.exports = {
   networks: {
     axon_local: {
       url: "http://localhost:8545",
-      chainId: 9001,
+      chainId: 8210,
       accounts: ["0xYOUR_PRIVATE_KEY"],
     },
     axon_testnet: {
@@ -389,7 +389,7 @@ forge build
 # 部署
 forge create src/HelloAxon.sol:HelloAxon \
   --rpc-url http://localhost:8545 \
-  --chain-id 9001 \
+  --chain-id 8210 \
   --private-key 0xYOUR_PRIVATE_KEY
 
 # 运行测试

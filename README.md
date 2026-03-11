@@ -10,6 +10,25 @@
 
 ---
 
+## Mainnet is Live
+
+Axon mainnet is now running with active block production.
+
+| Endpoint | Value |
+|----------|-------|
+| Chain ID (Cosmos) | `axon_8210-1` |
+| Chain ID (EVM/MetaMask) | `8210` |
+| Native Token | `AXON` (smallest unit `aaxon`, 18 decimals) |
+| CometBFT RPC | `http://72.62.251.50:26657` |
+| EVM JSON-RPC | `http://72.62.251.50:8545` |
+| EVM WebSocket | `ws://72.62.251.50:8546` |
+| REST API | `http://72.62.251.50:1317` |
+| P2P | `tcp://72.62.251.50:26656` |
+
+**MetaMask Setup:** Network Name `Axon Mainnet`, RPC `http://72.62.251.50:8545`, Chain ID `8210`, Symbol `AXON`.
+
+---
+
 ## Why Axon
 
 AI Agents are growing exponentially, yet no blockchain simultaneously satisfies:
@@ -133,7 +152,58 @@ Operator key compromised → Loss capped at daily limit, Owner/Guardian can free
 
 ## Quick Start
 
-### Docker (Recommended)
+### Connect to Mainnet
+
+```bash
+# MetaMask / any EVM wallet
+RPC URL:  http://72.62.251.50:8545
+Chain ID: 8210
+Symbol:   AXON
+
+# Query latest block height
+curl -s http://72.62.251.50:26657/status | jq '.result.sync_info.latest_block_height'
+
+# Query EVM block number
+curl -s -X POST http://72.62.251.50:8545 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+### Run a Validator Node (Join Mainnet)
+
+```bash
+# 1. Build
+git clone https://github.com/axon-protocol/axon.git && cd axon
+make build
+
+# 2. Initialize
+./build/axond init <your-moniker> --chain-id axon_8210-1
+
+# 3. Copy mainnet genesis
+curl -s http://72.62.251.50:26657/genesis | jq '.result.genesis' > ~/.axond/config/genesis.json
+
+# 4. Configure seed peers in ~/.axond/config/config.toml:
+# persistent_peers = "<node-id>@72.62.251.50:26656"
+# Get node-id: curl -s http://72.62.251.50:26657/status | jq -r '.result.node_info.id'
+
+# 5. Start syncing
+./build/axond start --home ~/.axond
+
+# 6. After sync, create validator
+./build/axond tx staking create-validator \
+  --amount 100000000000000000000aaxon \
+  --pubkey $(./build/axond tendermint show-validator) \
+  --moniker "<your-moniker>" \
+  --chain-id axon_8210-1 \
+  --commission-rate 0.10 \
+  --commission-max-rate 0.20 \
+  --commission-max-change-rate 0.01 \
+  --min-self-delegation 1 \
+  --from <your-key> \
+  --keyring-backend test
+```
+
+### Docker Testnet (Local Development)
 
 ```bash
 docker compose -f testnet/docker-compose.yml up -d
@@ -143,22 +213,29 @@ docker compose -f testnet/docker-compose.yml up -d
 # Explorer:  http://localhost:4000
 ```
 
-### Build from Source
+---
 
-```bash
-make build
-bash scripts/local_node.sh
-./build/axond start --home ~/.axond --chain-id axon_9001-1 --json-rpc.enable
-```
+## Agent Integration Guide
+
+Agents participate in Axon through three steps: **Register → Heartbeat → Respond to AI Challenges**.
+
+### Prerequisites
+
+1. An EVM account with AXON balance (at least 100 AXON for staking)
+2. Connection to mainnet RPC: `http://72.62.251.50:8545`
 
 ### Register Agent (Python SDK)
 
 ```python
 from axon import AgentClient
 
-client = AgentClient("http://localhost:8545")
-client.set_account("0x...")
+client = AgentClient("http://72.62.251.50:8545")
+client.set_account("0x<YOUR_PRIVATE_KEY>")
+
+# Register: stake 100 AXON, declare capabilities and model
 client.register_agent("nlp,reasoning", "gpt-4", stake_axon=100)
+
+# Send heartbeat (prove liveness, at least once every ~100 blocks)
 client.heartbeat()
 ```
 
@@ -167,7 +244,7 @@ client.heartbeat()
 ```typescript
 import { AgentClient } from '@axon-chain/sdk';
 
-const client = new AgentClient("http://localhost:8545", "0x...");
+const client = new AgentClient("http://72.62.251.50:8545", "0x<YOUR_PRIVATE_KEY>");
 await client.registerAgent("nlp,reasoning", "gpt-4", "100");
 await client.heartbeat();
 ```
@@ -178,8 +255,31 @@ await client.heartbeat();
 axond tx agent register \
   --capabilities "nlp,reasoning" \
   --model "gpt-4" \
-  --stake 100axon \
-  --from my-agent-key
+  --stake 100000000000000000000aaxon \
+  --chain-id axon_8210-1 \
+  --node http://72.62.251.50:26657 \
+  --from <your-key> \
+  --keyring-backend test
+```
+
+### Agent Daemon (Recommended for Production)
+
+```bash
+cd tools/agent-daemon && go build -o agent-daemon .
+
+./agent-daemon \
+  --rpc http://72.62.251.50:8545 \
+  --private-key-file /path/to/your/key.txt \
+  --heartbeat-interval 100
+```
+
+### Agent Lifecycle
+
+```
+Register → Online (continuous heartbeat) → AI Challenge (every Epoch ~1h) → Earn Rewards
+                  ↓                                 ↓
+           Heartbeat timeout → Rep decrease    Challenge fail → Rep decrease
+                                               Cheat detected → Stake slashed
 ```
 
 ---
@@ -249,8 +349,9 @@ Day 1-3    Chain Core Development     ✅ Done
 Day 4-6    Economics + Security       ✅ Done
 Day 7-9    SDK + Docs + Tests         ✅ Done
 Day 10-14  Public Testnet             ✅ Done
-Day 15-21  Mainnet Preparation        ✅ Done
-Day 22-45  Ecosystem + Performance
+Day 15-21  Mainnet Prep + Audit       ✅ Done
+Day 22     Mainnet Launch             ✅ Live
+Day 22-45  Ecosystem + Performance    ← Current
 Day 45+    Full Decentralization
 ```
 

@@ -10,6 +10,25 @@
 
 ---
 
+## 主网已上线
+
+Axon 主网现已运行，单节点验证者出块中。
+
+| 项目 | 值 |
+|------|-----|
+| Chain ID (Cosmos) | `axon_8210-1` |
+| Chain ID (EVM/MetaMask) | `8210` |
+| 原生代币 | `AXON`（最小单位 `aaxon`，18 位精度） |
+| CometBFT RPC | `http://72.62.251.50:26657` |
+| EVM JSON-RPC | `http://72.62.251.50:8545` |
+| EVM WebSocket | `ws://72.62.251.50:8546` |
+| REST API | `http://72.62.251.50:1317` |
+| P2P | `tcp://72.62.251.50:26656` |
+
+**MetaMask 配置：** 网络名称 `Axon Mainnet`，RPC `http://72.62.251.50:8545`，Chain ID `8210`，符号 `AXON`。
+
+---
+
 ## 为什么需要 Axon
 
 AI Agent 正在指数增长，但没有一条链同时满足：
@@ -133,7 +152,59 @@ Operator 密钥泄露 → 损失有日限额上限，Owner/Guardian 可立即冻
 
 ## 快速开始
 
-### Docker（推荐）
+### 连接主网
+
+```bash
+# MetaMask / 任何 EVM 钱包
+RPC URL:  http://72.62.251.50:8545
+Chain ID: 8210
+Symbol:   AXON
+
+# 查询最新区块（curl）
+curl -s http://72.62.251.50:26657/status | jq '.result.sync_info.latest_block_height'
+
+# 查询 EVM 区块号
+curl -s -X POST http://72.62.251.50:8545 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+### 运行验证者节点（加入主网）
+
+```bash
+# 1. 编译
+git clone https://github.com/axon-protocol/axon.git && cd axon
+make build
+
+# 2. 初始化节点
+./build/axond init <your-moniker> --chain-id axon_8210-1
+
+# 3. 复制主网 genesis（从现有节点获取）
+curl -s http://72.62.251.50:26657/genesis | jq '.result.genesis' > ~/.axond/config/genesis.json
+
+# 4. 配置种子节点
+# 在 ~/.axond/config/config.toml 中设置：
+# persistent_peers = "<node-id>@72.62.251.50:26656"
+# 获取 node-id: curl -s http://72.62.251.50:26657/status | jq -r '.result.node_info.id'
+
+# 5. 启动同步
+./build/axond start --home ~/.axond
+
+# 6. 同步完成后，创建验证者
+./build/axond tx staking create-validator \
+  --amount 100000000000000000000aaxon \
+  --pubkey $(./build/axond tendermint show-validator) \
+  --moniker "<your-moniker>" \
+  --chain-id axon_8210-1 \
+  --commission-rate 0.10 \
+  --commission-max-rate 0.20 \
+  --commission-max-change-rate 0.01 \
+  --min-self-delegation 1 \
+  --from <your-key> \
+  --keyring-backend test
+```
+
+### Docker 测试网（本地开发）
 
 ```bash
 docker compose -f testnet/docker-compose.yml up -d
@@ -143,22 +214,29 @@ docker compose -f testnet/docker-compose.yml up -d
 # 区块浏览器: http://localhost:4000
 ```
 
-### 源码构建
+---
 
-```bash
-make build
-bash scripts/local_node.sh
-./build/axond start --home ~/.axond --chain-id axon_9001-1 --json-rpc.enable
-```
+## Agent 接入指南
+
+Agent 要参与 Axon 网络，需要完成 **注册 → 心跳 → 响应 AI 挑战** 三个步骤。
+
+### 前置条件
+
+1. 一个有 AXON 余额的 EVM 账户（至少 100 AXON 用于质押）
+2. 连接到主网 RPC: `http://72.62.251.50:8545`
 
 ### 注册 Agent（Python SDK）
 
 ```python
 from axon import AgentClient
 
-client = AgentClient("http://localhost:8545")
-client.set_account("0x...")
+client = AgentClient("http://72.62.251.50:8545")
+client.set_account("0x<YOUR_PRIVATE_KEY>")
+
+# 注册：质押 100 AXON，声明能力和模型
 client.register_agent("nlp,reasoning", "gpt-4", stake_axon=100)
+
+# 发送心跳（证明在线，每 ~100 个区块至少一次）
 client.heartbeat()
 ```
 
@@ -167,7 +245,7 @@ client.heartbeat()
 ```typescript
 import { AgentClient } from '@axon-chain/sdk';
 
-const client = new AgentClient("http://localhost:8545", "0x...");
+const client = new AgentClient("http://72.62.251.50:8545", "0x<YOUR_PRIVATE_KEY>");
 await client.registerAgent("nlp,reasoning", "gpt-4", "100");
 await client.heartbeat();
 ```
@@ -178,8 +256,47 @@ await client.heartbeat();
 axond tx agent register \
   --capabilities "nlp,reasoning" \
   --model "gpt-4" \
-  --stake 100axon \
-  --from my-agent-key
+  --stake 100000000000000000000aaxon \
+  --chain-id axon_8210-1 \
+  --node http://72.62.251.50:26657 \
+  --from <your-key> \
+  --keyring-backend test
+```
+
+### Agent 守护进程（推荐生产环境使用）
+
+```bash
+# 编译守护进程
+cd tools/agent-daemon && go build -o agent-daemon .
+
+# 运行（自动发送心跳 + 响应 AI 挑战）
+./agent-daemon \
+  --rpc http://72.62.251.50:8545 \
+  --private-key-file /path/to/your/key.txt \
+  --heartbeat-interval 100
+```
+
+### Agent 生命周期
+
+```
+注册 → 在线（持续心跳）→ AI 挑战（每 Epoch ~1h 一次）→ 获得奖励
+                ↓                        ↓
+          心跳超时 → 信誉下降       挑战失败 → 信誉下降
+                                   作弊检测 → 质押罚没
+```
+
+### 预编译合约调用（Solidity）
+
+```solidity
+IAgentRegistry  REGISTRY   = IAgentRegistry(0x0000000000000000000000000000000000000801);
+IAgentReputation REPUTATION = IAgentReputation(0x0000000000000000000000000000000000000802);
+IAgentWallet    WALLET      = IAgentWallet(0x0000000000000000000000000000000000000803);
+
+// 查询 Agent 信誉
+uint256 rep = REPUTATION.getReputation(agentAddress);
+
+// 检查是否为注册 Agent
+bool isAgent = REGISTRY.isAgent(agentAddress);
 ```
 
 ---
@@ -252,9 +369,10 @@ axon/
 Day 1-3    链核心开发              ✅ 完成
 Day 4-6    经济模型 + 安全体系      ✅ 完成
 Day 7-9    SDK + 文档 + 测试       ✅ 完成
-Day 10-14  公开测试网              ← 当前
-Day 15-21  主网准备
-Day 22-45  生态建设 + 性能升级
+Day 10-14  公开测试网              ✅ 完成
+Day 15-21  主网准备 + 安全审计      ✅ 完成
+Day 22     主网上线                ✅ 已上线
+Day 22-45  生态建设 + 性能升级      ← 当前
 Day 45+    全面去中心化
 ```
 
