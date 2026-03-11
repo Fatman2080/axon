@@ -23,7 +23,7 @@ import (
 const (
 	registryAddr    = "0x0000000000000000000000000000000000000801"
 	heartbeatSig    = "0x3defb962" // keccak256("heartbeat()")[:4]
-	isAgentSig      = "0xb4256888" // keccak256("isAgent(address)")[:4]
+	isAgentSig      = "0x1ffbb064" // keccak256("isAgent(address)")[:4]
 	pollInterval    = 2 * time.Second
 	receiptTimeout  = 60 * time.Second
 	receiptPollWait = 3 * time.Second

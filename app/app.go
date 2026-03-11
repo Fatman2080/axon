@@ -442,6 +442,15 @@ func NewAxonApp(
 
 	tracer := cast.ToString(appOpts.Get(srvflags.EVMTracer))
 
+	// ---- Axon Agent keeper (must be created before EVMKeeper so precompiles get a valid storeKey) ----
+
+	app.AgentKeeper = agentkeeper.NewKeeper(
+		appCodec,
+		keys[agenttypes.StoreKey],
+		app.BankKeeper,
+		app.StakingKeeper,
+	)
+
 	app.EVMKeeper = evmkeeper.NewKeeper(
 		appCodec, keys[evmtypes.StoreKey], oKeys[evmtypes.ObjectKey], nonTransientKeys,
 		authtypes.NewModuleAddress(govtypes.ModuleName),
@@ -480,15 +489,6 @@ func NewAxonApp(
 		app.EVMKeeper,
 		app.StakingKeeper,
 		app.TransferKeeper,
-	)
-
-	// ---- Axon Agent keeper ----
-
-	app.AgentKeeper = agentkeeper.NewKeeper(
-		appCodec,
-		keys[agenttypes.StoreKey],
-		app.BankKeeper,
-		app.StakingKeeper,
 	)
 
 	// ---- EVM Hooks: burn 10 AXON on contract deployment + track contributions ----
