@@ -234,6 +234,13 @@ func (k msgServer) RevealAIChallengeResponse(goCtx context.Context, msg *types.M
 	ctx := sdk.UnwrapSDKContext(goCtx)
 	params := k.GetParams(ctx)
 
+	if _, found := k.GetAgent(ctx, msg.Sender); !found {
+		return nil, fmt.Errorf("agent not found: %s", msg.Sender)
+	}
+	if k.HasDeregisterRequest(ctx, msg.Sender) {
+		return nil, fmt.Errorf("agent is deregistering and cannot reveal")
+	}
+
 	challenge, found := k.GetChallenge(ctx, msg.Epoch)
 	if !found {
 		return nil, types.ErrChallengeNotActive

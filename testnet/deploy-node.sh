@@ -94,13 +94,14 @@ if [ -n "$SEEDS" ]; then
     sed -i "s|seeds = \"\"|seeds = \"$SEEDS\"|" "$CONFIG"
 fi
 
-# Listen on all interfaces for public access
-sed -i 's|laddr = "tcp://127.0.0.1:26657"|laddr = "tcp://0.0.0.0:26657"|' "$CONFIG"
+# CometBFT RPC listens on localhost only — reverse proxy for public access
+sed -i 's|laddr = "tcp://127.0.0.1:26657"|laddr = "tcp://127.0.0.1:26657"|' "$CONFIG"
+sed -i 's|laddr = "tcp://0.0.0.0:26657"|laddr = "tcp://127.0.0.1:26657"|' "$CONFIG"
 sed -i 's|addr_book_strict = true|addr_book_strict = false|' "$CONFIG"
 sed -i 's|prometheus = false|prometheus = true|' "$CONFIG"
 sed -i 's|address = "tcp://localhost:1317"|address = "tcp://0.0.0.0:1317"|' "$APP_TOML"
 sed -i 's|address = "localhost:9090"|address = "0.0.0.0:9090"|' "$APP_TOML"
-sed -i "s|minimum-gas-prices = \"\"|minimum-gas-prices = \"0${DENOM}\"|" "$APP_TOML"
+sed -i "s|minimum-gas-prices = \"\"|minimum-gas-prices = \"10000000000${DENOM}\"|" "$APP_TOML"
 
 ok "Node configured"
 
@@ -111,14 +112,13 @@ sudo ufw default deny incoming > /dev/null 2>&1
 sudo ufw default allow outgoing > /dev/null 2>&1
 sudo ufw allow 22/tcp    > /dev/null 2>&1   # SSH
 sudo ufw allow 26656/tcp > /dev/null 2>&1   # P2P
-sudo ufw allow 26657/tcp > /dev/null 2>&1   # CometBFT RPC
 sudo ufw allow 8545/tcp  > /dev/null 2>&1   # JSON-RPC
 sudo ufw allow 8546/tcp  > /dev/null 2>&1   # WebSocket
 sudo ufw allow 1317/tcp  > /dev/null 2>&1   # REST API
 sudo ufw allow 9090/tcp  > /dev/null 2>&1   # gRPC
 sudo ufw allow 26660/tcp > /dev/null 2>&1   # Prometheus
 sudo ufw --force enable  > /dev/null 2>&1
-ok "Firewall configured (SSH, P2P, RPC, JSON-RPC, API open)"
+ok "Firewall configured (SSH, P2P, JSON-RPC, API open; CometBFT RPC localhost-only)"
 
 # ── 8. Systemd service ──────────────────────────────────────
 log "Creating systemd service..."
@@ -138,7 +138,7 @@ ExecStart=/usr/local/bin/axond start \\
     --json-rpc.enable \\
     --json-rpc.address 0.0.0.0:8545 \\
     --json-rpc.ws-address 0.0.0.0:8546 \\
-    --json-rpc.api eth,txpool,personal,net,debug,web3 \\
+    --json-rpc.api eth,txpool,net,web3 \\
     --api.enable \\
     --api.address tcp://0.0.0.0:1317
 Restart=always

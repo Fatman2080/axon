@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	abci "github.com/cometbft/cometbft/abci/types"
 
@@ -78,7 +79,7 @@ func (am AgentAppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONCodec, data 
 
 	var extra genesisExtra
 	if err := json.Unmarshal(data, &extra); err != nil {
-		am.keeper.Logger(ctx).Error("failed to parse genesis extra fields", "error", err)
+		panic(fmt.Sprintf("failed to parse genesis extra fields: %v — this would reset mint caps and cause token over-issuance", err))
 	}
 	if extra.TotalBlockRewardsMinted != "" {
 		v, ok := sdkmath.NewIntFromString(extra.TotalBlockRewardsMinted)

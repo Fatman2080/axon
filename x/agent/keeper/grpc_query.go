@@ -43,12 +43,18 @@ func (k queryServer) Agent(goCtx context.Context, req *types.QueryAgentRequest) 
 	return &types.QueryAgentResponse{Agent: &agent}, nil
 }
 
+const maxAgentsPerQuery = 200
+
 func (k queryServer) Agents(goCtx context.Context, req *types.QueryAgentsRequest) (*types.QueryAgentsResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
 	ctx := sdk.UnwrapSDKContext(goCtx)
-	agents := k.GetAllAgents(ctx)
+	var agents []types.Agent
+	k.IterateAgents(ctx, func(agent types.Agent) bool {
+		agents = append(agents, agent)
+		return len(agents) >= maxAgentsPerQuery
+	})
 	return &types.QueryAgentsResponse{Agents: agents}, nil
 }
 

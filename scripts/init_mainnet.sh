@@ -131,6 +131,13 @@ with open(genesis_path, 'w') as f:
 print("Genesis patched with mainnet parameters.")
 PYTHON_SCRIPT
 
+# ── Patch app.toml for mainnet ──
+APP_TOML="$HOME_DIR/config/app.toml"
+if [ -f "$APP_TOML" ]; then
+    sed -i "s|minimum-gas-prices = \"\"|minimum-gas-prices = \"10000000000${DENOM}\"|" "$APP_TOML"
+    echo "app.toml patched: minimum-gas-prices = 10000000000${DENOM} (10 gwei)"
+fi
+
 echo ""
 echo "=== Mainnet Genesis Configuration ==="
 echo ""

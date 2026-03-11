@@ -233,16 +233,24 @@ func (p Precompile) executeWallet(ctx sdk.Context, contract *vm.Contract, method
 		return nil, fmt.Errorf("only operator can execute")
 	}
 
+	operatorBech32 := sdk.AccAddress(wallet.Operator.Bytes()).String()
+	if _, agentExists := p.keeper.GetAgent(ctx, operatorBech32); !agentExists {
+		return nil, fmt.Errorf("operator agent is no longer registered")
+	}
+
 	channel, hasTrust := p.loadTrustChannel(ctx, walletAddr, target)
+
+	// TrustBlocked never expires — check it before applying expiry logic
+	if hasTrust && channel.Level == TrustBlocked {
+		return nil, fmt.Errorf("target is blacklisted")
+	}
+
 	if hasTrust && channel.ExpiresAt > 0 && ctx.BlockHeight() > channel.ExpiresAt {
 		hasTrust = false
 	}
 
 	if hasTrust {
 		switch channel.Level {
-
-		case TrustBlocked:
-			return nil, fmt.Errorf("target is blacklisted")
 
 		case TrustFull:
 			if err := p.doTransfer(evm, walletAddr, target, value); err != nil {

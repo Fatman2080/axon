@@ -80,7 +80,14 @@ func (k Keeper) DistributeEpochRewards(ctx sdk.Context, epoch uint64) {
 		distributed = distributed.Add(reward)
 	}
 
-	remaining := pool.Sub(distributed)
+	var remaining sdk.Coin
+	if distributed.Amount.GT(pool.Amount) {
+		k.Logger(ctx).Error("distributed exceeds pool — clamping to zero",
+			"pool", pool, "distributed", distributed)
+		remaining = sdk.NewInt64Coin("aaxon", 0)
+	} else {
+		remaining = pool.Sub(distributed)
+	}
 	k.setRewardPool(ctx, remaining)
 
 	ctx.EventManager().EmitEvent(sdk.NewEvent(

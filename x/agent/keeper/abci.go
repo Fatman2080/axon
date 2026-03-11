@@ -28,7 +28,7 @@ func (k Keeper) BeginBlocker(ctx sdk.Context) {
 			}
 			for e := start; e <= currentEpoch; e++ {
 				if e > 1 {
-					k.onEpochStart(ctx, params, e-1)
+					k.onEpochStart(ctx, params, e, e-1)
 				}
 			}
 			k.SetLastProcessedEpoch(ctx, currentEpoch)
@@ -48,8 +48,7 @@ func (k Keeper) EndBlocker(ctx sdk.Context) {
 	}
 }
 
-func (k Keeper) onEpochStart(ctx sdk.Context, params types.Params, previousEpoch uint64) {
-	epoch := k.GetCurrentEpoch(ctx)
+func (k Keeper) onEpochStart(ctx sdk.Context, params types.Params, epoch, previousEpoch uint64) {
 	k.Logger(ctx).Info("new epoch started", "epoch", epoch)
 
 	k.GenerateChallenge(ctx, epoch)
