@@ -151,12 +151,12 @@ func (d *Daemon) Run(ctx context.Context) error {
 }
 
 func (d *Daemon) loop(ctx context.Context) error {
+	const maxBackoff = 300 * time.Second
+
 	var lastHeartbeatBlock uint64
 	var rpcBackoff = pollInterval
 	heartbeatBackoff := pollInterval
 	lastHeartbeatAttempt := time.Now().Add(-maxBackoff)
-
-	const maxBackoff = 300 * time.Second
 
 	for {
 		select {

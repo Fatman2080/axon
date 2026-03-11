@@ -77,7 +77,9 @@ func (am AgentAppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONCodec, data 
 	}
 
 	var extra genesisExtra
-	_ = json.Unmarshal(data, &extra)
+	if err := json.Unmarshal(data, &extra); err != nil {
+		am.keeper.Logger(ctx).Error("failed to parse genesis extra fields", "error", err)
+	}
 	if extra.TotalBlockRewardsMinted != "" {
 		v, ok := sdkmath.NewIntFromString(extra.TotalBlockRewardsMinted)
 		if ok {

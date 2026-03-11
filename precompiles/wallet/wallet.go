@@ -288,10 +288,10 @@ func (p Precompile) setTrust(ctx sdk.Context, contract *vm.Contract, method *abi
 		return nil, fmt.Errorf("only owner can set trust level")
 	}
 
-	trustLevel := TrustLevel(level.Uint64())
-	if trustLevel > TrustFull {
+	if !level.IsUint64() || level.Uint64() > uint64(TrustFull) {
 		return nil, fmt.Errorf("invalid trust level: must be 0-3")
 	}
+	trustLevel := TrustLevel(level.Uint64())
 
 	tc := TrustedChannel{
 		Level:        trustLevel,
@@ -383,6 +383,9 @@ func (p Precompile) recoverWallet(ctx sdk.Context, contract *vm.Contract, method
 	}
 	if contract.Caller() != wallet.Guardian {
 		return nil, fmt.Errorf("only guardian can recover")
+	}
+	if newOperator == (common.Address{}) {
+		return nil, fmt.Errorf("new operator cannot be zero address")
 	}
 
 	wallet.Operator = newOperator

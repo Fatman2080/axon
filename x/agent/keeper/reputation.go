@@ -20,8 +20,7 @@ func (k Keeper) SetAIBonus(ctx sdk.Context, address string, bonus int64) {
 	}
 	store := ctx.KVStore(k.storeKey)
 	bz := make([]byte, 8)
-	// Encode as offset from MinInt64 to avoid implicit two's complement issues
-	binary.BigEndian.PutUint64(bz, uint64(bonus-(-128))+0)
+	binary.BigEndian.PutUint64(bz, uint64(bonus+128))
 	store.Set(types.KeyAIBonus(address), bz)
 }
 

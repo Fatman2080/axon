@@ -157,7 +157,8 @@ func CmdSubmitAIChallenge() *cobra.Command {
 				return fmt.Errorf("invalid epoch: %w", err)
 			}
 
-			hash := sha256.Sum256([]byte(args[1]))
+			commitInput := clientCtx.GetFromAddress().String() + ":" + args[1]
+			hash := sha256.Sum256([]byte(commitInput))
 			commitHash := hex.EncodeToString(hash[:])
 
 			msg := &types.MsgSubmitAIChallengeResponse{
