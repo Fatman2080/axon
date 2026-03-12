@@ -41,16 +41,17 @@ type Precompile struct {
 	keeper keeper.Keeper
 }
 
-func NewPrecompile(k keeper.Keeper) (*Precompile, error) {
+func NewPrecompile(k keeper.Keeper, bankKeeper cmn.BankKeeper) (*Precompile, error) {
 	parsed, err := abi.JSON(strings.NewReader(abiJSON))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse IAgentReputation ABI: %w", err)
 	}
 	return &Precompile{
 		Precompile: cmn.Precompile{
-			KvGasConfig:          storetypes.KVGasConfig(),
-			TransientKVGasConfig: storetypes.GasConfig{},
-			ContractAddress:      address,
+			KvGasConfig:           storetypes.KVGasConfig(),
+			TransientKVGasConfig:  storetypes.GasConfig{},
+			ContractAddress:       address,
+			BalanceHandlerFactory: cmn.NewBalanceHandlerFactory(bankKeeper),
 		},
 		abi:    parsed,
 		keeper: k,

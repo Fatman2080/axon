@@ -3,6 +3,10 @@ package keeper
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"strings"
+
+	sdkmath "cosmossdk.io/math"
 
 	"cosmossdk.io/log/v2"
 	storetypes "cosmossdk.io/store/types"
@@ -147,6 +151,80 @@ func (k Keeper) ImportContractDeployers(ctx sdk.Context, deployers map[string]st
 	for contractAddr, deployerAddr := range deployers {
 		k.SetContractDeployer(ctx, contractAddr, deployerAddr)
 	}
+}
+
+// RegisterFromPrecompile is like MsgServer.Register but deducts stake from
+// fundsSource (the precompile address that already received msg.value via EVM)
+// instead of from the agent's own address, avoiding double deduction.
+func (k Keeper) RegisterFromPrecompile(ctx sdk.Context, msg *types.MsgRegister, fundsSource sdk.AccAddress) (*types.MsgRegisterResponse, error) {
+	params := k.GetParams(ctx)
+
+	if k.IsAgent(ctx, msg.Sender) {
+		return nil, types.ErrAgentAlreadyRegistered
+	}
+
+	if msg.Stake.Denom != "aaxon" {
+		return nil, fmt.Errorf("invalid stake denom: expected aaxon, got %s", msg.Stake.Denom)
+	}
+	minStakeInt := sdkmath.NewIntFromBigInt(new(big.Int).Mul(big.NewInt(int64(params.MinRegisterStake)), oneAxon))
+	minStake := sdk.NewCoin("aaxon", minStakeInt)
+	if msg.Stake.IsLT(minStake) {
+		return nil, types.ErrInsufficientStake
+	}
+
+	if k.GetDailyRegisterCount(ctx, msg.Sender) >= types.MaxDailyRegistrations {
+		return nil, types.ErrDailyRegisterLimitExceeded
+	}
+
+	stakeCoins := sdk.NewCoins(msg.Stake)
+	if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, fundsSource, types.ModuleName, stakeCoins); err != nil {
+		return nil, err
+	}
+
+	burnInt := sdkmath.NewIntFromBigInt(new(big.Int).Mul(big.NewInt(int64(params.RegisterBurnAmount)), oneAxon))
+	burnAmount := sdk.NewCoin("aaxon", burnInt)
+	burnCoins := sdk.NewCoins(burnAmount)
+	if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, burnCoins); err != nil {
+		return nil, err
+	}
+
+	if len(msg.Capabilities) > 1024 {
+		return nil, fmt.Errorf("capabilities too long: max 1024 bytes")
+	}
+	if len(msg.Model) > 256 {
+		return nil, fmt.Errorf("model name too long: max 256 bytes")
+	}
+	capabilities := strings.Split(msg.Capabilities, ",")
+	for i := range capabilities {
+		capabilities[i] = strings.TrimSpace(capabilities[i])
+	}
+
+	agent := types.Agent{
+		Address:          msg.Sender,
+		AgentId:          generateAgentID(msg.Sender, ctx.BlockHeight()),
+		Capabilities:     capabilities,
+		Model:            msg.Model,
+		Reputation:       params.InitialReputation,
+		Status:           types.AgentStatus_AGENT_STATUS_ONLINE,
+		StakeAmount:      msg.Stake,
+		BurnedAtRegister: burnAmount,
+		RegisteredAt:     ctx.BlockHeight(),
+		LastHeartbeat:    ctx.BlockHeight(),
+	}
+
+	k.SetAgent(ctx, agent)
+	k.IncrementDailyRegisterCount(ctx, msg.Sender)
+
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		"agent_registered",
+		sdk.NewAttribute("address", msg.Sender),
+		sdk.NewAttribute("agent_id", agent.AgentId),
+		sdk.NewAttribute("stake", msg.Stake.String()),
+		sdk.NewAttribute("burned", burnAmount.String()),
+		sdk.NewAttribute("reputation", fmt.Sprintf("%d", agent.Reputation)),
+	))
+
+	return &types.MsgRegisterResponse{AgentId: agent.AgentId}, nil
 }
 
 func (k Keeper) GetReputation(ctx sdk.Context, address string) uint64 {

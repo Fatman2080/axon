@@ -152,6 +152,27 @@ Operator key compromised → Loss capped at daily limit, Owner/Guardian can free
 
 ## Quick Start
 
+### Build Install Packages (Validator + Agent)
+
+```bash
+cd axon
+
+# Build both packages (default: current host OS/ARCH)
+make package-all
+
+# Build only one package
+make package-validator
+make package-agent
+
+# If axond cannot be built locally, package a prebuilt binary
+bash scripts/package_validator.sh --binary /path/to/axond
+```
+
+Artifacts are generated in `dist/`:
+
+- `axon-validator-<version>-<os>-<arch>.tar.gz`
+- `axon-agent-daemon-<version>-<os>-<arch>.tar.gz`
+
 ### Connect to Mainnet
 
 ```bash

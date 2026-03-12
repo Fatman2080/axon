@@ -1,6 +1,6 @@
 # Blockscout Block Explorer for Axon Chain
 # Usage: cd explorer && docker compose up -d
-# Access: http://localhost:4000
+# Frontend: http://localhost:3001  API: http://localhost:4000
 
 services:
   db:
@@ -36,7 +36,7 @@ services:
     environment:
       DATABASE_URL: postgresql://blockscout:blockscout@db:5432/blockscout
       ETHEREUM_JSONRPC_VARIANT: geth
-      ETHEREUM_JSONRPC_HTTP_URL: http://host.docker.internal:8545
+      ETHEREUM_JSONRPC_HTTP_URL: ${AXON_RPC:-http://host.docker.internal:8545}
       COIN: AXON
       MIX_ENV: prod
       ECTO_USE_SSL: "false"
@@ -58,23 +58,29 @@ services:
       DATABASE_URL: postgresql://blockscout:blockscout@db:5432/blockscout
 
       ETHEREUM_JSONRPC_VARIANT: geth
-      ETHEREUM_JSONRPC_HTTP_URL: http://host.docker.internal:8545
-      ETHEREUM_JSONRPC_WS_URL: ws://host.docker.internal:8546
-      ETHEREUM_JSONRPC_TRACE_URL: http://host.docker.internal:8545
+      ETHEREUM_JSONRPC_HTTP_URL: ${AXON_RPC:-http://host.docker.internal:8545}
+      ETHEREUM_JSONRPC_WS_URL: ${AXON_WS:-ws://host.docker.internal:8546}
+      ETHEREUM_JSONRPC_TRACE_URL: ${AXON_RPC:-http://host.docker.internal:8545}
 
-      CHAIN_ID: "9001"
+      CHAIN_ID: ${AXON_CHAIN_ID:-8210}
       COIN: AXON
       COIN_NAME: Axon
-      NETWORK: Axon Testnet
-      SUBNETWORK: Axon Local
+      NETWORK: ${AXON_NETWORK_NAME:-Axon Mainnet}
+      SUBNETWORK: ${AXON_SUBNETWORK:-Axon}
 
       LOGO: /images/blockscout_logo.svg
       BLOCKSCOUT_HOST: localhost
       BLOCKSCOUT_PROTOCOL: http
       PORT: "4000"
 
+      FIRST_BLOCK: "1"
       INDEXER_DISABLE_INTERNAL_TRANSACTIONS_FETCHER: "true"
       INDEXER_DISABLE_PENDING_TRANSACTIONS_FETCHER: "true"
+      INDEXER_CATCHUP_BLOCKS_BATCH_SIZE: "10"
+      INDEXER_CATCHUP_BLOCKS_CONCURRENCY: "5"
+      INDEXER_CATCHUP_BLOCK_INTERVAL: "5"
+      INDEXER_COIN_BALANCES_BATCH_SIZE: "5"
+      INDEXER_DISABLE_COIN_BALANCES_INDEX_INTERNAL_TRANSACTIONS: "true"
       FETCH_REWARDS_WAY: manual
 
       POOL_SIZE: "50"
@@ -102,15 +108,15 @@ services:
       NEXT_PUBLIC_API_HOST: localhost
       NEXT_PUBLIC_API_PORT: "4000"
       NEXT_PUBLIC_API_PROTOCOL: http
-      NEXT_PUBLIC_NETWORK_NAME: "Axon Testnet"
+      NEXT_PUBLIC_NETWORK_NAME: ${AXON_NETWORK_NAME:-Axon Mainnet}
       NEXT_PUBLIC_NETWORK_SHORT_NAME: "Axon"
-      NEXT_PUBLIC_NETWORK_ID: "9001"
+      NEXT_PUBLIC_NETWORK_ID: ${AXON_CHAIN_ID:-8210}
       NEXT_PUBLIC_NETWORK_CURRENCY_NAME: "AXON"
       NEXT_PUBLIC_NETWORK_CURRENCY_SYMBOL: "AXON"
       NEXT_PUBLIC_NETWORK_CURRENCY_DECIMALS: "18"
       NEXT_PUBLIC_API_BASE_PATH: /
       NEXT_PUBLIC_HOMEPAGE_CHARTS: "['daily_txs']"
-      NEXT_PUBLIC_IS_TESTNET: "true"
+      NEXT_PUBLIC_IS_TESTNET: ${AXON_IS_TESTNET:-false}
       NEXT_PUBLIC_API_WEBSOCKET_PROTOCOL: ws
       NEXT_PUBLIC_APP_HOST: localhost
       NEXT_PUBLIC_APP_PORT: "3001"

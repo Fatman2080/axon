@@ -2,7 +2,6 @@ package registry
 
 import (
 	"fmt"
-	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -46,16 +45,17 @@ type Precompile struct {
 	keeper keeper.Keeper
 }
 
-func NewPrecompile(k keeper.Keeper) (*Precompile, error) {
+func NewPrecompile(k keeper.Keeper, bankKeeper cmn.BankKeeper) (*Precompile, error) {
 	parsed, err := abi.JSON(strings.NewReader(abiJSON))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse IAgentRegistry ABI: %w", err)
 	}
 	return &Precompile{
 		Precompile: cmn.Precompile{
-			KvGasConfig:          storetypes.KVGasConfig(),
-			TransientKVGasConfig: storetypes.GasConfig{},
-			ContractAddress:      address,
+			KvGasConfig:           storetypes.KVGasConfig(),
+			TransientKVGasConfig:  storetypes.GasConfig{},
+			ContractAddress:       address,
+			BalanceHandlerFactory: cmn.NewBalanceHandlerFactory(bankKeeper),
 		},
 		abi:    parsed,
 		keeper: k,
@@ -92,7 +92,7 @@ func (p Precompile) RequiredGas(input []byte) uint64 {
 
 func (p Precompile) Run(evm *vm.EVM, contract *vm.Contract, readonly bool) ([]byte, error) {
 	return p.RunNativeAction(evm, contract, func(ctx sdk.Context) ([]byte, error) {
-		return p.execute(ctx, contract, readonly)
+		return p.execute(ctx, evm, contract, readonly)
 	})
 }
 
@@ -105,7 +105,7 @@ func (p Precompile) IsTransaction(method *abi.Method) bool {
 	}
 }
 
-func (p Precompile) execute(ctx sdk.Context, contract *vm.Contract, readOnly bool) ([]byte, error) {
+func (p Precompile) execute(ctx sdk.Context, evm *vm.EVM, contract *vm.Contract, readOnly bool) ([]byte, error) {
 	method, args, err := cmn.SetupABI(p.abi, contract, readOnly, p.IsTransaction)
 	if err != nil {
 		return nil, err
@@ -117,13 +117,13 @@ func (p Precompile) execute(ctx sdk.Context, contract *vm.Contract, readOnly boo
 	case GetAgentMethod:
 		return p.getAgent(ctx, method, args)
 	case RegisterMethod:
-		return p.register(ctx, contract, method, args)
+		return p.register(ctx, evm, contract, method, args)
 	case UpdateAgentMethod:
-		return p.updateAgent(ctx, contract, method, args)
+		return p.updateAgent(ctx, evm, contract, method, args)
 	case HeartbeatMethod:
-		return p.heartbeat(ctx, contract, method)
+		return p.heartbeat(ctx, evm, contract, method)
 	case DeregisterMethod:
-		return p.deregister(ctx, contract, method)
+		return p.deregister(ctx, evm, contract, method)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method.Name)
 	}
@@ -168,9 +168,9 @@ func (p Precompile) getAgent(ctx sdk.Context, method *abi.Method, args []interfa
 	)
 }
 
-func (p Precompile) register(ctx sdk.Context, contract *vm.Contract, method *abi.Method, args []interface{}) ([]byte, error) {
-	if len(args) < 3 {
-		return nil, fmt.Errorf("register requires 3 arguments: capabilities, model, stakeAmount")
+func (p Precompile) register(ctx sdk.Context, evm *vm.EVM, contract *vm.Contract, method *abi.Method, args []interface{}) ([]byte, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("register requires 2 arguments: capabilities, model")
 	}
 	capabilities, ok := args[0].(string)
 	if !ok {
@@ -180,21 +180,24 @@ func (p Precompile) register(ctx sdk.Context, contract *vm.Contract, method *abi
 	if !ok {
 		return nil, fmt.Errorf("model: expected string, got %T", args[1])
 	}
-	stakeAmountBig, ok := args[2].(*big.Int)
-	if !ok || stakeAmountBig == nil || stakeAmountBig.Sign() <= 0 {
-		return nil, fmt.Errorf("stakeAmount must be a positive integer")
+
+	msgValue := contract.Value()
+	if msgValue == nil || msgValue.IsZero() {
+		return nil, fmt.Errorf("must send AXON as msg.value for staking")
 	}
 
-	caller := sdk.AccAddress(contract.Caller().Bytes())
-	stakeAmount := sdk.NewCoin("aaxon", sdkmath.NewIntFromBigInt(stakeAmountBig))
+	caller := resolveRegisterSender(evm, contract)
+	stakeAmount := sdk.NewCoin("aaxon", sdkmath.NewIntFromBigInt(msgValue.ToBig()))
 
-	msgServer := keeper.NewMsgServerImpl(p.keeper)
-	resp, err := msgServer.Register(ctx, &types.MsgRegister{
+	// Funds already transferred from sender to precompile address by EVM.
+	// Use RegisterFromPrecompile to deduct from precompile address (not sender).
+	precompileAddr := sdk.AccAddress(address.Bytes())
+	resp, err := p.keeper.RegisterFromPrecompile(ctx, &types.MsgRegister{
 		Sender:       caller.String(),
 		Capabilities: capabilities,
 		Model:        model,
 		Stake:        stakeAmount,
-	})
+	}, precompileAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -203,14 +206,14 @@ func (p Precompile) register(ctx sdk.Context, contract *vm.Contract, method *abi
 	return method.Outputs.Pack()
 }
 
-func (p Precompile) updateAgent(ctx sdk.Context, contract *vm.Contract, method *abi.Method, args []interface{}) ([]byte, error) {
+func (p Precompile) updateAgent(ctx sdk.Context, evm *vm.EVM, contract *vm.Contract, method *abi.Method, args []interface{}) ([]byte, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("updateAgent requires 2 arguments")
 	}
 	capabilities, _ := args[0].(string)
 	model, _ := args[1].(string)
 
-	caller := sdk.AccAddress(contract.Caller().Bytes())
+	caller := p.resolveAgentSender(ctx, evm, contract)
 
 	msgServer := keeper.NewMsgServerImpl(p.keeper)
 	_, err := msgServer.UpdateAgent(ctx, &types.MsgUpdateAgent{
@@ -224,8 +227,8 @@ func (p Precompile) updateAgent(ctx sdk.Context, contract *vm.Contract, method *
 	return method.Outputs.Pack()
 }
 
-func (p Precompile) heartbeat(ctx sdk.Context, contract *vm.Contract, method *abi.Method) ([]byte, error) {
-	caller := sdk.AccAddress(contract.Caller().Bytes())
+func (p Precompile) heartbeat(ctx sdk.Context, evm *vm.EVM, contract *vm.Contract, method *abi.Method) ([]byte, error) {
+	caller := p.resolveAgentSender(ctx, evm, contract)
 
 	msgServer := keeper.NewMsgServerImpl(p.keeper)
 	_, err := msgServer.Heartbeat(ctx, &types.MsgHeartbeat{
@@ -237,8 +240,8 @@ func (p Precompile) heartbeat(ctx sdk.Context, contract *vm.Contract, method *ab
 	return method.Outputs.Pack()
 }
 
-func (p Precompile) deregister(ctx sdk.Context, contract *vm.Contract, method *abi.Method) ([]byte, error) {
-	caller := sdk.AccAddress(contract.Caller().Bytes())
+func (p Precompile) deregister(ctx sdk.Context, evm *vm.EVM, contract *vm.Contract, method *abi.Method) ([]byte, error) {
+	caller := p.resolveAgentSender(ctx, evm, contract)
 
 	msgServer := keeper.NewMsgServerImpl(p.keeper)
 	_, err := msgServer.Deregister(ctx, &types.MsgDeregister{
@@ -248,6 +251,33 @@ func (p Precompile) deregister(ctx sdk.Context, contract *vm.Contract, method *a
 		return nil, err
 	}
 	return method.Outputs.Pack()
+}
+
+// resolveRegisterSender binds new registration to tx origin.
+// This avoids intermediary contracts becoming the newly-registered account.
+func resolveRegisterSender(evm *vm.EVM, contract *vm.Contract) sdk.AccAddress {
+	if evm != nil && evm.Origin != (common.Address{}) {
+		return sdk.AccAddress(evm.Origin.Bytes())
+	}
+	return sdk.AccAddress(contract.Caller().Bytes())
+}
+
+// resolveAgentSender keeps compatibility for historical caller-based registrations:
+// prefer tx origin if registered; otherwise fall back to caller if registered.
+func (p Precompile) resolveAgentSender(ctx sdk.Context, evm *vm.EVM, contract *vm.Contract) sdk.AccAddress {
+	caller := sdk.AccAddress(contract.Caller().Bytes())
+	if evm == nil || evm.Origin == (common.Address{}) {
+		return caller
+	}
+
+	origin := sdk.AccAddress(evm.Origin.Bytes())
+	if p.keeper.IsAgent(ctx, origin.String()) {
+		return origin
+	}
+	if p.keeper.IsAgent(ctx, caller.String()) {
+		return caller
+	}
+	return origin
 }
 
 const abiJSON = `[
@@ -274,12 +304,11 @@ const abiJSON = `[
 	{
 		"inputs": [
 			{"name": "capabilities", "type": "string"},
-			{"name": "model", "type": "string"},
-			{"name": "stakeAmount", "type": "uint256"}
+			{"name": "model", "type": "string"}
 		],
 		"name": "register",
 		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "payable",
 		"type": "function"
 	},
 	{

@@ -230,9 +230,9 @@ contract MyAgentRegistrar {
     IAgentRegistry constant REGISTRY =
         IAgentRegistry(0x0000000000000000000000000000000000000801);
 
-    function registerSelf() external payable {
-        // msg.value must be >= 100 AXON (100 * 10^18 aaxon)
-        REGISTRY.register{value: msg.value}("nlp,reasoning", "gpt-4");
+    function registerSelf(uint256 stakeAmount) external {
+        // stakeAmount is in aaxon (smallest unit), must be >= 100 * 10^18
+        REGISTRY.register("nlp,reasoning", "gpt-4", stakeAmount);
     }
 
     function checkAgent(address account) external view returns (bool) {
@@ -481,20 +481,20 @@ Retrieve the full information of an Agent.
 
 ---
 
-#### `register(string capabilities, string model)` [payable]
+#### `register(string capabilities, string model, uint256 stakeAmount)`
 
-Register as an Agent. `msg.value` must be ≥ 100 AXON (`100 * 10^18 aaxon`). Of this, 20 AXON are permanently burned, and 80 AXON are locked as stake.
+Register as an Agent. `stakeAmount` must be ≥ 100 AXON (`100 * 10^18 aaxon`). 20 AXON are permanently burned and the remainder is locked as stake. This method does **not** use `msg.value`.
 
 ```solidity
 IAgentRegistry(0x0000000000000000000000000000000000000801)
-    .register{value: 100 ether}("nlp,reasoning", "gpt-4");
+    .register("nlp,reasoning", "gpt-4", 100e18);
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `capabilities` | `string` | Comma-separated capability tags |
 | `model` | `string` | AI model identifier |
-| `msg.value` | `uint256` | Stake amount (≥ 100 AXON) |
+| `stakeAmount` | `uint256` | Stake amount in aaxon (≥ 100 AXON) |
 
 ---
 

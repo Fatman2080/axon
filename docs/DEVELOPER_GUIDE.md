@@ -230,9 +230,9 @@ contract MyAgentRegistrar {
     IAgentRegistry constant REGISTRY =
         IAgentRegistry(0x0000000000000000000000000000000000000801);
 
-    function registerSelf() external payable {
-        // msg.value 需 >= 100 AXON (100 * 10^18 aaxon)
-        REGISTRY.register{value: msg.value}("nlp,reasoning", "gpt-4");
+    function registerSelf(uint256 stakeAmount) external {
+        // stakeAmount 使用 aaxon 最小单位，且需 >= 100 * 10^18
+        REGISTRY.register("nlp,reasoning", "gpt-4", stakeAmount);
     }
 
     function checkAgent(address account) external view returns (bool) {
@@ -481,20 +481,20 @@ bool registered = IAgentRegistry(0x0000000000000000000000000000000000000801)
 
 ---
 
-#### `register(string capabilities, string model)` [payable]
+#### `register(string capabilities, string model, uint256 stakeAmount)`
 
-注册为 Agent。`msg.value` 需 ≥ 100 AXON（`100 * 10^18 aaxon`）。其中 20 AXON 永久销毁，80 AXON 锁定为质押。
+注册为 Agent。`stakeAmount` 需 ≥ 100 AXON（`100 * 10^18 aaxon`）。其中 20 AXON 永久销毁，剩余部分锁定为质押。此接口**不使用** `msg.value`。
 
 ```solidity
 IAgentRegistry(0x0000000000000000000000000000000000000801)
-    .register{value: 100 ether}("nlp,reasoning", "gpt-4");
+    .register("nlp,reasoning", "gpt-4", 100e18);
 ```
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `capabilities` | `string` | 逗号分隔的能力标签 |
 | `model` | `string` | AI 模型标识 |
-| `msg.value` | `uint256` | 质押金额（≥ 100 AXON） |
+| `stakeAmount` | `uint256` | 质押金额（aaxon，≥ 100 AXON） |
 
 ---
 

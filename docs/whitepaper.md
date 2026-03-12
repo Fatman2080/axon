@@ -356,8 +356,9 @@ interface IAgentRegistry {
 
     function register(
         string memory capabilities,
-        string memory model
-    ) external payable;
+        string memory model,
+        uint256 stakeAmount
+    ) external;
 
     function updateAgent(
         string memory capabilities,

@@ -152,6 +152,27 @@ Operator 密钥泄露 → 损失有日限额上限，Owner/Guardian 可立即冻
 
 ## 快速开始
 
+### 构建安装包（验证者 + Agent）
+
+```bash
+cd axon
+
+# 同时打包两个安装包（默认当前系统架构）
+make package-all
+
+# 单独打包
+make package-validator
+make package-agent
+
+# 如果本地无法直接编译 axond，可使用已编译二进制打验证者包
+bash scripts/package_validator.sh --binary /path/to/axond
+```
+
+输出目录：`dist/`
+
+- 验证者包：`axon-validator-<version>-<os>-<arch>.tar.gz`
+- Agent 包：`axon-agent-daemon-<version>-<os>-<arch>.tar.gz`
+
 ### 连接主网
 
 ```bash

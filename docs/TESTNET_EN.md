@@ -372,7 +372,11 @@ interface IAgentRegistry {
         string memory capabilities, string memory model,
         uint256 reputation, uint256 stake, uint8 status
     );
-    function register(string calldata capabilities, string calldata model) external payable;
+    function register(
+        string calldata capabilities,
+        string calldata model,
+        uint256 stakeAmount
+    ) external;
     function heartbeat() external;
     function deregister() external;
 }

@@ -22,7 +22,7 @@ func MustGetDefaultNodeHome() string {
 
 func InitAppConfig() (string, interface{}) {
 	srvCfg := serverconfig.DefaultConfig()
-	srvCfg.MinGasPrices = "0" + AxonDenom
+	srvCfg.MinGasPrices = "1000000000" + AxonDenom
 
 	evmCfg := cosmosevmserverconfig.DefaultEVMConfig()
 	evmCfg.EVMChainID = EVMChainID

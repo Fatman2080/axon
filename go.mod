@@ -380,3 +380,5 @@ replace github.com/cosmos/cosmos-sdk/x/group => github.com/cosmos/cosmos-sdk/ent
 replace cosmossdk.io/log/v2 => github.com/cosmos/cosmos-sdk/log/v2 v2.0.2-0.20260302180736-2fbcc8d5f49e
 
 replace cosmossdk.io/x/group => github.com/cosmos/cosmos-sdk/enterprise/group v0.0.0-20260227212600-39d4711b8970
+
+replace github.com/cosmos/evm => ./local_cosmos_evm

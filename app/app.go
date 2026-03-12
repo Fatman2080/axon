@@ -735,7 +735,60 @@ func (app *AxonApp) setPostHandler() {
 func (app *AxonApp) Name() string { return app.BaseApp.Name() }
 
 func (app *AxonApp) BeginBlocker(ctx sdk.Context) (sdk.BeginBlock, error) {
+	app.ensurePrecompilesActive(ctx)
+	app.ensureFeeMarketParams(ctx)
 	return app.ModuleManager.BeginBlock(ctx)
+}
+
+// ensurePrecompilesActive is a one-time migration that activates all static
+// precompiles if the on-chain param list is empty (genesis misconfiguration).
+func (app *AxonApp) ensurePrecompilesActive(ctx sdk.Context) {
+	params := app.EVMKeeper.GetParams(ctx)
+	if len(params.ActiveStaticPrecompiles) > 0 {
+		return
+	}
+	params.ActiveStaticPrecompiles = evmtypes.AvailableStaticPrecompiles
+	if err := app.EVMKeeper.SetParams(ctx, params); err != nil {
+		ctx.Logger().Error("failed to activate static precompiles", "error", err)
+	} else {
+		ctx.Logger().Info("activated static precompiles",
+			"count", len(params.ActiveStaticPrecompiles),
+		)
+	}
+}
+
+// ensureFeeMarketParams is a one-time migration that sets a reasonable
+// min_gas_price and resets base_fee when they are near zero.
+// Without a floor the EIP-1559 base fee decays to zero on idle chains,
+// making all transactions free and disabling the deflationary burn.
+func (app *AxonApp) ensureFeeMarketParams(ctx sdk.Context) {
+	fmParams := app.FeeMarketKeeper.GetParams(ctx)
+
+	minGasTarget := feemarkettypes.DefaultParams().BaseFee
+	needsUpdate := false
+
+	if fmParams.MinGasPrice.IsZero() || fmParams.MinGasPrice.LT(minGasTarget) {
+		fmParams.MinGasPrice = minGasTarget
+		needsUpdate = true
+	}
+
+	if fmParams.BaseFee.LT(minGasTarget) {
+		fmParams.BaseFee = minGasTarget
+		needsUpdate = true
+	}
+
+	if !needsUpdate {
+		return
+	}
+
+	if err := app.FeeMarketKeeper.SetParams(ctx, fmParams); err != nil {
+		ctx.Logger().Error("failed to fix feemarket params", "error", err)
+	} else {
+		ctx.Logger().Info("fixed feemarket params",
+			"min_gas_price", fmParams.MinGasPrice.String(),
+			"base_fee", fmParams.BaseFee.String(),
+		)
+	}
 }
 
 func (app *AxonApp) EndBlocker(ctx sdk.Context) (sdk.EndBlock, error) {
@@ -887,19 +940,19 @@ func axonStaticPrecompiles(
 		govKeeper, slashingKeeper, cdc,
 	)
 
-	reg, err := registryprecompile.NewPrecompile(agentKeeper)
+	reg, err := registryprecompile.NewPrecompile(agentKeeper, bankKeeper)
 	if err != nil {
 		panic(fmt.Sprintf("failed to init registry precompile: %v", err))
 	}
 	defaults[reg.Address()] = reg
 
-	rep, err := reputationprecompile.NewPrecompile(agentKeeper)
+	rep, err := reputationprecompile.NewPrecompile(agentKeeper, bankKeeper)
 	if err != nil {
 		panic(fmt.Sprintf("failed to init reputation precompile: %v", err))
 	}
 	defaults[rep.Address()] = rep
 
-	wal, err := walletprecompile.NewPrecompile(agentKeeper)
+	wal, err := walletprecompile.NewPrecompile(agentKeeper, bankKeeper)
 	if err != nil {
 		panic(fmt.Sprintf("failed to init wallet precompile: %v", err))
 	}

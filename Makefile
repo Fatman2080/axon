@@ -14,7 +14,7 @@ ldflags = -X github.com/cosmos/cosmos-sdk/version.Name=axon \
 
 BUILD_FLAGS := -ldflags '$(ldflags)'
 
-.PHONY: all build install clean test lint proto
+.PHONY: all build install clean test lint proto package-validator package-agent package-all
 
 all: build
 
@@ -146,3 +146,16 @@ monitoring-up:
 
 monitoring-down:
 	@docker compose -f testnet/monitoring/docker-compose.yml down
+
+###############################################################################
+###                            Distribution                                  ###
+###############################################################################
+
+package-validator:
+	@bash scripts/package_validator.sh
+
+package-agent:
+	@bash scripts/package_agent.sh
+
+package-all:
+	@bash scripts/package_all.sh

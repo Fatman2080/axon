@@ -33,12 +33,21 @@ func BlockedAddresses() map[string]bool {
 		blockedAddrs[authtypes.NewModuleAddress(acc).String()] = true
 	}
 
+	axonPrecompiles := map[string]bool{
+		"0x0000000000000000000000000000000000000801": true,
+		"0x0000000000000000000000000000000000000802": true,
+		"0x0000000000000000000000000000000000000803": true,
+	}
+
 	blockedPrecompilesHex := vmtypes.AvailableStaticPrecompiles
 	for _, addr := range corevm.PrecompiledAddressesPrague {
 		blockedPrecompilesHex = append(blockedPrecompilesHex, addr.Hex())
 	}
 
 	for _, precompile := range blockedPrecompilesHex {
+		if axonPrecompiles[precompile] {
+			continue
+		}
 		blockedAddrs[cosmosevmutils.Bech32StringFromHexAddress(precompile)] = true
 	}
 
