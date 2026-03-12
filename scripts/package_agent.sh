@@ -100,7 +100,7 @@ install -m 0755 "bin/agent-daemon" "$TARGET_BIN_DIR/agent-daemon"
 echo "Installed: $TARGET_BIN_DIR/agent-daemon"
 echo
 echo "Example:"
-echo "  $TARGET_BIN_DIR/agent-daemon --rpc http://72.62.251.50:8545 --private-key-file /path/to/key.txt --heartbeat-interval 100"
+echo "  $TARGET_BIN_DIR/agent-daemon --rpc http://mainnet.axonchain.ai:8545 --private-key-file /path/to/key.txt --heartbeat-interval 100"
 EOF
 
 cp "$AGENT_DIR/README.md" "$STAGE_DIR/README.md"

@@ -19,13 +19,13 @@ Axon 主网现已运行，单节点验证者出块中。
 | Chain ID (Cosmos) | `axon_8210-1` |
 | Chain ID (EVM/MetaMask) | `8210` |
 | 原生代币 | `AXON`（最小单位 `aaxon`，18 位精度） |
-| CometBFT RPC | `http://72.62.251.50:26657` |
-| EVM JSON-RPC | `http://72.62.251.50:8545` |
-| EVM WebSocket | `ws://72.62.251.50:8546` |
-| REST API | `http://72.62.251.50:1317` |
-| P2P | `tcp://72.62.251.50:26656` |
+| CometBFT RPC | `http://mainnet.axonchain.ai:26657` |
+| EVM JSON-RPC | `http://mainnet.axonchain.ai:8545` |
+| EVM WebSocket | `ws://mainnet.axonchain.ai:8546` |
+| REST API | `http://mainnet.axonchain.ai:1317` |
+| P2P | `tcp://mainnet.axonchain.ai:26656` |
 
-**MetaMask 配置：** 网络名称 `Axon Mainnet`，RPC `http://72.62.251.50:8545`，Chain ID `8210`，符号 `AXON`。
+**MetaMask 配置：** 网络名称 `Axon Mainnet`，RPC `http://mainnet.axonchain.ai:8545`，Chain ID `8210`，符号 `AXON`。
 
 ---
 
@@ -177,15 +177,15 @@ bash scripts/package_validator.sh --binary /path/to/axond
 
 ```bash
 # MetaMask / 任何 EVM 钱包
-RPC URL:  http://72.62.251.50:8545
+RPC URL:  http://mainnet.axonchain.ai:8545
 Chain ID: 8210
 Symbol:   AXON
 
 # 查询最新区块（curl）
-curl -s http://72.62.251.50:26657/status | jq '.result.sync_info.latest_block_height'
+curl -s http://mainnet.axonchain.ai:26657/status | jq '.result.sync_info.latest_block_height'
 
 # 查询 EVM 区块号
-curl -s -X POST http://72.62.251.50:8545 \
+curl -s -X POST http://mainnet.axonchain.ai:8545 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 ```
@@ -201,12 +201,12 @@ make build
 ./build/axond init <your-moniker> --chain-id axon_8210-1
 
 # 3. 复制主网 genesis（从现有节点获取）
-curl -s http://72.62.251.50:26657/genesis | jq '.result.genesis' > ~/.axond/config/genesis.json
+curl -s http://mainnet.axonchain.ai:26657/genesis | jq '.result.genesis' > ~/.axond/config/genesis.json
 
 # 4. 配置种子节点
 # 在 ~/.axond/config/config.toml 中设置：
-# persistent_peers = "<node-id>@72.62.251.50:26656"
-# 获取 node-id: curl -s http://72.62.251.50:26657/status | jq -r '.result.node_info.id'
+# persistent_peers = "<node-id>@mainnet.axonchain.ai:26656"
+# 获取 node-id: curl -s http://mainnet.axonchain.ai:26657/status | jq -r '.result.node_info.id'
 
 # 5. 启动同步
 ./build/axond start --home ~/.axond
@@ -244,14 +244,14 @@ Agent 要参与 Axon 网络，需要完成 **注册 → 心跳 → 响应 AI 挑
 ### 前置条件
 
 1. 一个有 AXON 余额的 EVM 账户（至少 100 AXON 用于质押）
-2. 连接到主网 RPC: `http://72.62.251.50:8545`
+2. 连接到主网 RPC: `http://mainnet.axonchain.ai:8545`
 
 ### 注册 Agent（Python SDK）
 
 ```python
 from axon import AgentClient
 
-client = AgentClient("http://72.62.251.50:8545")
+client = AgentClient("http://mainnet.axonchain.ai:8545")
 client.set_account("0x<YOUR_PRIVATE_KEY>")
 
 # 注册：质押 100 AXON，声明能力和模型
@@ -266,7 +266,7 @@ client.heartbeat()
 ```typescript
 import { AgentClient } from '@axon-chain/sdk';
 
-const client = new AgentClient("http://72.62.251.50:8545", "0x<YOUR_PRIVATE_KEY>");
+const client = new AgentClient("http://mainnet.axonchain.ai:8545", "0x<YOUR_PRIVATE_KEY>");
 await client.registerAgent("nlp,reasoning", "gpt-4", "100");
 await client.heartbeat();
 ```
@@ -279,7 +279,7 @@ axond tx agent register \
   --model "gpt-4" \
   --stake 100000000000000000000aaxon \
   --chain-id axon_8210-1 \
-  --node http://72.62.251.50:26657 \
+  --node http://mainnet.axonchain.ai:26657 \
   --from <your-key> \
   --keyring-backend test
 ```
@@ -292,7 +292,7 @@ cd tools/agent-daemon && go build -o agent-daemon .
 
 # 运行（自动发送心跳 + 响应 AI 挑战）
 ./agent-daemon \
-  --rpc http://72.62.251.50:8545 \
+  --rpc http://mainnet.axonchain.ai:8545 \
   --private-key-file /path/to/your/key.txt \
   --heartbeat-interval 100
 ```
