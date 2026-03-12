@@ -140,7 +140,6 @@ const Profile = () => {
     if (isVisitorView || !user) return;
     setShowXOnLeaderboard(Boolean(user.showXOnLeaderboard));
   }, [isVisitorView, user]);
-
   const periodToApi = (period: string) => {
     switch (period) {
       case "1D":

@@ -747,6 +747,7 @@ func (s *Server) handleAdminBatchDeleteAgentPool(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_delete_agent_accounts"})
 	}
+	s.reconcileAgentArenaState()
 	logInfo("audit", "admin %s: deleted %d agent accounts", adminID, deleted)
 	return c.JSON(http.StatusOK, echo.Map{"deleted": deleted})
 }
@@ -782,6 +783,7 @@ func (s *Server) handleAdminBatchDeleteUsers(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed_to_delete_users"})
 	}
+	s.reconcileAgentArenaState()
 	logInfo("audit", "admin %s: deleted %d users", adminID, deleted)
 	return c.JSON(http.StatusOK, echo.Map{"deleted": deleted})
 }
@@ -890,6 +892,7 @@ func (s *Server) handleAdminRevokeAgent(c echo.Context) error {
 	if err := s.store.revokeUserAgent(publicKey); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
+	s.reconcileAgentArenaState()
 	adminID := c.Get("subject").(string)
 	logInfo("audit", "admin %s: revoked agent %s", adminID, publicKey)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
@@ -923,6 +926,7 @@ func (s *Server) handleAdminReassignAgent(c echo.Context) error {
 	if err := s.store.reassignAgent(publicKey, userID); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
+	s.reconcileAgentArenaState()
 	adminID := c.Get("subject").(string)
 	logInfo("audit", "admin %s: reassigned agent %s to %s", adminID, publicKey, req.UserName)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
@@ -936,6 +940,7 @@ func (s *Server) handleAdminRevokeUserInvite(c echo.Context) error {
 	if err := s.store.revokeUserInviteCode(userID); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
+	s.reconcileAgentArenaState()
 	adminID := c.Get("subject").(string)
 	logInfo("audit", "admin %s: revoked invite for user %s", adminID, userID)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})
@@ -959,6 +964,7 @@ func (s *Server) handleAdminRevokeUserAgent(c echo.Context) error {
 	if err := s.store.revokeUserAgent(user.AgentPublicKey); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
+	s.reconcileAgentArenaState()
 	adminID := c.Get("subject").(string)
 	logInfo("audit", "admin %s: revoked agent for user %s", adminID, userID)
 	return c.JSON(http.StatusOK, echo.Map{"success": true})

@@ -9,19 +9,19 @@ export interface Vault {
   depositorCount: number;
   performanceHistory: number[]; // 每日收益率历史
   // Equity Breakdown
-  chainBalance: number;    // On-chain Wallet
-  clusterBalance: number;  // Address Cluster
-  hypeBalance: number;     // Hyperliquid Exchange
-  agentBalance: number;    // Agent Cluster Account
+  chainBalance: number; // On-chain Wallet
+  clusterBalance: number; // Address Cluster
+  hypeBalance: number; // Hyperliquid Exchange
+  agentBalance: number; // Agent Cluster Account
 }
 
 export interface Strategy {
   id: string;
   name: string;
   description: string;
-  category: 'arbitrage' | 'trend' | 'grid' | 'martingale';
+  category: "arbitrage" | "trend" | "grid" | "martingale";
   minInvestment: number; // 这里的投资概念变为"最低分配额度"
-  riskLevel: 'low' | 'medium' | 'high';
+  riskLevel: "low" | "medium" | "high";
   expectedReturn: number; // 预期年化收益率
   runningDays: number;
   userCount: number; // 支持者数量 (Stakers/Voters)
@@ -45,8 +45,8 @@ export interface Strategy {
   rating: number;
   reviews: Review[];
   // Agent 提交与审核状态
-  status: 'pending' | 'approved' | 'rejected' | 'active'; 
-  codeType?: 'python' | 'langgraph' | 'api';
+  status: "pending" | "approved" | "rejected" | "active";
+  codeType?: "python" | "langgraph" | "api";
   backtestMetrics?: {
     sharpeRatio: number;
     maxDrawdown: number;
@@ -58,7 +58,7 @@ export interface Strategy {
   };
   vaultAddress?: string;
   evmBalance?: number;
-  agentStatus?: 'inactive' | 'active' | 'revoked';
+  agentStatus?: "inactive" | "active" | "revoked";
   initialCapital?: number;
   lastSyncedAt?: string;
   startedAt?: string;
@@ -78,7 +78,7 @@ export interface Agent {
   strategyId: string;
   userId: string; // Owner/Developer
   publicKey?: string;
-  status: 'running' | 'stopped' | 'error';
+  status: "running" | "stopped" | "error";
   investment: number; // 这里的 investment 实际是指分配到的 TVL
   currentValue: number; // 当前 TVL + 浮盈
   totalProfit: number; // 累计贡献利润
@@ -96,7 +96,7 @@ export interface Agent {
 export interface Trade {
   id: string;
   pair: string;
-  type: 'buy' | 'sell';
+  type: "buy" | "sell";
   amount: number;
   price: number;
   profit: number;
@@ -112,7 +112,7 @@ export interface User {
   xUsername?: string;
   avatar?: string;
   showXOnLeaderboard?: boolean;
-  level: 'basic' | 'premium' | 'vip';
+  level: "basic" | "premium" | "vip";
   // LP 相关
   lpShares: number; // 持有的 HLP 份额
   lpValue: number; // 当前 LP 价值
@@ -127,7 +127,7 @@ export interface User {
   preferences: {
     notifications: boolean;
     autoUpdate: boolean;
-    currency: 'USD' | 'CNY' | 'BTC';
+    currency: "USD" | "CNY" | "BTC";
   };
   agents?: Agent[]; // Fetched from backend
   strategies?: Strategy[]; // Fetched from backend
@@ -156,7 +156,7 @@ export interface AgentMarketItem {
   publicKey: string;
   name?: string;
   description?: string;
-  category?: Strategy['category'];
+  category?: Strategy["category"];
   userId?: string;
   userName?: string;
   avatar?: string;
@@ -164,7 +164,7 @@ export interface AgentMarketItem {
   totalPnL?: number;
   vaultAddress?: string;
   evmBalance?: number;
-  agentStatus?: 'inactive' | 'active' | 'revoked';
+  agentStatus?: "inactive" | "active" | "revoked";
   tvl?: number;
   lastSyncedAt?: string;
   startedAt?: string;
@@ -297,4 +297,48 @@ export interface PlatformStats {
   totalTrades: number;
   growthRate7d: Record<string, number>;
   lastUpdated: string;
+}
+
+export interface AgentArenaSnapshotAgent {
+  id: string;
+  publicKey: string;
+  name: string;
+  userName?: string;
+  accountValue: number;
+  totalPnl: number;
+  status: "idle" | "running" | "phone" | "dead";
+  lastSyncedAt?: string;
+  lastRealizedPnl: number;
+  lastRealizedAt?: string;
+  lastFillId?: string;
+  lastFillTime?: number;
+  updatedAt?: string;
+}
+
+export interface AgentArenaSnapshotResponse {
+  generatedAt: string;
+  syncIntervalSeconds: number;
+  staleAfterSeconds: number;
+  agents: AgentArenaSnapshotAgent[];
+}
+
+export interface AgentArenaStreamEvent {
+  type:
+    | "agent_joined"
+    | "agent_removed"
+    | "agent_state_changed"
+    | "agent_pnl_realized"
+    | "agent_died"
+    | "agent_revived";
+  emittedAt: string;
+  agentId?: string;
+  agent?: AgentArenaSnapshotAgent;
+  pnlDelta?: number;
+  status?: "idle" | "running" | "phone";
+}
+
+export interface AgentArenaStreamMessage {
+  type: "snapshot" | "events";
+  snapshot?: AgentArenaSnapshotResponse;
+  events?: AgentArenaStreamEvent[];
 }

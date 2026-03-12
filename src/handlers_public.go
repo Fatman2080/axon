@@ -30,6 +30,7 @@ type Server struct {
 	syncStop          chan struct{}
 	syncRoundRunning  int32
 	cache             *apiCache
+	arenaHub          *agentArenaHub
 	dbPath            string
 	backupStop        chan struct{}
 	backupRunning     int32
@@ -55,6 +56,8 @@ func (s *Server) registerPublicRoutes(g *echo.Group) {
 
 	g.GET("/agent-market", s.handleAgentMarket)
 	g.GET("/agent-market/:publicKey", s.handleAgentMarketDetail)
+	g.GET("/agent-arena/snapshot", s.handleAgentArenaSnapshot)
+	g.GET("/agent-arena/ws", s.handleAgentArenaWS)
 
 	g.GET("/vault/stats", s.handleVaultStats)
 	g.GET("/daily-slots", s.handleDailySlots)
@@ -121,6 +124,7 @@ func (s *Server) loginWithXIdentity(xID string, xName string, xUsername string, 
 	if xName == "" && displayName != "" {
 		user.Name = displayName
 	}
+	arenaNeedsReconcile := false
 
 	// Invite code is separate from authentication.
 	// If the user hasn't used an invite code yet and one is provided, try to consume it.
@@ -154,12 +158,14 @@ func (s *Server) loginWithXIdentity(xID string, xName string, xUsername string, 
 			user.InviteCodeUsed = invite.Code
 			user.AgentPublicKey = acct.PublicKey
 			user.AgentAssignedAt = acct.AssignedAt
+			arenaNeedsReconcile = true
 		}
 	} else if user.InviteCodeUsed != "" && user.AgentPublicKey == "" {
 		acct, err := s.store.assignUnusedAgentAccount(user.ID)
 		if err == nil {
 			user.AgentPublicKey = acct.PublicKey
 			user.AgentAssignedAt = acct.AssignedAt
+			arenaNeedsReconcile = true
 		}
 	}
 
@@ -167,6 +173,9 @@ func (s *Server) loginWithXIdentity(xID string, xName string, xUsername string, 
 		if err := s.store.saveUser(user); err != nil {
 			return "", User{}, &xLoginError{Status: http.StatusInternalServerError, Code: "failed_to_save_user"}
 		}
+	}
+	if arenaNeedsReconcile {
+		s.reconcileAgentArenaState()
 	}
 
 	token, err := issueToken(s.tokenSecret, user.ID, "user", 72*time.Hour)
@@ -447,6 +456,7 @@ func (s *Server) handleConsumeInviteCode(c echo.Context) error {
 	if getErr == nil {
 		user = latest
 	}
+	s.reconcileAgentArenaState()
 
 	return c.JSON(http.StatusOK, echo.Map{
 		"success":    true,

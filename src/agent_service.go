@@ -226,6 +226,7 @@ func (s *Server) runSyncRound() {
 
 	// --- Phase 4: Refresh public API cache ---
 	s.refreshPublicCache()
+	s.reconcileAgentArenaState()
 
 	elapsed := time.Since(start).Seconds()
 	logInfo("sync", "=== round #%d completed in %.1fs === next in %ds", round, elapsed, s.syncIntervalSecs)

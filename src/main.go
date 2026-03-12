@@ -78,9 +78,11 @@ func main() {
 			FrontendFailureURL: cfg.AppBaseURL + "/auth/x/callback",
 			Scopes:             xoauthScopes,
 		},
-		cache:            newAPICache(),
-		dbPath:           cfg.Storage.DBPath,
+		cache:    newAPICache(),
+		arenaHub: newAgentArenaHub(),
+		dbPath:   cfg.Storage.DBPath,
 	}
+	server.reconcileAgentArenaState()
 
 	// EVM client init is async — it can be slow to dial the RPC endpoint.
 	if server.contractRPCURL != "" && server.contractAllocator != "" {
